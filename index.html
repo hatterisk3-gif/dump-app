@@ -2902,6 +2902,12 @@
       }
     }
 
+    #supple-paste-zone:empty::before {
+      content: attr(data-placeholder);
+      color: rgba(165, 243, 252, 0.78);
+      pointer-events: none;
+    }
+
     /* サプリタブ時は裏の同期くるくるボタンを非表示 */
     #supplement-mode.active ~ #cross-device-sync-btn,
     body:has(#supplement-mode.active) #cross-device-sync-btn {
@@ -9194,29 +9200,20 @@
             <div class="flex items-center gap-2 pt-0.5">
               <button
                 type="button"
-                onclick="searchSuppleByJan()"
-                class="flex-1 py-1.5 px-2.5 rounded-xl bg-cyan-950/80 hover:bg-cyan-900 border border-cyan-700/60 text-cyan-200 text-[11px] font-bold flex items-center justify-center gap-1.5 transition-all active:scale-95"
-              >
-                <span>🔍</span>
-                <span>JANコードから商品名・画像を自動取得</span>
-              </button>
-              <button
-                type="button"
                 onclick="openSuppleJanGoogleImageSearch()"
-                class="py-1.5 px-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 text-[11px] font-bold flex items-center justify-center gap-1 transition-all active:scale-95 shrink-0"
+                class="w-full py-1.5 px-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-[11px] font-bold flex items-center justify-center gap-1.5 transition-all active:scale-95"
                 title="Google画像検索を別画面で開く"
               >
                 <span>🌐</span>
                 <span>Web画像検索</span>
               </button>
             </div>
-            <p id="supple-jan-fetch-status" class="hidden text-[11px] text-cyan-300 font-medium px-1"></p>
           </div>
 
           <!-- 写真設定 -->
           <div>
             <label class="block text-xs font-bold text-cyan-200 mb-1.5">📸 サプリの写真 / アイコン</label>
-            <div class="flex items-center gap-4">
+            <div class="flex items-start gap-4">
               <div class="relative w-18 h-18 rounded-2xl bg-black/40 border-2 border-dashed border-cyan-800/60 flex items-center justify-center overflow-hidden shrink-0">
                 <img id="supple-master-preview" src="" alt="プレビュー" class="w-full h-full object-cover hidden" />
                 <div id="supple-master-placeholder" class="text-slate-400 flex flex-col items-center justify-center text-center">
@@ -9240,15 +9237,40 @@
                     <input type="file" id="supple-master-file-gallery" accept="image/*" class="hidden" onchange="handleSupplePhotoUpload(event)" />
                   </label>
 
-                  <!-- 画像URLを貼る -->
-                  <button type="button" onclick="promptSuppleImageUrl()" class="px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-cyan-200 text-xs font-bold flex items-center gap-1 border border-cyan-900/40 transition-colors active:scale-95 shadow-2xs">
-                    <span>🔗</span>
-                    <span>URL</span>
+                  <!-- Web画像検索 -->
+                  <button type="button" onclick="openSuppleJanGoogleImageSearch()" class="px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-cyan-200 text-xs font-bold flex items-center gap-1 border border-cyan-900/40 transition-colors active:scale-95 shadow-2xs" title="Google画像検索を別画面で開く">
+                    <span>🌐</span>
+                    <span>Web画像検索</span>
                   </button>
 
                   <!-- 削除 -->
                   <button type="button" onclick="clearSupplePhoto()" id="supple-btn-clear-photo" class="hidden text-xs text-rose-400 hover:text-rose-300 font-bold px-1.5 py-1">削除</button>
                 </div>
+
+                <!-- 画像貼り付けスペース -->
+                <div class="space-y-1">
+                  <div class="flex items-center gap-1.5">
+                    <div
+                      id="supple-paste-zone"
+                      contenteditable="true"
+                      inputmode="none"
+                      role="textbox"
+                      aria-label="画像をここに貼り付け"
+                      onpaste="handleSuppleImagePaste(event)"
+                      oninput="handleSupplePasteZoneInput(this)"
+                      class="flex-1 min-h-[40px] px-3 py-2 rounded-xl bg-black/45 border border-dashed border-cyan-600/70 hover:border-cyan-400 focus:border-cyan-300 focus:outline-hidden flex items-center justify-center text-center text-[11px] font-semibold cursor-text transition-colors overflow-hidden"
+                      data-placeholder="📋 ここに画像を貼り付け (Ctrl+V / 長押しペースト)"
+                    ></div>
+                    <button
+                      type="button"
+                      onclick="pasteSuppleImageFromClipboard()"
+                      class="px-2.5 py-2 rounded-xl bg-cyan-950/80 hover:bg-cyan-900 border border-cyan-700/60 text-cyan-200 text-[11px] font-bold whitespace-nowrap shrink-0 active:scale-95 transition-all"
+                      title="クリップボードから画像を貼り付ける"
+                    >📋 貼付</button>
+                  </div>
+                  <p id="supple-paste-status" class="hidden text-[11px] font-medium px-0.5"></p>
+                </div>
+
                 <p class="text-[10px] text-slate-400">またはプリセットから選択：</p>
                 <div class="flex gap-2 flex-wrap" id="supple-preset-container"></div>
               </div>
@@ -60016,39 +60038,120 @@ initFortuneHub();
       });
     }
 
+    const SUPPLE_MAX_IMAGE_DIM = 200;
+    const SUPPLE_MAX_B64_LENGTH = 45000;
+
+    function applySupplePhotoDataUrl(b64, statusMsg) {
+      document.getElementById('supple-master-photo-data').value = b64;
+      const preview = document.getElementById('supple-master-preview');
+      const placeholder = document.getElementById('supple-master-placeholder');
+      const clearBtn = document.getElementById('supple-btn-clear-photo');
+
+      if (preview) { preview.src = b64; preview.classList.remove('hidden'); }
+      if (placeholder) placeholder.classList.add('hidden');
+      if (clearBtn) clearBtn.classList.remove('hidden');
+      document.querySelectorAll('.supple-preset-btn').forEach(btn => btn.style.borderColor = 'transparent');
+
+      if (statusMsg) setSupplePasteStatus(statusMsg, 'success');
+    }
+
+    function setSupplePasteStatus(msg, type = 'info') {
+      const el = document.getElementById('supple-paste-status');
+      if (!el) return;
+      if (!msg) {
+        el.classList.add('hidden');
+        el.textContent = '';
+        return;
+      }
+      el.textContent = msg;
+      el.classList.remove('hidden', 'text-cyan-300', 'text-emerald-300', 'text-rose-400');
+      if (type === 'success') el.classList.add('text-emerald-300');
+      else if (type === 'error') el.classList.add('text-rose-400');
+      else el.classList.add('text-cyan-300');
+    }
+
+    function resizeAndApplySuppleImage(img) {
+      const origW = img.naturalWidth || img.width;
+      const origH = img.naturalHeight || img.height;
+      if (!origW || !origH) return false;
+
+      let maxDim = SUPPLE_MAX_IMAGE_DIM;
+      let quality = 0.85;
+      let b64 = '';
+      let outW = origW;
+      let outH = origH;
+
+      for (let attempt = 0; attempt < 6; attempt++) {
+        if (origW >= origH) {
+          outW = maxDim;
+          outH = Math.max(1, Math.round((origH * maxDim) / origW));
+        } else {
+          outH = maxDim;
+          outW = Math.max(1, Math.round((origW * maxDim) / origH));
+        }
+
+        const canvas = document.createElement('canvas');
+        canvas.width = outW;
+        canvas.height = outH;
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, outW, outH);
+        ctx.drawImage(img, 0, 0, outW, outH);
+        b64 = canvas.toDataURL('image/jpeg', quality);
+
+        if (b64.length <= SUPPLE_MAX_B64_LENGTH) break;
+        if (quality > 0.55) {
+          quality = Math.max(0.5, quality - 0.15);
+        } else {
+          maxDim = Math.max(96, Math.round(maxDim * 0.8));
+        }
+      }
+
+      const kb = Math.max(1, Math.round((b64.length * 3) / 4 / 1024));
+      applySupplePhotoDataUrl(b64, `✅ 画像を設定しました (${origW}×${origH} → ${outW}×${outH}, 約${kb}KB)`);
+      return true;
+    }
+
+    function loadSuppleImageBlob(blob) {
+      if (!blob) return;
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        loadSuppleImageSrc(e.target.result, false);
+      };
+      reader.readAsDataURL(blob);
+    }
+
+    function loadSuppleImageSrc(src, allowUrlFallback = true) {
+      if (!src) return;
+      const img = new Image();
+      if (!src.startsWith('data:')) {
+        img.crossOrigin = 'anonymous';
+      }
+      img.onload = function() {
+        try {
+          resizeAndApplySuppleImage(img);
+        } catch (err) {
+          if (allowUrlFallback && (src.startsWith('http://') || src.startsWith('https://'))) {
+            applySupplePhotoDataUrl(src, '✅ 画像URLを設定しました');
+          } else {
+            setSupplePasteStatus('画像の変換に失敗しました。別の画像を試してください。', 'error');
+          }
+        }
+      };
+      img.onerror = function() {
+        if (allowUrlFallback && (src.startsWith('http://') || src.startsWith('https://'))) {
+          applySupplePhotoDataUrl(src, '✅ 画像URLを設定しました');
+        } else {
+          setSupplePasteStatus('画像の読み込みに失敗しました。画像そのものをコピーして貼り付けてください。', 'error');
+        }
+      };
+      img.src = src;
+    }
+
     function handleSupplePhotoUpload(ev) {
       const file = ev.target.files[0];
       if (!file) return;
-      const reader = new FileReader();
-      reader.onload = function(e) {
-        const img = new Image();
-        img.onload = function() {
-          const canvas = document.createElement('canvas');
-          const maxDim = 200;
-          let w = img.width, h = img.height;
-          if (w > h) {
-            if (w > maxDim) { h = Math.round((h * maxDim) / w); w = maxDim; }
-          } else {
-            if (h > maxDim) { w = Math.round((w * maxDim) / h); h = maxDim; }
-          }
-          canvas.width = w; canvas.height = h;
-          const ctx = canvas.getContext('2d');
-          ctx.drawImage(img, 0, 0, w, h);
-          const b64 = canvas.toDataURL('image/jpeg', 0.85);
-
-          document.getElementById('supple-master-photo-data').value = b64;
-          const preview = document.getElementById('supple-master-preview');
-          const placeholder = document.getElementById('supple-master-placeholder');
-          const clearBtn = document.getElementById('supple-btn-clear-photo');
-
-          if (preview) { preview.src = b64; preview.classList.remove('hidden'); }
-          if (placeholder) placeholder.classList.add('hidden');
-          if (clearBtn) clearBtn.classList.remove('hidden');
-          document.querySelectorAll('.supple-preset-btn').forEach(btn => btn.style.borderColor = 'transparent');
-        };
-        img.src = e.target.result;
-      };
-      reader.readAsDataURL(file);
+      loadSuppleImageBlob(file);
     }
 
     function clearSupplePhoto() {
@@ -60057,6 +60160,9 @@ initFortuneHub();
       if (fCam) fCam.value = '';
       const fGal = document.getElementById('supple-master-file-gallery');
       if (fGal) fGal.value = '';
+      const pasteZone = document.getElementById('supple-paste-zone');
+      if (pasteZone) pasteZone.innerHTML = '';
+      setSupplePasteStatus('');
       const preview = document.getElementById('supple-master-preview');
       const placeholder = document.getElementById('supple-master-placeholder');
       const clearBtn = document.getElementById('supple-btn-clear-photo');
@@ -60073,8 +60179,9 @@ initFortuneHub();
       document.getElementById('supple-master-dose').value = '';
       selectSuppleCategory('ビタミン');
       selectSupplePresetIcon('preset_vitamin');
-      const stEl = document.getElementById('supple-jan-fetch-status');
-      if (stEl) { stEl.classList.add('hidden'); stEl.textContent = ''; }
+      const pasteZone = document.getElementById('supple-paste-zone');
+      if (pasteZone) pasteZone.innerHTML = '';
+      setSupplePasteStatus('');
       const modal = document.getElementById('modal-supple-master');
       if (modal) {
         modal.classList.remove('hidden');
@@ -60213,7 +60320,6 @@ initFortuneHub();
 
       if (suppleCurrentScannerTarget === 'master') {
         document.getElementById('supple-master-barcode').value = barcode;
-        trySuppleAutoFetch(barcode);
       } else {
         const matched = suppleMasters.find(s => s.barcode && s.barcode.trim() === barcode.trim());
         if (matched) {
@@ -60222,7 +60328,6 @@ initFortuneHub();
           if (confirm('バーコード「' + barcode + '」に一致するサプリは未登録です。新しくサプリを登録しますか？')) {
             openSuppleMasterModal();
             document.getElementById('supple-master-barcode').value = barcode;
-            trySuppleAutoFetch(barcode);
           }
         }
       }
@@ -60234,98 +60339,128 @@ initFortuneHub();
       onSuppleBarcodeScanned(val);
     }
 
-    function setSupplePhotoPreviewUrl(url) {
-      if (!url) return;
-      document.getElementById('supple-master-photo-data').value = url;
-      const preview = document.getElementById('supple-master-preview');
-      const placeholder = document.getElementById('supple-master-placeholder');
-      const clearBtn = document.getElementById('supple-btn-clear-photo');
-      if (preview) {
-        preview.src = url;
-        preview.classList.remove('hidden');
-      }
-      if (placeholder) placeholder.classList.add('hidden');
-      if (clearBtn) clearBtn.classList.remove('hidden');
-      document.querySelectorAll('.supple-preset-btn').forEach(btn => btn.style.borderColor = 'transparent');
-    }
-
-    function promptSuppleImageUrl() {
-      const url = prompt('画像のURL (https://...) を貼り付けてください：');
-      if (url && (url.trim().startsWith('http://') || url.trim().startsWith('https://') || url.trim().startsWith('data:image'))) {
-        setSupplePhotoPreviewUrl(url.trim());
-      } else if (url && url.trim()) {
-        alert('有効な画像URL (https://...) を入力してください');
-      }
-    }
-
     function openSuppleJanGoogleImageSearch() {
       const code = (document.getElementById('supple-master-barcode').value || '').trim();
-      if (!code) {
-        alert('先にバーコード(JANコード)を入力またはスキャンしてください');
+      const name = (document.getElementById('supple-master-name').value || '').trim();
+      const query = code || name;
+      if (!query) {
+        alert('先にバーコード(JANコード)またはサプリ名を入力してください');
         return;
       }
-      const url = 'https://www.google.com/search?tbm=isch&q=' + encodeURIComponent(code);
+      const url = 'https://www.google.com/search?tbm=isch&q=' + encodeURIComponent(query);
       window.open(url, '_blank', 'noopener,noreferrer');
     }
 
-    async function searchSuppleByJan() {
-      const code = (document.getElementById('supple-master-barcode').value || '').trim();
-      if (!code) {
-        alert('先にバーコード(JANコード)を入力またはスキャンしてください');
-        return;
-      }
-      const stEl = document.getElementById('supple-jan-fetch-status');
-      if (stEl) {
-        stEl.textContent = '🔍 データベースから検索中...';
-        stEl.classList.remove('hidden');
-      }
-      const found = await trySuppleAutoFetch(code, true);
-      if (!found && stEl) {
-        stEl.innerHTML = '見つかりませんでした。右の「🌐 Web画像検索」から画像を探して保存またはURLコピーしてください。';
-      }
-    }
-
-    async function trySuppleAutoFetch(barcode, manualTrigger = false) {
-      const cleanCode = (barcode || '').trim();
-      if (!cleanCode) return false;
-      const stEl = document.getElementById('supple-jan-fetch-status');
-      const endpoints = [
-        'https://world.openfoodfacts.org/api/v0/product/' + encodeURIComponent(cleanCode) + '.json',
-        'https://world.openproductsfacts.org/api/v0/product/' + encodeURIComponent(cleanCode) + '.json'
-      ];
-      for (const ep of endpoints) {
-        try {
-          const res = await fetch(ep);
-          if (!res.ok) continue;
-          const d = await res.json();
-          if (d && d.status === 1 && d.product) {
-            const p = d.product;
-            const pName = p.product_name_ja || p.product_name || p.generic_name || '';
-            const pImg = p.image_front_small_url || p.image_front_url || p.image_url || '';
-            let updatedAny = false;
-            if (pName) {
-              const nameInput = document.getElementById('supple-master-name');
-              if (nameInput && (!nameInput.value.trim() || manualTrigger)) {
-                nameInput.value = pName;
-                updatedAny = true;
-              }
-            }
-            if (pImg) {
-              setSupplePhotoPreviewUrl(pImg);
-              updatedAny = true;
-            }
-            if (updatedAny) {
-              if (stEl) {
-                stEl.textContent = pImg ? '✅ 商品名と画像を自動取得しました！' : '✅ 商品名を取得しました（画像は未登録のためWeb画像検索をご利用ください）';
-                stEl.classList.remove('hidden');
-              }
+    function extractSuppleImageFromClipboardData(cd) {
+      if (!cd) return false;
+      if (cd.items) {
+        for (const item of cd.items) {
+          if (item.type && item.type.startsWith('image/')) {
+            const file = item.getAsFile();
+            if (file) {
+              loadSuppleImageBlob(file);
               return true;
             }
           }
-        } catch (e) {}
+        }
+      }
+      if (cd.files && cd.files.length > 0) {
+        for (const file of cd.files) {
+          if (file.type && file.type.startsWith('image/')) {
+            loadSuppleImageBlob(file);
+            return true;
+          }
+        }
+      }
+      const html = cd.getData ? cd.getData('text/html') : '';
+      if (html) {
+        const m = html.match(/<img[^>]+src=["']([^"']+)["']/i);
+        if (m && m[1]) {
+          loadSuppleImageSrc(m[1], true);
+          return true;
+        }
+      }
+      const text = (cd.getData ? cd.getData('text/plain') : '').trim();
+      if (text && (text.startsWith('data:image/') || /^https?:\/\/.+\.(png|jpe?g|webp|gif|bmp|avif)(\?.*)?$/i.test(text) || /^https?:\/\//i.test(text))) {
+        loadSuppleImageSrc(text, true);
+        return true;
       }
       return false;
     }
+
+    function handleSuppleImagePaste(ev) {
+      const cd = ev.clipboardData || window.clipboardData;
+      const handled = extractSuppleImageFromClipboardData(cd);
+      if (handled) {
+        ev.preventDefault();
+        const pasteZone = document.getElementById('supple-paste-zone');
+        if (pasteZone) pasteZone.innerHTML = '';
+        return;
+      }
+      ev.preventDefault();
+      const pasteZone = document.getElementById('supple-paste-zone');
+      if (pasteZone) pasteZone.innerHTML = '';
+      setSupplePasteStatus('クリップボードに画像が見つかりませんでした。画像をコピーしてから貼り付けてください。', 'error');
+    }
+
+    function handleSupplePasteZoneInput(el) {
+      if (!el) return;
+      const img = el.querySelector('img');
+      if (img && img.src) {
+        loadSuppleImageSrc(img.src, true);
+      }
+      el.innerHTML = '';
+    }
+
+    async function pasteSuppleImageFromClipboard() {
+      if (!navigator.clipboard || typeof navigator.clipboard.read !== 'function') {
+        const pasteZone = document.getElementById('supple-paste-zone');
+        if (pasteZone) pasteZone.focus();
+        setSupplePasteStatus('上の枠をタップして「ペースト」または Ctrl+V で貼り付けてください。', 'info');
+        return;
+      }
+      try {
+        const items = await navigator.clipboard.read();
+        for (const item of items) {
+          const imgType = item.types.find(t => t.startsWith('image/'));
+          if (imgType) {
+            const blob = await item.getType(imgType);
+            loadSuppleImageBlob(blob);
+            return;
+          }
+        }
+        if (typeof navigator.clipboard.readText === 'function') {
+          const txt = (await navigator.clipboard.readText() || '').trim();
+          if (txt && (txt.startsWith('data:image/') || txt.startsWith('http://') || txt.startsWith('https://'))) {
+            loadSuppleImageSrc(txt, true);
+            return;
+          }
+        }
+        setSupplePasteStatus('クリップボードに画像がありません。画像検索で画像をコピーしてください。', 'error');
+      } catch (err) {
+        const pasteZone = document.getElementById('supple-paste-zone');
+        if (pasteZone) pasteZone.focus();
+        setSupplePasteStatus('上の枠をタップして「ペースト」または Ctrl+V で貼り付けてください。', 'info');
+      }
+    }
+
+    (function initSuppleModalPasteShortcut() {
+      const modal = document.getElementById('modal-supple-master');
+      if (!modal) return;
+      modal.addEventListener('paste', function(ev) {
+        if (ev.target && ev.target.id === 'supple-paste-zone') return;
+        const cd = ev.clipboardData || window.clipboardData;
+        if (!cd || !cd.items) return;
+        for (const item of cd.items) {
+          if (item.type && item.type.startsWith('image/')) {
+            ev.preventDefault();
+            const file = item.getAsFile();
+            if (file) loadSuppleImageBlob(file);
+            return;
+          }
+        }
+      });
+    })();
 </script>
 </body>
 </html>

@@ -2,18 +2,16 @@ const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
 
-// AGY通信局のURL + ?target=DUMP を指定する
+// 🌟 DUMP専用ターゲット指定付きURL
 const GAS_WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbw7y4G2ltoMtBtyu0fqqClXfzOloZMm4fe1bd3zk5epOAoa7glPOcwc_8vAJxIl3lBz/exec?target=DUMP';
 
 const LOCK_FILE = path.join(__dirname, '.watch.lock');
 const TASK_FILE = path.join(__dirname, '.ai_task.txt');
 const DONE_FILE = path.join(__dirname, '.ai_task_done.txt');
 
+// 🌟 画像URL・ID・ローカル保存パスを一時記憶する配列
 let pendingImages = [];
 
-// -------------------------------------------------------------------
-// 🔒 二重起動防止ロック
-// -------------------------------------------------------------------
 function isPidAlive(pid) {
     if (!pid || !Number.isFinite(pid)) return false;
     try {
@@ -34,9 +32,7 @@ function acquireWatchLock() {
             }
         }
         fs.writeFileSync(LOCK_FILE, String(process.pid), 'utf8');
-    } catch (e) {
-        console.warn('⚠️ ロックファイル作成警告:', e.message);
-    }
+    } catch (e) { }
 }
 
 function releaseWatchLock() {
@@ -52,24 +48,81 @@ process.on('exit', releaseWatchLock);
 process.on('SIGINT', () => { releaseWatchLock(); process.exit(0); });
 process.on('SIGTERM', () => { releaseWatchLock(); process.exit(0); });
 
-// -------------------------------------------------------------------
-// 🤖 エディタ（Antigravity IDE）へ指示を貼り付けて完了を待つ処理
-// -------------------------------------------------------------------
-async function runIDEAgent(promptText) {
-    if (fs.existsSync(DONE_FILE)) fs.unlinkSync(DONE_FILE);
+// 📸 Googleドライブの画像をローカルにダウンロードする関数（エディタAIが確実に読めるようにする）
+async function downloadImageToLocal(url, index) {
+    try {
+        const res = await fetch(url, { redirect: 'follow' });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const buffer = Buffer.from(await res.arrayBuffer());
+        const fileName = `line_image_${Date.now()}_${index}.jpg`;
+        const filePath = path.join(__dirname, fileName);
+        fs.writeFileSync(filePath, buffer);
+        console.log(`📥 画像をローカルに保存しました: ${fileName}`);
+        return fileName;
+    } catch (e) {
+        console.warn(`⚠️ 画像のローカル保存に失敗（URL参照にフォールバックします）: ${e.message}`);
+        return null;
+    }
+}
 
-    // 1. プロンプトを .ai_task.txt に保存
+// 🤖 エディタ（Antigravity）を最前面に出して指示を貼り付け・送信する関数
+async function runAIAgent(promptText) {
+    if (fs.existsSync(DONE_FILE)) fs.unlinkSync(DONE_FILE);
     fs.writeFileSync(TASK_FILE, promptText, 'utf8');
 
-    // 2. PowerShellでクリップボードにコピーし、そのまま Ctrl+V と Enter を押す
+    const windowKeyword = path.basename(__dirname); // "dump-app"
+
+    // 2. 該当フォルダ名のウィンドウを最前面に出し、右下のチャット入力欄を自動クリックして Ctrl+V → Enter
     const psScript = `
+Add-Type @"
+using System;
+using System.Runtime.InteropServices;
+public class Win32 {
+  [StructLayout(LayoutKind.Sequential)]
+  public struct RECT { public int Left; public int Top; public int Right; public int Bottom; }
+
+  [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr hWnd);
+  [DllImport("user32.dll")] public static extern bool ShowWindowAsync(IntPtr hWnd, int nCmdShow);
+  [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect);
+  [DllImport("user32.dll")] public static extern bool SetCursorPos(int X, int Y);
+  [DllImport("user32.dll")] public static extern void mouse_event(uint dwFlags, uint dx, uint dy, uint dwData, int dwExtraInfo);
+}
+"@
+
 $text = Get-Content -Path "${TASK_FILE.replace(/\\/g, '\\\\')}" -Raw -Encoding UTF8
 Set-Clipboard -Value $text
-$wshell = New-Object -ComObject wscript.shell
-$wshell.SendKeys('^v')
-Start-Sleep -Milliseconds 400
-$wshell.SendKeys('{ENTER}')
+
+$proc = Get-Process | Where-Object { $_.MainWindowTitle -like "*${windowKeyword}*" } | Select-Object -First 1
+
+if ($proc -and $proc.MainWindowHandle -ne [IntPtr]::Zero) {
+  $hWnd = $proc.MainWindowHandle
+  [Win32]::ShowWindowAsync($hWnd, 9) | Out-Null
+  Start-Sleep -Milliseconds 200
+  [Win32]::SetForegroundWindow($hWnd) | Out-Null
+  Start-Sleep -Milliseconds 400
+
+  # ウィンドウの四隅の座標を取得し、右下（チャット入力欄）を計算して自動クリック
+  $rect = New-Object Win32+RECT
+  [Win32]::GetWindowRect($hWnd, [ref]$rect) | Out-Null
+  $clickX = $rect.Right - 180
+  $clickY = $rect.Bottom - 85
+
+  [Win32]::SetCursorPos($clickX, $clickY) | Out-Null
+  Start-Sleep -Milliseconds 150
+  # 左クリック (MOUSEEVENTF_LEFTDOWN = 0x02, MOUSEEVENTF_LEFTUP = 0x04)
+  [Win32]::mouse_event(0x02, 0, 0, 0, 0)
+  [Win32]::mouse_event(0x04, 0, 0, 0, 0)
+  Start-Sleep -Milliseconds 300
+
+  $wshell = New-Object -ComObject wscript.shell
+  $wshell.SendKeys('^v')
+  Start-Sleep -Milliseconds 400
+  $wshell.SendKeys('{ENTER}')
+} else {
+  Write-Warning "対象のウィンドウ (*${windowKeyword}*) が見つかりませんでした。"
+}
 `;
+
     const psFile = path.join(__dirname, 'tmp_send.ps1');
     fs.writeFileSync(psFile, '\ufeff' + psScript, 'utf8');
     try {
@@ -79,9 +132,8 @@ $wshell.SendKeys('{ENTER}')
     }
     try { fs.unlinkSync(psFile); } catch (e) { }
 
-    console.log('📝 エディタ（Antigravity）に指示を送信しました！');
+    console.log(`📝 エディタ（${windowKeyword}）を最前面に出して指示を送信しました！`);
 
-    // AIが .ai_task_done.txt を作成するまで最大30分待機
     let waitTime = 0;
     while (!fs.existsSync(DONE_FILE) && waitTime < 1800) {
         await new Promise(resolve => setTimeout(resolve, 1000));
@@ -89,12 +141,12 @@ $wshell.SendKeys('{ENTER}')
     }
 
     if (!fs.existsSync(DONE_FILE)) {
-        console.log('⚠️ 待機タイムアウト（応答なし）のためスキップします。');
+        console.log('⚠️ 待機時間を超えましたが、不要なタイムアウト報告はスキップします。');
         try { fs.unlinkSync(TASK_FILE); } catch (e) { }
         return '';
     }
 
-    console.log('✅ エディタでのAI処理が完了しました！');
+    console.log('✅ IDEでのAI処理が完了しました！');
     let aiReportText = '';
     for (let r = 0; r < 5; r++) {
         try {
@@ -107,7 +159,6 @@ $wshell.SendKeys('{ENTER}')
         }
     }
 
-    // 一時ファイルの削除
     for (let r = 0; r < 3; r++) {
         try {
             if (fs.existsSync(TASK_FILE)) fs.unlinkSync(TASK_FILE);
@@ -121,25 +172,36 @@ $wshell.SendKeys('{ENTER}')
     return aiReportText;
 }
 
-// -------------------------------------------------------------------
-// 📡 GAS（スプレッドシート）との通信処理
-// -------------------------------------------------------------------
-async function fetchNextJob() {
-    const response = await fetch(GAS_WEBAPP_URL, { method: 'GET' });
+async function fetchGasJson(options) {
+    const response = await fetch(GAS_WEBAPP_URL, options);
     if (!response.ok) throw new Error(`GAS HTTP ${response.status}`);
-    const data = await response.json();
+    const text = await response.text();
+    return JSON.parse(text);
+}
 
+async function fetchNextJob() {
+    const data = await fetchGasJson({ method: 'GET' });
     if (data.rowIndex > 0) {
         const cmdStr = String(data.command || '').trim();
-        if (cmdStr) return data;
-
-        // 空行だった場合は「処理中」のまま残らないよう即座に完了返し
-        await notifyJobComplete(data.rowIndex, '【スキップ】指示文が空でした。', '', []);
+        if (cmdStr) {
+            return data;
+        } else {
+            await notifyJobComplete(data.rowIndex, '【スキップ】指示文が空のためスキップしました。', '指示文が空のためスキップしました。', []);
+            return null;
+        }
     }
     return null;
 }
 
+let lastNotifiedRow = null;
+let lastNotifiedTime = 0;
+
 async function notifyJobComplete(rowIndex, summary, fullSummary, fileIds) {
+    const now = Date.now();
+    if (lastNotifiedRow === rowIndex && (now - lastNotifiedTime) < 15000) return true;
+    lastNotifiedRow = rowIndex;
+    lastNotifiedTime = now;
+
     const updatePayload = {
         action: 'update',
         row: rowIndex,
@@ -148,7 +210,7 @@ async function notifyJobComplete(rowIndex, summary, fullSummary, fileIds) {
     };
     if (fileIds && fileIds.length > 0) updatePayload.fileIds = fileIds;
 
-    for (let i = 0; i < 5; i++) {
+    for (let retries = 5; retries > 0; retries--) {
         try {
             const res = await fetch(GAS_WEBAPP_URL, {
                 method: 'POST',
@@ -157,98 +219,118 @@ async function notifyJobComplete(rowIndex, summary, fullSummary, fileIds) {
                 redirect: 'manual'
             });
             if (res.status === 200 || res.status === 302 || res.type === 'opaqueredirect') {
-                console.log(`🔔 完了通知をGASへ送信しました (row=${rowIndex})`);
+                console.log(`🔔 完了通知をGASへ送信しました。(row=${rowIndex})`);
                 return true;
             }
         } catch (e) {
             await new Promise(resolve => setTimeout(resolve, 2000));
         }
     }
-    console.error(`❌ GASへの完了通知に失敗しました (row=${rowIndex})`);
     return false;
 }
 
-function getChangedFilesText() {
+function cleanupTempFiles() {
     try {
-        const status = execSync('git status --porcelain', { cwd: __dirname }).toString().trim();
-        if (!status) return '';
-        const files = status.split('\n')
-            .map(line => line.trim().split(/\s+/).pop())
-            .filter(f => f && !f.startsWith('tmp_') && !['.ai_task.txt', '.ai_task_done.txt', '.watch.lock'].includes(f));
-        return files.length > 0 ? `\n【変更ファイル】: ${files.join(', ')}` : '';
-    } catch (e) {
-        return '';
-    }
+        const files = fs.readdirSync(__dirname);
+        files.forEach(file => {
+            const lowerFile = file.toLowerCase();
+            if (lowerFile.startsWith('line_image_') || lowerFile.startsWith('tmp_')) {
+                try { fs.unlinkSync(path.join(__dirname, file)); } catch (e) { }
+            }
+        });
+    } catch (e) { }
 }
 
-// -------------------------------------------------------------------
-// ⚙️ 1件の指示を実行するメインフロー
-// -------------------------------------------------------------------
+function collectGitDiffSummary() {
+    let fileChangesText = '';
+    let changedFilesList = new Set();
+    try {
+        const statusOut = execSync('git status --porcelain', { cwd: __dirname, env: { ...process.env, GIT_PAGER: 'cat' } }).toString().trim();
+        let modified = new Set(), added = new Set(), deleted = new Set();
+        if (statusOut) {
+            statusOut.split('\n').forEach(line => {
+                const parts = line.trim().split(/\s+/);
+                if (parts.length >= 2) {
+                    const status = parts[0].charAt(0);
+                    const file = parts[parts.length - 1];
+                    if (file.startsWith('tmp_') || file.startsWith('line_image_') || file === '.ai_task.txt' || file === '.ai_task_done.txt' || file === '.watch.lock') return;
+                    changedFilesList.add(file);
+                    if (status === 'A' || status === '?') added.add(file);
+                    else if (status === 'D') deleted.add(file);
+                    else modified.add(file);
+                }
+            });
+        }
+        if (modified.size > 0) fileChangesText += `\n【変更】: ${Array.from(modified).join(', ')}`;
+        if (added.size > 0) fileChangesText += `\n【追加】: ${Array.from(added).join(', ')}`;
+        if (deleted.size > 0) fileChangesText += `\n【削除】: ${Array.from(deleted).join(', ')}`;
+    } catch (e) { }
+    return { summaryText: fileChangesText, changedFiles: Array.from(changedFilesList) };
+}
+
 async function processJob(data) {
     const rowIndex = data.rowIndex;
-    const rawCommand = String(data.command || '');
+    const rawCommand = data.command;
     let summaryForLine = '✅ 処理完了';
     let fullSummaryForEmail = '';
     let usedImageIds = [];
 
-    console.log(`🤖 指示を処理開始 (row=${rowIndex}): "${rawCommand.slice(0, 60)}..."`);
+    console.log(`🤖 DUMP指示を処理開始 (row=${rowIndex}): "${String(rawCommand).slice(0, 80)}"`);
 
     try {
-        // 📸 画像URLの受信（一時保持）
-        if (rawCommand.startsWith('[IMAGE_URL:')) {
-            const urlMatch = rawCommand.match(/\[IMAGE_URL:\s*(.*?)\]/);
+        // 📸 1. 画像受信モード
+        if (String(rawCommand).startsWith('[IMAGE_URL:')) {
+            const urlMatch = String(rawCommand).match(/\[IMAGE_URL:\s*(.*?)\]/);
             if (urlMatch && urlMatch[1]) {
                 const url = urlMatch[1];
+                let id = '';
                 const idMatch = url.match(/id=([^&]+)/);
-                pendingImages.push({ url, id: idMatch ? idMatch[1] : '' });
-                console.log(`📸 画像をセットしました（現在 ${pendingImages.length} 枚）`);
-                summaryForLine = `✅ ${pendingImages.length}枚目の画像をセットしました！続けてテキストで指示を送ってください。`;
-            } else {
-                summaryForLine = '【エラー】画像URLを解析できませんでした。';
+                if (idMatch && idMatch[1]) id = idMatch[1];
+
+                const localFile = await downloadImageToLocal(url, pendingImages.length + 1);
+                pendingImages.push({ url, id, localFile });
+                console.log(`📸 DUMP用画像を受信しました（現在 ${pendingImages.length} 枚待機中）`);
+                summaryForLine = `✅ [DUMP] ${pendingImages.length}枚目の画像をセットしました！続けて「Dump 〇〇して」と指示を送ってください。`;
+                fullSummaryForEmail = summaryForLine;
             }
-            fullSummaryForEmail = summaryForLine;
         }
-        // 💬 テキスト指示の実行
+        // 💬 2. テキスト指示モード
         else {
-            const cleanCommand = rawCommand.replace(/\r?\n/g, '、').replace(/"/g, '”');
+            const cleanCommand = String(rawCommand).replace(/\r?\n/g, '、').replace(/"/g, '”');
             let imageContext = '';
 
             if (pendingImages.length > 0) {
-                const urls = pendingImages.map(img => img.url).join('\n');
-                imageContext = `【参考画像】以下のURLを確認して指示を実行してください:\n${urls}\n\n`;
-                usedImageIds = pendingImages.map(img => img.id).filter(Boolean);
+                const fileRefs = pendingImages
+                    .map(img => img.localFile ? `./${img.localFile} (URL: ${img.url})` : img.url)
+                    .join('\n');
+                imageContext = `【重要】ワークスペース内に保存された以下の画像ファイル（またはURL）を視覚的に確認し、参考資料として指示を実行してください。\n参照画像:\n${fileRefs}\n\n`;
+                usedImageIds = pendingImages.map(img => img.id).filter(id => id !== '');
                 pendingImages = [];
             }
 
-            const isDeployCommand = /^\/?deploy$/i.test(cleanCommand.trim()) || cleanCommand.trim() === 'デプロイ';
-            let modifyPrompt = '';
+            const isSlashDeploy = /^\/deploy\b/i.test(cleanCommand.trim());
+            const modifyPrompt = isSlashDeploy
+                ? `/deploy\n\n※デプロイ処理がすべて完了したら、必ず最後に Node.js の \`fs.writeFileSync('.ai_task_done.txt', 'デプロイ完了レポート本文', 'utf8')\` を実行して「.ai_task_done.txt」を作成してください。`
+                : `${imageContext}${cleanCommand}
+【最後に行うことのリスト】
+ 1.修正したら、個所が正しく動作するか自律的にテスト・再修正してください。
+ 2.テストや検証用にスクリプトを作成する場合は、必ず 'tmp_' から始まるファイル名を使用してください。
+ 3.システム動作に関係のない一時ファイルは削除してください。
+ 4.必ず Node.js の \`fs.writeFileSync('.ai_task_done.txt', 'レポート本文', 'utf8')\` を使って詳細の解説レポートを記した「 .ai_task_done.txt 」を作成すること。`;
 
-            if (isDeployCommand) {
-                modifyPrompt = `「.agents/workflows/deploy.md」の手順に従ってデプロイ作業を実行してください。
+            const rawAiOutput = await runAIAgent(modifyPrompt);
+            const aiOutput = (rawAiOutput && rawAiOutput !== '完了') ? rawAiOutput : 'AI処理が完了しました。';
 
-【完了時の必須ルール】
-すべてのデプロイコマンド（clasp push / git push / clasp deploy）が完了したら、必ず Node.js の \`fs.writeFileSync('.ai_task_done.txt', '🚀 DUMPの要約コミットとGitHub・GASへのデプロイが完了しました！\\n（コミット内容の要約）', 'utf8')\` を実行して「.ai_task_done.txt」を作成してください。`;
+            cleanupTempFiles();
+            const diffInfo = collectGitDiffSummary();
+            const shortAiOutput = aiOutput.length > 1500 ? aiOutput.slice(0, 1500) + '\n...(以下省略)' : aiOutput;
+
+            if (isSlashDeploy) {
+                summaryForLine = `🚀 【DUMP デプロイ完了】\n${diffInfo.summaryText}\n\n${shortAiOutput}`;
             } else {
-                modifyPrompt = `${imageContext}${cleanCommand}
-
-【完了時の必須ルール】
-作業が完了したら、必ず Node.js の \`fs.writeFileSync('.ai_task_done.txt', '作業内容の要約レポート', 'utf8')\` を実行して「.ai_task_done.txt」を作成してください（このファイルの作成を合図にLINEへ完了通知が飛びます）。`;
+                summaryForLine = `🛠️ 【DUMP 修正完了】\n${diffInfo.summaryText}\n\n${shortAiOutput}`;
             }
-
-            const aiOutput = await runIDEAgent(modifyPrompt);
-            const changedText = getChangedFilesText();
-            const shortOut = aiOutput.length > 1500 ? aiOutput.slice(0, 1500) + '\n...(省略)' : aiOutput;
-            const safeFullOut = aiOutput.length > 8000 ? aiOutput.slice(0, 8000) + '\n...(省略)' : aiOutput;
-
-            if (aiOutput) {
-                const isDeploy = rawCommand.toLowerCase().includes('deploy') || rawCommand.includes('デプロイ');
-                const title = isDeploy ? '🚀 【DUMP デプロイ完了報告】' : '✅ 【DUMP 修正・作業報告】';
-                summaryForLine = `${title}${changedText}\n\n${shortOut}`;
-                fullSummaryForEmail = `${title}${changedText}\n\n${safeFullOut}`;
-            } else {
-                summaryForLine = '【スキップ】AIからの応答がなかったため通知を省略しました。';
-                fullSummaryForEmail = summaryForLine;
-            }
+            fullSummaryForEmail = summaryForLine;
         }
     } catch (err) {
         console.error('❌ 処理エラー:', err.message);
@@ -259,33 +341,25 @@ async function processJob(data) {
     }
 }
 
-// -------------------------------------------------------------------
-// 🔄 常駐監視ループ
-// -------------------------------------------------------------------
-let isProcessing = false;
-let pollCount = 0;
+async function drainQueue() {
+    while (true) {
+        let job = null;
+        try { job = await fetchNextJob(); } catch (e) { break; }
+        if (!job) break;
+        await processJob(job);
+        await new Promise(resolve => setTimeout(resolve, 1500));
+    }
+}
 
+let isProcessing = false;
 async function loop() {
     if (!isProcessing) {
         isProcessing = true;
-        try {
-            while (true) {
-                const job = await fetchNextJob();
-                if (!job) break;
-                await processJob(job);
-                await new Promise(resolve => setTimeout(resolve, 1500));
-            }
-        } catch (e) {
-            console.warn(`⚠️ ポーリングエラー: ${e.message}`);
-        } finally {
-            isProcessing = false;
-        }
+        try { await drainQueue(); } finally { isProcessing = false; }
     }
-    pollCount++;
-    if (pollCount % 30 === 0) console.log(`💓 待機中... (${pollCount}回)`);
     setTimeout(loop, 1000);
 }
 
 acquireWatchLock();
-console.log('👀 DUMP用 AIブリッジ起動：LINEからの指示を待機中...');
+console.log('👀 DUMP用 AIブリッジ起動：LINEからの指示・画像を待機中...');
 loop();

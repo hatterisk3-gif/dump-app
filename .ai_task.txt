@@ -1,4 +1,0 @@
-「.agents/workflows/deploy.md」の手順に従ってデプロイ作業を実行してください。
-
-【完了時の必須ルール】
-すべてのデプロイコマンド（clasp push / git push / clasp deploy）が完了したら、必ず Node.js の `fs.writeFileSync('.ai_task_done.txt', '🚀 DUMPの要約コミットとGitHub・GASへのデプロイが完了しました！\n（コミット内容の要約）', 'utf8')` を実行して「.ai_task_done.txt」を作成してください。

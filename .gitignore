@@ -3,3 +3,4 @@
 node_modules/
 .ai_task_done.txt
 .watch.lock
+watch.js

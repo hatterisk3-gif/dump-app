@@ -1,0 +1,3 @@
+/deploy
+
+※デプロイ処理がすべて完了したら、必ず最後に Node.js の `fs.writeFileSync('.ai_task_done.txt', 'デプロイ完了レポート本文', 'utf8')` を実行して「.ai_task_done.txt」を作成してください。

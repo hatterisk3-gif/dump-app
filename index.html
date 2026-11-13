@@ -5095,6 +5095,7 @@
 
     // ページを閉じたあとも書き込みが続く（Google Keep 相当）。本文はブラウザ上限 ~64KB
     const KEEPALIVE_WRITE_ACTIONS = new Set([
+      'batch',
       'addInbox',
       'addManyInbox',
       'addDataRecord',
@@ -5204,15 +5205,46 @@
     }
 
     let syncGauge = null;
+    const SYNC_GAUGE_HANDOFF_MS = 4000;
+    const handedOffSyncJobIds = new Set();
 
     function syncGaugeEstimateMs(textLength) {
       const n = Math.max(0, Number(textLength) || 0);
       return Math.min(15000, Math.max(2500, 2200 + n * 3));
     }
 
+    function handoffSyncGaugeToBackground(g) {
+      if (!g || g.handedOff) return;
+      g.handedOff = true;
+      if (g.timer) {
+        clearInterval(g.timer);
+        g.timer = null;
+      }
+      g.jobs.forEach((j) => {
+        if (!j.done) handedOffSyncJobIds.add(j.id);
+      });
+      if (typeof setCrossDeviceSyncStatus === 'function') {
+        setCrossDeviceSyncStatus('クラウド同期中…', 'busy');
+      }
+      const msg = '✓ ' + g.accepted + '件を端末に保存済み（裏で同期中）';
+      const el = g.el;
+      if (el && el.isConnected) {
+        el.className = 'text-sm sm:text-base mt-1 text-center font-bold text-emerald-400';
+        el.textContent = msg;
+        setTimeout(() => {
+          if (el && el.textContent === msg) el.textContent = '';
+        }, 1800);
+      }
+      if (syncGauge === g) syncGauge = null;
+    }
+
     function paintSyncGauge() {
       const g = syncGauge;
       if (!g || !g.el || !g.el.isConnected) return;
+      if (!g.photoProgressText && g.jobs.some((j) => !j.done && j.startedAt && (Date.now() - j.startedAt) >= SYNC_GAUGE_HANDOFF_MS)) {
+        handoffSyncGaugeToBackground(g);
+        return;
+      }
       const sig = g.jobs.map((j) => j.id + ':' + (j.done ? (j.failed ? 'f' : 'd') : 'w')).join('|') + '|' + (g.label || '') + '|' + (g.undoHtml || '');
       if (g.paintSig !== sig) {
         g.paintSig = sig;
@@ -5368,8 +5400,16 @@
 
     function settleSyncGaugeJob(el, jobId, opts) {
       opts = opts || {};
+      const wasHandedOff = !!(jobId && handedOffSyncJobIds.delete(jobId));
       const g = syncGauge;
       if (!g || (el && g.el !== el)) {
+        if (wasHandedOff && !opts.failed) {
+          if (handedOffSyncJobIds.size === 0 && typeof setCrossDeviceSyncStatus === 'function') {
+            const stamp = new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            setCrossDeviceSyncStatus('同期済み ' + stamp, 'ok');
+          }
+          return;
+        }
         if (el && opts.doneText) {
           el.textContent = opts.doneText;
           if (opts.className) el.className = opts.className;
@@ -5410,6 +5450,7 @@
       if (!g || !historyId) return false;
       const removed = g.jobs.filter((j) => j.historyId && j.historyId === historyId);
       if (!removed.length) return false;
+      removed.forEach((j) => handedOffSyncJobIds.delete(j.id));
       const removedCount = removed.reduce((n, j) => n + (j.count || 1), 0);
       g.jobs = g.jobs.filter((j) => j.historyId !== historyId);
       g.accepted = Math.max(0, g.accepted - removedCount);
@@ -6536,6 +6577,43 @@
       return missing;
     }
 
+    function isInputHistoryStoreReadyLocally() {
+      if (inputHistoryStoreEnsured) return true;
+      try {
+        if (localStorage.getItem('input_history_cloud_migrated') === 'true'
+          || localStorage.getItem('input_history_store_ready') === '1'
+          || (cloudInputHistoryCache && cloudInputHistoryCache.live)) {
+          inputHistoryStoreEnsured = true;
+          return true;
+        }
+      } catch (_) {}
+      return false;
+    }
+
+    function markInputHistoryStoreReady() {
+      inputHistoryStoreEnsured = true;
+      try { localStorage.setItem('input_history_store_ready', '1'); } catch (_) {}
+    }
+
+    function buildInputHistoryCloudItems(contents, folder, file) {
+      const chunks = (contents || [])
+        .filter((c) => c && String(c).trim())
+        .filter((c) => typeof isUsableInputHistoryContent === 'function' ? isUsableInputHistoryContent(c) : true);
+      if (!chunks.length) return [];
+      chunks.forEach((content) => {
+        if (typeof clearInputHistoryTombstoneForContent === 'function') {
+          clearInputHistoryTombstoneForContent(content);
+        }
+      });
+      return chunks.map((content) => {
+        const encoded = typeof encodeInputHistoryPayload === 'function'
+          ? encodeInputHistoryPayload(content, folder, file)
+          : '';
+        if (!encoded) return null;
+        return { folder: '__SYSTEM__', file: 'input_history', content: encoded };
+      }).filter(Boolean);
+    }
+
     /** 登録チェックのクラウド同期は DUMP 本体と切り離す（「同期中」が長く残るのを防ぐ） */
     function enqueueInputHistoryCloudSync(contents, folder, file) {
       const chunks = (contents || []).filter((c) => c && String(c).trim());
@@ -7098,26 +7176,68 @@
         }
       }
 
+      const ops = [];
+      let mainOpIndex = 0;
+      let historyStoreOpIndex = -1;
+      let historyWriteOpIndex = -1;
+
       if (directFolder) {
         if (!configData[directFolder]) configData[directFolder] = [];
         if (!configData[directFolder].includes(destFile)) {
           configData[directFolder].push(destFile);
-          const cfgRes = await callAPI('addConfigRecord', { folder: directFolder, file: destFile }, { silent: true });
-          if (isApiFailure(cfgRes)) console.warn('addConfigRecord failed; continuing dump', cfgRes);
+          ops.push({ action: 'addConfigRecord', folder: directFolder, file: destFile });
         }
-        const writeRes = await callAPI('addManyDataRecords', {
+        mainOpIndex = ops.length;
+        ops.push({
+          action: 'addManyDataRecords',
           items: addedChunks.map((content) => ({ folder: directFolder, file: destFile, content }))
-        }, { silent: true });
+        });
+      } else {
+        mainOpIndex = ops.length;
+        ops.push({ action: 'addManyInbox', contents: addedChunks });
+      }
+
+      const historyItems = buildInputHistoryCloudItems(addedChunks, destFolder, destFile);
+      if (historyItems.length > 0) {
+        if (!isInputHistoryStoreReadyLocally()) {
+          historyStoreOpIndex = ops.length;
+          ops.push({ action: 'addConfigRecord', folder: '__SYSTEM__', file: 'input_history' });
+        }
+        historyWriteOpIndex = ops.length;
+        ops.push({ action: 'addManyDataRecords', items: historyItems });
+      }
+
+      let historySyncedInBatch = false;
+      if (ops.length === 1) {
+        const single = ops[0];
+        const writeRes = await callAPI(single.action, single, { silent: true });
         assertWriteResult(writeRes, addedChunks.length);
         returnedIds = Array.isArray(writeRes && writeRes.ids) ? writeRes.ids.map(String) : [];
+      } else {
+        const batchRes = await callAPI('batch', { ops }, { silent: true });
+        if (isApiFailure(batchRes) || !Array.isArray(batchRes && batchRes.results)) {
+          assertWriteResult(batchRes, addedChunks.length);
+        }
+        const mainRes = batchRes.results[mainOpIndex];
+        assertWriteResult(mainRes, addedChunks.length);
+        returnedIds = Array.isArray(mainRes && mainRes.ids) ? mainRes.ids.map(String) : [];
+        if (historyStoreOpIndex >= 0 && !isApiFailure(batchRes.results[historyStoreOpIndex])) {
+          markInputHistoryStoreReady();
+        }
+        if (historyWriteOpIndex >= 0 && !isApiFailure(batchRes.results[historyWriteOpIndex])) {
+          historySyncedInBatch = true;
+          markInputHistoryStoreReady();
+          if (typeof invalidateCloudInputHistoryCache === 'function') {
+            invalidateCloudInputHistoryCache();
+          }
+        }
+      }
+
+      if (directFolder) {
         // purge は本体完了後に裏で（同期中を伸ばさない）
         runInBackground(async () => {
           try { await purgeInboxExactDuplicatesIfEnabled(); } catch (_) {}
         });
-      } else {
-        const writeRes = await callAPI('addManyInbox', { contents: addedChunks }, { silent: true });
-        assertWriteResult(writeRes, addedChunks.length);
-        returnedIds = Array.isArray(writeRes && writeRes.ids) ? writeRes.ids.map(String) : [];
       }
 
       if (job.historyId && cancelledDumpHistoryIds.has(job.historyId)) {
@@ -7163,8 +7283,10 @@
         console.warn('bindDumpIds after dump failed', e);
       }
 
-      // 登録チェックのクラウド同期は裏へ（ここで待たない）
-      enqueueInputHistoryCloudSync(addedChunks, destFolder, destFile);
+      // batch 内で履歴書き込みに失敗した場合のみフォールバック同期
+      if (!historySyncedInBatch && historyItems.length > 0) {
+        enqueueInputHistoryCloudSync(addedChunks, destFolder, destFile);
+      }
       if (job.pendingReplaceId) {
         enqueueInputHistoryDeleteSync(async () => {
           await removeInputHistoryEntry(job.pendingReplaceId);
@@ -47173,7 +47295,7 @@ initFortuneHub();
       );
       localStorage.setItem('lastDumpTime', new Date().toISOString());
       if (typeof recordDumpVolume === 'function') recordDumpVolume(addedChunks);
-      setTimeout(() => { loadStats(); }, 500);
+      setTimeout(() => { loadStats({ skipFetch: true }); }, 500);
 
       let label = `✓ ${addedChunks.length}件を受け付けました`;
       if (replacedDupChunks.length > 0) label += ` (同一 ${replacedDupChunks.length}件は過去を削除して更新)`;
@@ -50618,10 +50740,13 @@ initFortuneHub();
         console.error('Failed to migrate drafts to inbox', e);
       }
     }
-    function loadStats() {
-      fetchOrganizerDataShared({ silent: true }).then((data) => {
-        applyOrganizerData(data);
-      });
+    function loadStats(options) {
+      options = options || {};
+      if (!options.skipFetch) {
+        fetchOrganizerDataShared({ silent: true }).then((data) => {
+          applyOrganizerData(data);
+        });
+      }
       const lastDump = localStorage.getItem('lastDumpTime');
       if (lastDump) {
         const diffMs = new Date() - new Date(lastDump);
@@ -53997,18 +54122,9 @@ initFortuneHub();
     }
     let inputHistoryStoreEnsured = false;
     async function ensureInputHistoryStore() {
-      if (inputHistoryStoreEnsured) return;
-      try {
-        if (localStorage.getItem('input_history_cloud_migrated') === 'true'
-          || localStorage.getItem('input_history_store_ready') === '1'
-          || (cloudInputHistoryCache && cloudInputHistoryCache.live)) {
-          inputHistoryStoreEnsured = true;
-          return;
-        }
-      } catch (_) {}
+      if (isInputHistoryStoreReadyLocally()) return;
       await callAPI('addConfigRecord', { folder: '__SYSTEM__', file: 'input_history' }, { silent: true });
-      inputHistoryStoreEnsured = true;
-      try { localStorage.setItem('input_history_store_ready', '1'); } catch (_) {}
+      markInputHistoryStoreReady();
     }
 
     let cloudInputHistoryCache = { at: 0, live: null, promise: null };
@@ -54646,18 +54762,9 @@ initFortuneHub();
     }
 
     async function syncInputHistoryToCloud(contents, folder, file) {
-      const chunks = (contents || [])
-        .filter((c) => c && String(c).trim())
-        .filter((c) => isUsableInputHistoryContent(c));
-      if (chunks.length === 0) return;
-      chunks.forEach((content) => clearInputHistoryTombstoneForContent(content));
-      await ensureInputHistoryStore();
-      const items = chunks.map((content) => {
-        const encoded = encodeInputHistoryPayload(content, folder, file);
-        if (!encoded) return null;
-        return { folder: '__SYSTEM__', file: 'input_history', content: encoded };
-      }).filter(Boolean);
+      const items = buildInputHistoryCloudItems(contents, folder, file);
       if (!items.length) return;
+      await ensureInputHistoryStore();
       const writeRes = await callAPI('addManyDataRecords', { items }, { silent: true });
       if (isApiFailure(writeRes)) throw new Error('history_cloud_write');
       // pending は merge 側でクラウド反映確認後に外す（先に消すと登録チェックから消える）

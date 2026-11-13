@@ -1,0 +1,1474 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>サプリ管理アプリ - SuppleLog</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- html5-qrcode (バーコード/QRコード スキャナー) -->
+  <script src="https://unpkg.com/html5-qrcode"></script>
+
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Noto+Sans+JP:wght@400;500;700;900&display=swap');
+    
+    * {
+      -webkit-tap-highlight-color: transparent;
+      font-family: 'Plus Jakarta Sans', 'Noto Sans JP', sans-serif;
+    }
+    
+    .fade-in {
+      animation: fadeIn 0.25s ease-out forwards;
+    }
+    .slide-up {
+      animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+    @keyframes slideUp {
+      from { transform: translateY(100%); }
+      to { transform: translateY(0); }
+    }
+    
+    ::-webkit-scrollbar {
+      width: 4px;
+      height: 4px;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 9999px;
+    }
+
+    /* バーコードスキャン用アニメーション枠 */
+    .scanner-laser {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: #10b981;
+      box-shadow: 0 0 8px #10b981, 0 0 16px #34d399;
+      animation: scanLaser 2s infinite ease-in-out;
+    }
+    @keyframes scanLaser {
+      0%, 100% { transform: translateY(20px); opacity: 0.3; }
+      50% { transform: translateY(180px); opacity: 1; }
+    }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 antialiased min-h-screen pb-24 selection:bg-emerald-500 selection:text-white">
+
+  <!-- ヘッダー -->
+  <header class="sticky top-0 z-30 bg-white/85 backdrop-blur-md border-b border-slate-200/80 px-4 py-3 sm:px-6">
+    <div class="max-w-3xl mx-auto flex items-center justify-between">
+      <div class="flex items-center gap-2.5">
+        <div class="w-10 h-10 rounded-2xl bg-gradient-to-tr from-emerald-500 to-teal-400 flex items-center justify-center text-white shadow-md shadow-emerald-200">
+          <i data-lucide="pill" class="w-5 h-5"></i>
+        </div>
+        <div>
+          <h1 class="text-lg font-extrabold tracking-tight text-slate-900 leading-none">サプリアプリ</h1>
+          
+        </div>
+      </div>
+      <div class="flex items-center gap-2">
+        <span id="today-badge" class="text-xs font-semibold px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200/60"></span>
+      </div>
+    </div>
+  </header>
+
+  <!-- メインコンテンツ -->
+  <main class="max-w-3xl mx-auto px-4 sm:px-6 pt-5 space-y-6">
+
+    <!-- 上側：グラフセクション -->
+    <section class="bg-white rounded-3xl p-5 shadow-sm border border-slate-200/70">
+      <div class="flex items-center justify-between mb-4">
+        <div class="flex items-center gap-2">
+          <div class="p-1.5 rounded-lg bg-teal-50 text-teal-600">
+            <i data-lucide="bar-chart-3" class="w-4 h-4"></i>
+          </div>
+          <h2 class="font-bold text-slate-800 text-sm sm:text-base">摂取状況グラフ</h2>
+        </div>
+        <!-- 期間切り替えタブ -->
+        <div class="flex bg-slate-100 p-0.5 rounded-xl text-xs font-semibold text-slate-600">
+          <button id="btn-period-7" onclick="setChartPeriod(7)" class="px-3 py-1 rounded-lg bg-white text-slate-900 shadow-xs transition-all">直近7日</button>
+          <button id="btn-period-30" onclick="setChartPeriod(30)" class="px-3 py-1 rounded-lg text-slate-500 hover:text-slate-800 transition-all">30日</button>
+        </div>
+      </div>
+
+      <!-- グラフ描画エリア -->
+      <div class="relative w-full h-48 sm:h-56">
+        <canvas id="intakeChart"></canvas>
+      </div>
+
+      <!-- 統計サマリーカード -->
+      <div class="grid grid-cols-3 gap-2 mt-4 pt-4 border-t border-slate-100 text-center">
+        <div class="bg-slate-50/70 rounded-2xl p-2.5">
+          <p class="text-[11px] text-slate-400 font-medium">今日の摂取</p>
+          <p id="stat-today-count" class="text-lg font-black text-emerald-600">0<span class="text-xs font-normal text-slate-400 ml-0.5">回</span></p>
+        </div>
+        <div class="bg-slate-50/70 rounded-2xl p-2.5">
+          <p class="text-[11px] text-slate-400 font-medium">今週の合計</p>
+          <p id="stat-week-count" class="text-lg font-black text-teal-600">0<span class="text-xs font-normal text-slate-400 ml-0.5">回</span></p>
+        </div>
+        <div class="bg-slate-50/70 rounded-2xl p-2.5">
+          <p class="text-[11px] text-slate-400 font-medium">登録サプリ種</p>
+          <p id="stat-supple-count" class="text-lg font-black text-slate-700">0<span class="text-xs font-normal text-slate-400 ml-0.5">種</span></p>
+        </div>
+      </div>
+    </section>
+
+    <!-- 摂取履歴タイムライン一覧 -->
+    <section class="space-y-3">
+      <div class="flex items-center justify-between px-1">
+        <div class="flex items-center gap-2">
+          <div class="p-1.5 rounded-lg bg-emerald-50 text-emerald-600">
+            <i data-lucide="history" class="w-4 h-4"></i>
+          </div>
+          <h2 class="font-bold text-slate-800 text-sm sm:text-base">摂取履歴</h2>
+        </div>
+        <span id="history-total-count" class="text-xs text-slate-400 font-medium"></span>
+      </div>
+
+      <!-- 履歴リストコンテナ -->
+      <div id="history-container" class="space-y-4">
+        <!-- JSで動的レンダリング -->
+      </div>
+    </section>
+
+  </main>
+
+  <!-- 右下のフローティングプラスボタン (FAB) -->
+  <button
+    id="fab-add-intake"
+    onclick="openIntakeModal()"
+    class="fixed right-6 bottom-6 z-40 w-14 h-14 rounded-full bg-gradient-to-tr from-emerald-500 to-teal-500 text-white shadow-xl shadow-emerald-500/35 flex items-center justify-center hover:scale-105 active:scale-95 transition-all duration-200 group focus:outline-hidden"
+    aria-label="摂取したサプリを登録"
+  >
+    <i data-lucide="plus" class="w-7 h-7 stroke-[2.5] group-hover:rotate-90 transition-transform duration-300"></i>
+  </button>
+
+
+  <!-- ============================================== -->
+  <!-- ◯ 摂取したサプリ 登録画面 (モーダル / シート)     -->
+  <!-- ============================================== -->
+  <div id="modal-intake" class="fixed inset-0 z-50 hidden bg-slate-900/60 backdrop-blur-xs flex flex-col justify-end sm:justify-center items-center p-0 sm:p-4 fade-in">
+    <div class="bg-white w-full max-w-xl h-full sm:h-[92vh] max-h-[100dvh] rounded-t-3xl sm:rounded-3xl shadow-2xl border border-slate-100 flex flex-col slide-up overflow-hidden">
+      
+      <!-- モーダルヘッダー -->
+      <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+        <div class="flex items-center gap-2.5">
+          <div class="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center">
+            <i data-lucide="check-circle-2" class="w-5 h-5"></i>
+          </div>
+          <div>
+            <h3 class="font-extrabold text-slate-900 text-base">摂取したサプリの記録</h3>
+            <p class="text-xs text-slate-400">日付とサプリを選んで登録します</p>
+          </div>
+        </div>
+        <button onclick="closeIntakeModal()" class="w-8 h-8 rounded-full bg-slate-100 text-slate-400 hover:text-slate-600 flex items-center justify-center transition-colors">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+
+      <!-- モーダルボディ -->
+      <div class="p-5 space-y-4 overflow-y-auto">
+        
+        <!-- 1. 今日の日付（変更可能） -->
+        <div>
+          <label class="block text-xs font-bold text-slate-600 mb-1.5 flex items-center gap-1.5">
+            <i data-lucide="calendar" class="w-3.5 h-3.5 text-slate-400"></i>
+            摂取した日付
+          </label>
+          <input
+            type="date"
+            id="intake-date"
+            class="w-full px-4 py-3 rounded-2xl bg-slate-50 border border-slate-200 text-slate-800 text-sm font-semibold focus:outline-hidden focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 transition-all"
+          />
+        </div>
+
+        <!-- 2. 摂取したサプリ選択 (写真付きカスタムプルダウン & バーコードスキャン) -->
+        <div>
+          <div class="flex items-center justify-between mb-1.5">
+            <label class="block text-xs font-bold text-slate-600 flex items-center gap-1.5">
+              <i data-lucide="package" class="w-3.5 h-3.5 text-slate-400"></i>
+              摂取したサプリを選択
+            </label>
+            <!-- サプリ新規登録への導線 -->
+            <button
+              type="button"
+              onclick="openMasterModal()"
+              class="text-xs font-bold text-emerald-600 hover:text-emerald-700 flex items-center gap-1 hover:underline"
+            >
+              <i data-lucide="plus-circle" class="w-3.5 h-3.5"></i>
+              サプリを新規登録
+            </button>
+          </div>
+
+          <!-- バーコードで一発選択ボタン -->
+          <div class="mb-2">
+            <button
+              type="button"
+              onclick="openBarcodeScanner('intake')"
+              class="w-full py-2.5 px-3 rounded-2xl bg-gradient-to-r from-emerald-500/10 to-teal-500/10 border border-emerald-500/30 text-emerald-700 hover:bg-emerald-500/20 active:scale-[0.99] transition-all flex items-center justify-center gap-2 text-xs font-extrabold shadow-2xs"
+            >
+              <i data-lucide="scan-barcode" class="w-4 h-4 text-emerald-600"></i>
+              バーコードをかざして自動選択
+            </button>
+          </div>
+
+          <!-- カスタムセレクトボックス（クリックで開閉） -->
+          <div class="relative">
+            <button
+              type="button"
+              id="dropdown-trigger"
+              onclick="toggleSupplementDropdown()"
+              class="w-full px-3.5 py-3 rounded-2xl bg-slate-50 border border-slate-200 text-left flex items-center justify-between hover:bg-slate-100/60 transition-all focus:outline-hidden focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500"
+            >
+              <div id="dropdown-selected-content" class="flex items-center gap-3">
+                <span class="text-sm text-slate-400 font-medium">サプリを選択してください</span>
+              </div>
+              <i data-lucide="chevron-down" id="dropdown-arrow" class="w-4 h-4 text-slate-400 transition-transform duration-200"></i>
+            </button>
+
+            <!-- ドロップダウンメニューの選択肢リスト -->
+            <div
+              id="dropdown-menu"
+              class="hidden absolute left-0 right-0 top-full mt-2 z-50 bg-white rounded-2xl shadow-xl border border-slate-200 max-h-60 overflow-y-auto p-1.5 space-y-1 fade-in"
+            >
+              <!-- JSでサプリ一覧を写真付きでレンダリング -->
+            </div>
+          </div>
+          <input type="hidden" id="selected-supple-id" value="" />
+        </div>
+
+        <!-- 3. メモ / 時間（任意） -->
+        <div>
+          <label class="block text-xs font-bold text-slate-600 mb-1.5 flex items-center gap-1.5">
+            <i data-lucide="clock" class="w-3.5 h-3.5 text-slate-400"></i>
+            摂取タイミング / メモ（任意）
+          </label>
+          <div class="flex gap-2">
+            <select id="intake-timing" class="px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs font-medium text-slate-700 focus:outline-hidden focus:ring-2 focus:ring-emerald-500/30">
+              <option value="朝">朝食後</option>
+              <option value="昼">昼食後</option>
+              <option value="夜" selected>夕食後 / 就寝前</option>
+              <option value="運動前後">運動前後</option>
+              <option value="随時">随時</option>
+            </select>
+            <input
+              type="text"
+              id="intake-note"
+              placeholder="例: 1錠、多めの水で"
+              class="flex-1 px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-800 placeholder-slate-400 focus:outline-hidden focus:ring-2 focus:ring-emerald-500/30"
+            />
+          </div>
+        </div>
+
+      </div>
+
+      <!-- モーダルフッター -->
+      <div class="p-4 border-t border-slate-100 bg-slate-50/50 flex items-center gap-3">
+        <button
+          type="button"
+          onclick="closeIntakeModal()"
+          class="flex-1 py-3 px-4 rounded-2xl bg-white border border-slate-200 text-slate-600 text-sm font-bold hover:bg-slate-100 transition-colors"
+        >
+          キャンセル
+        </button>
+        <button
+          type="button"
+          onclick="submitIntake()"
+          class="flex-2 py-3 px-4 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-500 text-white text-sm font-extrabold shadow-lg shadow-emerald-500/25 hover:opacity-95 active:scale-[0.99] transition-all flex items-center justify-center gap-2"
+        >
+          <i data-lucide="check" class="w-4 h-4"></i>
+          登録して戻る
+        </button>
+      </div>
+
+    </div>
+  </div>
+
+
+  <!-- ============================================== -->
+  <!-- ◯ サプリマスター新規登録画面 (写真/名前/カテゴリ/バーコード) -->
+  <!-- ============================================== -->
+  <div id="modal-master" class="fixed inset-0 z-60 hidden bg-slate-900/60 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 fade-in">
+    <div class="bg-white w-full max-w-lg rounded-t-3xl sm:rounded-3xl shadow-2xl border border-slate-100 max-h-[94vh] flex flex-col slide-up overflow-hidden">
+      
+      <!-- ヘッダー -->
+      <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+        <div class="flex items-center gap-2.5">
+          <div class="w-8 h-8 rounded-xl bg-teal-100 text-teal-700 flex items-center justify-center">
+            <i data-lucide="sparkles" class="w-5 h-5"></i>
+          </div>
+          <div>
+            <h3 class="font-extrabold text-slate-900 text-base">新しいサプリを登録</h3>
+            <p class="text-xs text-slate-400">バーコード・写真・名前・カテゴリを設定</p>
+          </div>
+        </div>
+        <button onclick="closeMasterModal()" class="w-8 h-8 rounded-full bg-slate-100 text-slate-400 hover:text-slate-600 flex items-center justify-center transition-colors">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+
+      <!-- 入力フォーム -->
+      <div class="p-5 space-y-4 overflow-y-auto">
+
+        <!-- ★ バーコード登録エリア -->
+        <div class="bg-slate-50 p-3.5 rounded-2xl border border-slate-200">
+          <div class="flex items-center justify-between mb-1.5">
+            <label class="block text-xs font-bold text-slate-700 flex items-center gap-1.5">
+              <i data-lucide="barcode" class="w-3.5 h-3.5 text-emerald-600"></i>
+              バーコード (JANコード)
+            </label>
+            <span class="text-[10px] text-slate-400 font-medium">パッケージのバーコード</span>
+          </div>
+
+          <div class="flex gap-2">
+            <div class="relative flex-1">
+              <input
+                type="text"
+                id="supple-barcode"
+                placeholder="スキャンまたは番号入力 (例: 4987035...)"
+                class="w-full pl-9 pr-3 py-2.5 rounded-xl bg-white border border-slate-200 text-slate-800 text-xs font-mono font-bold focus:outline-hidden focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500"
+              />
+              <i data-lucide="scan" class="w-4 h-4 text-slate-400 absolute left-3 top-3"></i>
+            </div>
+            <button
+              type="button"
+              onclick="openBarcodeScanner('master')"
+              class="px-3 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-sm active:scale-95 transition-all whitespace-nowrap"
+            >
+              <i data-lucide="camera" class="w-3.5 h-3.5"></i>
+              スキャン
+            </button>
+          </div>
+        </div>
+
+        <!-- 写真の設定 -->
+        <div>
+          <label class="block text-xs font-bold text-slate-600 mb-1.5 flex items-center gap-1.5">
+            <i data-lucide="camera" class="w-3.5 h-3.5 text-slate-400"></i>
+            サプリの写真
+          </label>
+          <div class="flex items-center gap-4">
+            <!-- 写真プレビュー -->
+            <div class="relative w-20 h-20 rounded-2xl bg-slate-100 border-2 border-dashed border-slate-300 flex items-center justify-center overflow-hidden shrink-0 group">
+              <img id="supple-photo-preview" src="" alt="プレビュー" class="w-full h-full object-cover hidden" />
+              <div id="supple-photo-placeholder" class="text-slate-400 flex flex-col items-center justify-center gap-1">
+                <i data-lucide="image" class="w-6 h-6"></i>
+                <span class="text-[10px] font-medium">未設定</span>
+              </div>
+            </div>
+
+            <!-- 写真アップロード & プリセット -->
+            <div class="flex-1 space-y-2">
+              <div class="flex flex-wrap items-center gap-2">
+                <!-- カメラ起動 -->
+                <label class="cursor-pointer px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold flex items-center gap-1.5 transition-colors active:scale-95 shadow-2xs">
+                  <i data-lucide="camera" class="w-3.5 h-3.5 text-teal-600"></i>
+                  カメラ起動
+                  <input type="file" id="supple-photo-camera" accept="image/*" capture="environment" class="hidden" onchange="handlePhotoUpload(event)" />
+                </label>
+                <!-- ギャラリーから選ぶ -->
+                <label class="cursor-pointer px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold flex items-center gap-1.5 transition-colors active:scale-95 shadow-2xs">
+                  <i data-lucide="image" class="w-3.5 h-3.5 text-teal-600"></i>
+                  ギャラリーから選ぶ
+                  <input type="file" id="supple-photo-gallery" accept="image/*" class="hidden" onchange="handlePhotoUpload(event)" />
+                </label>
+                <!-- 削除 -->
+                <button type="button" onclick="clearPhoto()" id="btn-clear-photo" class="hidden text-xs text-rose-500 hover:text-rose-600 font-medium px-1 py-0.5">削除</button>
+              </div>
+              <p class="text-[11px] text-slate-400">または下からプリセットアイコンを選択：</p>
+              <div class="flex gap-2" id="preset-icons-container">
+                <!-- JSでプリセットアイコンボタンを生成 -->
+              </div>
+            </div>
+          </div>
+          <input type="hidden" id="supple-photo-data" value="" />
+        </div>
+
+        <!-- 名前 -->
+        <div>
+          <label class="block text-xs font-bold text-slate-600 mb-1.5 flex items-center gap-1.5">
+            <i data-lucide="tag" class="w-3.5 h-3.5 text-slate-400"></i>
+            サプリ名 <span class="text-rose-500">*</span>
+          </label>
+          <input
+            type="text"
+            id="supple-name"
+            placeholder="例: ビタミンC 1000mg、亜鉛サプリ"
+            class="w-full px-4 py-3 rounded-2xl bg-slate-50 border border-slate-200 text-slate-800 text-sm font-semibold focus:outline-hidden focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500 transition-all"
+          />
+        </div>
+
+        <!-- カテゴリ -->
+        <div>
+          <label class="block text-xs font-bold text-slate-600 mb-1.5 flex items-center gap-1.5">
+            <i data-lucide="folder-heart" class="w-3.5 h-3.5 text-slate-400"></i>
+            カテゴリ <span class="text-rose-500">*</span>
+          </label>
+          <div class="grid grid-cols-3 gap-2" id="category-selector">
+            <!-- JSで選択肢ボタンを生成 -->
+          </div>
+          <input type="hidden" id="supple-category" value="ビタミン" />
+        </div>
+
+        <!-- 目安量・メモ（任意） -->
+        <div>
+          <label class="block text-xs font-bold text-slate-600 mb-1.5 flex items-center gap-1.5">
+            <i data-lucide="file-text" class="w-3.5 h-3.5 text-slate-400"></i>
+            目安量・メモ（任意）
+          </label>
+          <input
+            type="text"
+            id="supple-standard-dose"
+            placeholder="例: 1日1回 2粒"
+            class="w-full px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-slate-800 text-xs focus:outline-hidden focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500 transition-all"
+          />
+        </div>
+
+      </div>
+
+      <!-- フッター -->
+      <div class="p-4 border-t border-slate-100 bg-slate-50/50 flex items-center gap-3">
+        <button
+          type="button"
+          onclick="closeMasterModal()"
+          class="flex-1 py-3 px-4 rounded-2xl bg-white border border-slate-200 text-slate-600 text-sm font-bold hover:bg-slate-100 transition-colors"
+        >
+          戻る
+        </button>
+        <button
+          type="button"
+          onclick="submitMasterSupplement()"
+          class="flex-2 py-3 px-4 rounded-2xl bg-gradient-to-r from-teal-500 to-emerald-500 text-white text-sm font-extrabold shadow-lg shadow-teal-500/25 hover:opacity-95 active:scale-[0.99] transition-all flex items-center justify-center gap-2"
+        >
+          <i data-lucide="save" class="w-4 h-4"></i>
+          サプリを登録
+        </button>
+      </div>
+
+    </div>
+  </div>
+
+
+  <!-- ============================================== -->
+  <!-- ◯ バーコードスキャナー モーダル (カメラ / 手動入力)  -->
+  <!-- ============================================== -->
+  <div id="modal-scanner" class="fixed inset-0 z-70 hidden bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4 fade-in">
+    <div class="bg-slate-900 w-full max-w-sm rounded-3xl shadow-2xl border border-slate-800 overflow-hidden flex flex-col text-white">
+      
+      <!-- スキャナーヘッダー -->
+      <div class="px-5 py-4 border-b border-slate-800 flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <div class="p-1.5 rounded-xl bg-emerald-500/20 text-emerald-400">
+            <i data-lucide="scan-barcode" class="w-4 h-4"></i>
+          </div>
+          <div>
+            <h4 class="font-extrabold text-sm" id="scanner-title">バーコードをスキャン</h4>
+            <p class="text-[11px] text-slate-400" id="scanner-subtitle">カメラをバーコードに合わせてください</p>
+          </div>
+        </div>
+        <button onclick="closeBarcodeScanner()" class="w-8 h-8 rounded-full bg-slate-800 text-slate-400 hover:text-white flex items-center justify-center transition-colors">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+
+      <!-- カメラ映像コンテナ -->
+      <div class="relative bg-black flex items-center justify-center min-h-[260px] overflow-hidden">
+        <div id="barcode-reader" class="w-full h-full"></div>
+        
+        <!-- レーザーアニメーション線 -->
+        <div class="scanner-laser pointer-events-none"></div>
+
+        <!-- ガイドオーバーレイ -->
+        <div class="absolute inset-x-8 inset-y-10 border-2 border-dashed border-emerald-400/70 rounded-2xl pointer-events-none flex items-center justify-center">
+          <span class="bg-black/60 text-emerald-300 text-[10px] font-bold px-2 py-1 rounded-full backdrop-blur-xs">JAN / バーコード</span>
+        </div>
+      </div>
+
+      <!-- 手動入力 & カメラ切り替えフッター -->
+      <div class="p-4 bg-slate-900 space-y-3">
+        <div class="flex items-center justify-between text-xs text-slate-400">
+          <span>カメラが起動しない・認識しにくい場合：</span>
+        </div>
+        
+        <div class="flex gap-2">
+          <input
+            type="text"
+            id="scanner-manual-input"
+            placeholder="バーコード番号を直接入力"
+            class="flex-1 px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 text-white text-xs font-mono placeholder-slate-500 focus:outline-hidden focus:border-emerald-500"
+          />
+          <button
+            type="button"
+            onclick="submitManualBarcodeInput()"
+            class="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold active:scale-95 transition-all"
+          >
+            決定
+          </button>
+        </div>
+
+        <button
+          type="button"
+          onclick="closeBarcodeScanner()"
+          class="w-full py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition-colors"
+        >
+          閉じる
+        </button>
+      </div>
+
+    </div>
+  </div>
+
+
+  <!-- トースト通知 -->
+  <div id="toast" class="fixed top-5 left-1/2 -translate-x-1/2 z-80 hidden px-4 py-2.5 rounded-full bg-slate-900/95 text-white text-xs font-bold shadow-xl flex items-center gap-2 backdrop-blur-md fade-in border border-slate-700">
+    <i data-lucide="check-circle" class="w-4 h-4 text-emerald-400"></i>
+    <span id="toast-message">保存しました</span>
+  </div>
+
+  <!-- アプリスクリプト -->
+  <script>
+    // ==========================================
+    // データモデル & ストレージ管理
+    // ==========================================
+    const STORAGE_KEY_SUPPLEMENTS = 'supple_app_masters_v2';
+    const STORAGE_KEY_INTAKES = 'supple_app_intakes_v2';
+
+    // プリセット用写真/アイコン
+    const PRESET_ICONS = [
+      { id: 'preset_vitamin', label: 'ビタミン', emoji: '🍋', bg: '#fef08a', color: '#854d0e' },
+      { id: 'preset_capsule', label: 'カプセル', emoji: '💊', bg: '#e0f2fe', color: '#0369a1' },
+      { id: 'preset_tablet', label: 'タブレット', emoji: '⚪', bg: '#f1f5f9', color: '#475569' },
+      { id: 'preset_protein', label: 'プロテイン', emoji: '🥛', bg: '#fce7f3', color: '#9d174d' },
+      { id: 'preset_fishoil', label: 'オメガ3', emoji: '🐟', bg: '#dcfce7', color: '#166534' },
+      { id: 'preset_herb', label: 'ハーブ', emoji: '🌿', bg: '#ecfdf5', color: '#047857' }
+    ];
+
+    // カテゴリ定義
+    const CATEGORIES = [
+      { name: 'ビタミン', color: 'bg-amber-100 text-amber-800 border-amber-300', dot: '#f59e0b' },
+      { name: 'ミネラル', color: 'bg-blue-100 text-blue-800 border-blue-300', dot: '#3b82f6' },
+      { name: 'プロテイン', color: 'bg-pink-100 text-pink-800 border-pink-300', dot: '#ec4899' },
+      { name: 'オメガ・脂肪酸', color: 'bg-emerald-100 text-emerald-800 border-emerald-300', dot: '#10b981' },
+      { name: 'アミノ酸', color: 'bg-purple-100 text-purple-800 border-purple-300', dot: '#a855f7' },
+      { name: 'その他', color: 'bg-slate-100 text-slate-800 border-slate-300', dot: '#64748b' }
+    ];
+
+    // 初期マスターデータ（バーコード付き）
+    const DEFAULT_MASTERS = [
+      {
+        id: 'supple_1',
+        name: 'ビタミンC 1000mg',
+        barcode: '4987035265313',
+        category: 'ビタミン',
+        photo: 'preset_vitamin',
+        dose: '1日2回 1カプセル',
+        createdAt: new Date().toISOString()
+      },
+      {
+        id: 'supple_2',
+        name: 'マルチミネラル＆鉄',
+        barcode: '4903301206132',
+        category: 'ミネラル',
+        photo: 'preset_tablet',
+        dose: '1日1回 2粒',
+        createdAt: new Date().toISOString()
+      },
+      {
+        id: 'supple_3',
+        name: 'オメガ3 DHA/EPA',
+        barcode: '4987072016350',
+        category: 'オメガ・脂肪酸',
+        photo: 'preset_fishoil',
+        dose: '食後 1カプセル',
+        createdAt: new Date().toISOString()
+      },
+      {
+        id: 'supple_4',
+        name: 'ホエイプロテイン',
+        barcode: '4902777323176',
+        category: 'プロテイン',
+        photo: 'preset_protein',
+        dose: 'スプーン1杯（30g）',
+        createdAt: new Date().toISOString()
+      }
+    ];
+
+    function getTodayString(offsetDays = 0) {
+      const d = new Date();
+      if (offsetDays !== 0) d.setDate(d.getDate() + offsetDays);
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    }
+
+    function getDefaultIntakes() {
+      const today = getTodayString(0);
+      const yesterday = getTodayString(-1);
+      const twoDaysAgo = getTodayString(-2);
+      const threeDaysAgo = getTodayString(-3);
+
+      return [
+        { id: 'intake_1', date: today, suppleId: 'supple_1', timing: '朝', note: '朝食後', createdAt: new Date().toISOString() },
+        { id: 'intake_2', date: today, suppleId: 'supple_3', timing: '夜', note: '', createdAt: new Date().toISOString() },
+        { id: 'intake_3', date: yesterday, suppleId: 'supple_1', timing: '朝', note: '', createdAt: new Date().toISOString() },
+        { id: 'intake_4', date: yesterday, suppleId: 'supple_2', timing: '昼', note: '', createdAt: new Date().toISOString() },
+        { id: 'intake_5', date: yesterday, suppleId: 'supple_4', timing: '運動前後', note: 'ジム後', createdAt: new Date().toISOString() },
+        { id: 'intake_6', date: twoDaysAgo, suppleId: 'supple_1', timing: '朝', note: '', createdAt: new Date().toISOString() },
+        { id: 'intake_7', date: twoDaysAgo, suppleId: 'supple_3', timing: '夜', note: '', createdAt: new Date().toISOString() },
+        { id: 'intake_8', date: threeDaysAgo, suppleId: 'supple_1', timing: '朝', note: '', createdAt: new Date().toISOString() },
+        { id: 'intake_9', date: threeDaysAgo, suppleId: 'supple_2', timing: '昼', note: '', createdAt: new Date().toISOString() },
+      ];
+    }
+
+    function loadMasters() {
+      try {
+        const data = localStorage.getItem(STORAGE_KEY_SUPPLEMENTS) || localStorage.getItem('supple_app_masters_v1');
+        if (data) return JSON.parse(data);
+      } catch (e) {
+        console.error(e);
+      }
+      saveMasters(DEFAULT_MASTERS);
+      return DEFAULT_MASTERS;
+    }
+
+    function saveMasters(masters) {
+      localStorage.setItem(STORAGE_KEY_SUPPLEMENTS, JSON.stringify(masters));
+    }
+
+    function loadIntakes() {
+      try {
+        const data = localStorage.getItem(STORAGE_KEY_INTAKES) || localStorage.getItem('supple_app_intakes_v1');
+        if (data) return JSON.parse(data);
+      } catch (e) {
+        console.error(e);
+      }
+      const initial = getDefaultIntakes();
+      saveIntakes(initial);
+      return initial;
+    }
+
+    function saveIntakes(intakes) {
+      localStorage.setItem(STORAGE_KEY_INTAKES, JSON.stringify(intakes));
+    }
+
+    // ==========================================
+    // グローバル状態
+    // ==========================================
+    let supplements = loadMasters();
+    let intakes = loadIntakes();
+    let chartPeriod = 7;
+    let chartInstance = null;
+
+    // バーコードスキャナー制御用
+    let html5QrScanner = null;
+    let currentScannerTarget = 'intake'; // 'intake' または 'master'
+
+    // ==========================================
+    // 画面初期化
+    // ==========================================
+    document.addEventListener('DOMContentLoaded', () => {
+      initHeaderBadge();
+      initCategorySelector();
+      initPresetIcons();
+      renderAll();
+      initDateInputs();
+      lucide.createIcons();
+    });
+
+    function initHeaderBadge() {
+      const today = new Date();
+      const options = { month: 'short', day: 'numeric', weekday: 'short' };
+      document.getElementById('today-badge').textContent = today.toLocaleDateString('ja-JP', options);
+    }
+
+    function initDateInputs() {
+      document.getElementById('intake-date').value = getTodayString(0);
+    }
+
+    function renderAll() {
+      renderSummaryCards();
+      renderChart();
+      renderHistoryList();
+      renderSupplementDropdown();
+      lucide.createIcons();
+    }
+
+    // ==========================================
+    // 効果音 (ピピッ！というWeb Audio APIシンセ音)
+    // ==========================================
+    function playBeepSound() {
+      try {
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(1760, audioCtx.currentTime); // 高いA音 (ピッ！)
+        gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.12);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.12);
+
+        if (navigator.vibrate) {
+          navigator.vibrate(80);
+        }
+      } catch (e) {
+        console.log('AudioContext error:', e);
+      }
+    }
+
+    // ==========================================
+    // バーコードスキャン機能 (Html5Qrcode)
+    // ==========================================
+    async function openBarcodeScanner(target = 'intake') {
+      currentScannerTarget = target;
+      const modal = document.getElementById('modal-scanner');
+      const title = document.getElementById('scanner-title');
+      const subtitle = document.getElementById('scanner-subtitle');
+      document.getElementById('scanner-manual-input').value = '';
+
+      if (target === 'master') {
+        title.textContent = 'サプリのバーコードを登録';
+        subtitle.textContent = 'パッケージのバーコードを枠に合わせてください';
+      } else {
+        title.textContent = 'バーコードでサプリを選択';
+        subtitle.textContent = '飲むサプリのバーコードをスキャンしてください';
+      }
+
+      modal.classList.remove('hidden');
+      lucide.createIcons();
+
+      // カメラ起動
+      try {
+        if (!html5QrScanner) {
+          html5QrScanner = new Html5Qrcode("barcode-reader");
+        }
+
+        const config = {
+          fps: 15,
+          qrbox: { width: 260, height: 160 },
+          aspectRatio: 1.0,
+          formatsToSupport: [
+            Html5QrcodeSupportedFormats.EAN_13,
+            Html5QrcodeSupportedFormats.EAN_8,
+            Html5QrcodeSupportedFormats.UPC_A,
+            Html5QrcodeSupportedFormats.UPC_E,
+            Html5QrcodeSupportedFormats.CODE_128,
+            Html5QrcodeSupportedFormats.QR_CODE
+          ]
+        };
+
+        await html5QrScanner.start(
+          { facingMode: "environment" },
+          config,
+          (decodedText, decodedResult) => {
+            onBarcodeScanned(decodedText);
+          },
+          (errorMessage) => {
+            // スキャン中通常フレーム
+          }
+        );
+      } catch (err) {
+        console.warn("Camera start failed, fallback to manual input:", err);
+        document.getElementById('scanner-subtitle').textContent = 'カメラ未検出：下の入力欄から番号を入力できます';
+      }
+    }
+
+    async function closeBarcodeScanner() {
+      const modal = document.getElementById('modal-scanner');
+      modal.classList.add('hidden');
+      if (html5QrScanner) {
+        try {
+          await html5QrScanner.stop();
+        } catch (e) {
+          // ignore
+        }
+      }
+    }
+
+    function onBarcodeScanned(barcode) {
+      playBeepSound();
+      closeBarcodeScanner();
+
+      if (currentScannerTarget === 'master') {
+        document.getElementById('supple-barcode').value = barcode;
+        showToast(`バーコード「${barcode}」を読み取りました！`);
+        tryAutoFetchProductName(barcode);
+
+      } else {
+        const matched = supplements.find(s => s.barcode && s.barcode.trim() === barcode.trim());
+        if (matched) {
+          selectSupplementForIntake(matched.id);
+          showToast(`「${matched.name}」をバーコードで選択しました！`);
+        } else {
+          const confirmRegister = confirm(`バーコード「${barcode}」に一致するサプリは未登録です。\n\n新しくサプリマスターに登録しますか？`);
+          if (confirmRegister) {
+            openMasterModal();
+            document.getElementById('supple-barcode').value = barcode;
+            tryAutoFetchProductName(barcode);
+          }
+        }
+      }
+    }
+
+    function submitManualBarcodeInput() {
+      const input = document.getElementById('scanner-manual-input').value.trim();
+      if (!input) {
+        alert('バーコード番号を入力してください');
+        return;
+      }
+      onBarcodeScanned(input);
+    }
+
+    async function tryAutoFetchProductName(barcode) {
+      try {
+        const res = await fetch(`https://world.openfoodfacts.org/api/v0/product/${barcode}.json`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data && data.status === 1 && data.product && data.product.product_name) {
+            const nameInput = document.getElementById('supple-name');
+            if (!nameInput.value.trim()) {
+              nameInput.value = data.product.product_name;
+              showToast(`商品名「${data.product.product_name}」を自動入力しました`);
+            }
+          }
+        }
+      } catch (e) {
+        // network or not found
+      }
+    }
+
+    // ==========================================
+    // 上側：グラフ描画 & 統計
+    // ==========================================
+    function setChartPeriod(days) {
+      chartPeriod = days;
+      const btn7 = document.getElementById('btn-period-7');
+      const btn30 = document.getElementById('btn-period-30');
+      if (days === 7) {
+        btn7.className = "px-3 py-1 rounded-lg bg-white text-slate-900 shadow-xs transition-all";
+        btn30.className = "px-3 py-1 rounded-lg text-slate-500 hover:text-slate-800 transition-all";
+      } else {
+        btn30.className = "px-3 py-1 rounded-lg bg-white text-slate-900 shadow-xs transition-all";
+        btn7.className = "px-3 py-1 rounded-lg text-slate-500 hover:text-slate-800 transition-all";
+      }
+      renderChart();
+    }
+
+    function renderSummaryCards() {
+      const todayStr = getTodayString(0);
+      const todayCount = intakes.filter(i => i.date === todayStr).length;
+
+      const sevenDaysAgo = new Date();
+      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+      const weekCount = intakes.filter(i => new Date(i.date) >= sevenDaysAgo).length;
+
+      document.getElementById('stat-today-count').innerHTML = `${todayCount}<span class="text-xs font-normal text-slate-400 ml-0.5">回</span>`;
+      document.getElementById('stat-week-count').innerHTML = `${weekCount}<span class="text-xs font-normal text-slate-400 ml-0.5">回</span>`;
+      document.getElementById('stat-supple-count').innerHTML = `${supplements.length}<span class="text-xs font-normal text-slate-400 ml-0.5">種</span>`;
+      document.getElementById('history-total-count').textContent = `全 ${intakes.length} 件の記録`;
+    }
+
+    function renderChart() {
+      const ctx = document.getElementById('intakeChart').getContext('2d');
+      const dates = [];
+      const counts = [];
+
+      for (let i = chartPeriod - 1; i >= 0; i--) {
+        const dateStr = getTodayString(-i);
+        const d = new Date();
+        d.setDate(d.getDate() - i);
+        const label = chartPeriod === 7 
+          ? `${d.getMonth() + 1}/${d.getDate()} (${['日','月','火','水','木','金','土'][d.getDay()]})`
+          : `${d.getMonth() + 1}/${d.getDate()}`;
+        
+        dates.push(label);
+        const count = intakes.filter(item => item.date === dateStr).length;
+        counts.push(count);
+      }
+
+      if (chartInstance) {
+        chartInstance.destroy();
+      }
+
+      const gradient = ctx.createLinearGradient(0, 0, 0, 200);
+      gradient.addColorStop(0, 'rgba(16, 185, 129, 0.45)');
+      gradient.addColorStop(1, 'rgba(16, 185, 129, 0.0)');
+
+      chartInstance = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: dates,
+          datasets: [{
+            label: '摂取回数',
+            data: counts,
+            fill: true,
+            backgroundColor: gradient,
+            borderColor: '#10b981',
+            borderWidth: 2.5,
+            pointBackgroundColor: '#10b981',
+            pointBorderColor: '#ffffff',
+            pointBorderWidth: 2,
+            pointRadius: chartPeriod === 7 ? 5 : 3,
+            pointHoverRadius: 7,
+            tension: 0.35
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              backgroundColor: '#0f172a',
+              titleFont: { size: 12, weight: 'bold' },
+              bodyFont: { size: 13 },
+              padding: 10,
+              cornerRadius: 12,
+              displayColors: false,
+              callbacks: {
+                label: (ctx) => `摂取回数: ${ctx.raw} 回`
+              }
+            }
+          },
+          scales: {
+            x: {
+              grid: { display: false },
+              ticks: {
+                font: { size: 10, weight: '600' },
+                color: '#94a3b8',
+                maxRotation: 0,
+                autoSkip: true,
+                maxTicksLimit: chartPeriod === 7 ? 7 : 8
+              }
+            },
+            y: {
+              beginAtZero: true,
+              suggestedMax: 4,
+              ticks: {
+                stepSize: 1,
+                font: { size: 10 },
+                color: '#94a3b8'
+              },
+              grid: {
+                color: '#f1f5f9',
+                borderDash: [4, 4]
+              }
+            }
+          }
+        }
+      });
+    }
+
+    // ==========================================
+    // メイン画面：摂取履歴一覧（日付＋サプリ名チップ表示）
+    // ==========================================
+    function renderHistoryList() {
+      const container = document.getElementById('history-container');
+      container.innerHTML = '';
+
+      if (intakes.length === 0) {
+        container.innerHTML = `
+          <div class="bg-white rounded-3xl p-8 text-center border border-slate-200/60">
+            <div class="w-12 h-12 mx-auto rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center mb-3">
+              <i data-lucide="inbox" class="w-6 h-6"></i>
+            </div>
+            <p class="text-sm font-bold text-slate-700">まだ摂取記録がありません</p>
+            <p class="text-xs text-slate-400 mt-1">右下の「＋」ボタンから今日のサプリを記録しましょう</p>
+          </div>
+        `;
+        return;
+      }
+
+      const grouped = {};
+      const sortedIntakes = [...intakes].sort((a, b) => new Date(b.date) - new Date(a.date) || new Date(b.createdAt) - new Date(a.createdAt));
+
+      sortedIntakes.forEach(item => {
+        if (!grouped[item.date]) grouped[item.date] = [];
+        grouped[item.date].push(item);
+      });
+
+      const todayStr = getTodayString(0);
+      const yesterdayStr = getTodayString(-1);
+
+      Object.keys(grouped).forEach(dateStr => {
+        const items = grouped[dateStr];
+        const dateObj = new Date(dateStr + 'T00:00:00');
+        const dayNames = ['日', '月', '火', '水', '木', '金', '土'];
+        const dayOfWeek = dayNames[dateObj.getDay()];
+
+        let dateLabel = `${dateObj.getMonth() + 1}月${dateObj.getDate()}日 (${dayOfWeek})`;
+        let badgeHtml = '';
+        if (dateStr === todayStr) {
+          badgeHtml = '<span class="text-[10px] font-extrabold px-2 py-0.5 rounded-md bg-emerald-500 text-white shadow-xs">今日</span>';
+        } else if (dateStr === yesterdayStr) {
+          badgeHtml = '<span class="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-slate-200 text-slate-700">昨日</span>';
+        }
+
+        const dateGroupEl = document.createElement('div');
+        dateGroupEl.className = 'bg-white rounded-3xl p-4 sm:p-5 shadow-xs border border-slate-200/70 space-y-3';
+
+        dateGroupEl.innerHTML = `
+          <div class="flex items-center justify-between pb-2 border-b border-slate-100">
+            <div class="flex items-center gap-2">
+              <span class="font-extrabold text-slate-900 text-sm sm:text-base">${dateLabel}</span>
+              ${badgeHtml}
+            </div>
+            <span class="text-xs font-semibold text-slate-400">${items.length} 回摂取</span>
+          </div>
+          <div class="flex flex-wrap gap-2 pt-1" id="chips-${dateStr}">
+          </div>
+        `;
+
+        container.appendChild(dateGroupEl);
+
+        const chipsContainer = dateGroupEl.querySelector(`#chips-${dateStr}`);
+
+        items.forEach(item => {
+          const supple = supplements.find(s => s.id === item.suppleId) || {
+            name: '削除されたサプリ',
+            category: 'その他',
+            photo: 'preset_capsule'
+          };
+
+          const chip = document.createElement('div');
+          chip.className = 'group relative inline-flex items-center gap-2 pl-1.5 pr-3 py-1.5 rounded-2xl bg-slate-50 border border-slate-200 hover:border-slate-300 hover:bg-slate-100/80 transition-all shadow-2xs';
+
+          const photoThumb = getPhotoThumbnailHtml(supple.photo, 24);
+          const catInfo = CATEGORIES.find(c => c.name === supple.category) || CATEGORIES[5];
+
+          chip.innerHTML = `
+            ${photoThumb}
+            <div class="flex flex-col text-left">
+              <div class="flex items-center gap-1.5">
+                <span class="text-xs font-bold text-slate-800">${escapeHtml(supple.name)}</span>
+                <span class="w-1.5 h-1.5 rounded-full" style="background-color: ${catInfo.dot};"></span>
+              </div>
+              ${item.timing || item.note ? `<span class="text-[10px] text-slate-400 font-medium">${item.timing ? item.timing : ''}${item.note ? '・' + escapeHtml(item.note) : ''}</span>` : ''}
+            </div>
+            <button
+              onclick="deleteIntake('${item.id}', event)"
+              class="ml-1 w-5 h-5 rounded-full bg-slate-200/80 hover:bg-rose-100 hover:text-rose-600 text-slate-400 flex items-center justify-center transition-colors"
+              title="この記録を削除"
+            >
+              <i data-lucide="x" class="w-3 h-3"></i>
+            </button>
+          `;
+
+          chipsContainer.appendChild(chip);
+        });
+      });
+    }
+
+    function getPhotoThumbnailHtml(photoRef, size = 28) {
+      if (!photoRef) {
+        return `<div class="w-[${size}px] h-[${size}px] rounded-xl bg-slate-200 flex items-center justify-center text-xs">💊</div>`;
+      }
+
+      if (photoRef.startsWith('data:image')) {
+        return `<img src="${photoRef}" class="w-[${size}px] h-[${size}px] rounded-xl object-cover border border-slate-200 shadow-2xs shrink-0" style="width:${size}px; height:${size}px;" />`;
+      }
+
+      const preset = PRESET_ICONS.find(p => p.id === photoRef) || PRESET_ICONS[1];
+      return `
+        <div class="rounded-xl flex items-center justify-center shrink-0 text-sm shadow-2xs border border-white" style="width:${size}px; height:${size}px; background-color:${preset.bg}; color:${preset.color};">
+          ${preset.emoji}
+        </div>
+      `;
+    }
+
+    function deleteIntake(id, event) {
+      if (event) event.stopPropagation();
+      if (!confirm('この摂取記録を削除しますか？')) return;
+      intakes = intakes.filter(i => i.id !== id);
+      saveIntakes(intakes);
+      renderAll();
+      showToast('摂取記録を削除しました');
+    }
+
+    // ==========================================
+    // ◯ 摂取したサプリ 登録画面 (モーダル操作)
+    // ==========================================
+    function openIntakeModal() {
+      document.getElementById('intake-date').value = getTodayString(0);
+      document.getElementById('intake-note').value = '';
+      
+      if (supplements.length > 0) {
+        selectSupplementForIntake(supplements[0].id);
+      } else {
+        resetSupplementDropdownSelection();
+      }
+
+      closeDropdown();
+      document.getElementById('modal-intake').classList.remove('hidden');
+      lucide.createIcons();
+    }
+
+    function closeIntakeModal() {
+      document.getElementById('modal-intake').classList.add('hidden');
+      closeDropdown();
+    }
+
+    function renderSupplementDropdown() {
+      const menu = document.getElementById('dropdown-menu');
+      menu.innerHTML = '';
+
+      if (supplements.length === 0) {
+        menu.innerHTML = `
+          <div class="p-3 text-center text-xs text-slate-400">
+            登録されているサプリがありません
+          </div>
+        `;
+        return;
+      }
+
+      supplements.forEach(supple => {
+        const item = document.createElement('button');
+        item.type = 'button';
+        item.className = 'w-full px-3 py-2 rounded-xl text-left flex items-center justify-between hover:bg-slate-100 transition-colors group';
+        item.onclick = () => {
+          selectSupplementForIntake(supple.id);
+          closeDropdown();
+        };
+
+        const thumb = getPhotoThumbnailHtml(supple.photo, 32);
+        const catInfo = CATEGORIES.find(c => c.name === supple.category) || CATEGORIES[5];
+
+        item.innerHTML = `
+          <div class="flex items-center gap-3">
+            ${thumb}
+            <div>
+              <p class="text-xs font-bold text-slate-800 group-hover:text-emerald-700">${escapeHtml(supple.name)}</p>
+              <div class="flex items-center gap-1.5 mt-0.5">
+                <span class="text-[10px] font-semibold px-2 py-0.2 rounded-md ${catInfo.color}">
+                  ${escapeHtml(supple.category)}
+                </span>
+                ${supple.barcode ? `<span class="text-[10px] text-slate-400 font-mono">#${escapeHtml(supple.barcode)}</span>` : ''}
+              </div>
+            </div>
+          </div>
+          <i data-lucide="check" class="w-4 h-4 text-emerald-600 opacity-0 group-hover:opacity-100 transition-opacity"></i>
+        `;
+
+        menu.appendChild(item);
+      });
+      lucide.createIcons();
+    }
+
+    function selectSupplementForIntake(suppleId) {
+      const supple = supplements.find(s => s.id === suppleId);
+      if (!supple) return;
+
+      document.getElementById('selected-supple-id').value = supple.id;
+      const display = document.getElementById('dropdown-selected-content');
+      const thumb = getPhotoThumbnailHtml(supple.photo, 32);
+
+      display.innerHTML = `
+        ${thumb}
+        <div class="flex flex-col text-left">
+          <div class="flex items-center gap-2">
+            <span class="text-sm font-bold text-slate-800">${escapeHtml(supple.name)}</span>
+            ${supple.barcode ? `<span class="text-[9px] font-mono px-1.5 py-0.2 rounded-sm bg-slate-100 text-slate-500">JAN一致</span>` : ''}
+          </div>
+          <span class="text-[10px] font-semibold text-slate-400">${escapeHtml(supple.category)} ${supple.dose ? '・' + escapeHtml(supple.dose) : ''}</span>
+        </div>
+      `;
+    }
+
+    function resetSupplementDropdownSelection() {
+      document.getElementById('selected-supple-id').value = '';
+      document.getElementById('dropdown-selected-content').innerHTML = `
+        <span class="text-sm text-slate-400 font-medium">サプリを選択してください</span>
+      `;
+    }
+
+    function toggleSupplementDropdown() {
+      const menu = document.getElementById('dropdown-menu');
+      const arrow = document.getElementById('dropdown-arrow');
+      if (menu.classList.contains('hidden')) {
+        menu.classList.remove('hidden');
+        arrow.classList.add('rotate-180');
+      } else {
+        closeDropdown();
+      }
+    }
+
+    function closeDropdown() {
+      const menu = document.getElementById('dropdown-menu');
+      const arrow = document.getElementById('dropdown-arrow');
+      if (menu) menu.classList.add('hidden');
+      if (arrow) arrow.classList.remove('rotate-180');
+    }
+
+    function submitIntake() {
+      const date = document.getElementById('intake-date').value;
+      const suppleId = document.getElementById('selected-supple-id').value;
+      const timing = document.getElementById('intake-timing').value;
+      const note = document.getElementById('intake-note').value.trim();
+
+      if (!date) {
+        alert('日付を選択してください');
+        return;
+      }
+      if (!suppleId) {
+        alert('摂取したサプリを選択してください');
+        return;
+      }
+
+      const newRecord = {
+        id: 'intake_' + Date.now(),
+        date: date,
+        suppleId: suppleId,
+        timing: timing,
+        note: note,
+        createdAt: new Date().toISOString()
+      };
+
+      intakes.push(newRecord);
+      saveIntakes(intakes);
+
+      closeIntakeModal();
+      renderAll();
+      showToast('サプリの摂取を記録しました！');
+    }
+
+    // ==========================================
+    // ◯ サプリマスター新規登録 (写真/名前/カテゴリ/バーコード)
+    // ==========================================
+    function initCategorySelector() {
+      const container = document.getElementById('category-selector');
+      container.innerHTML = '';
+
+      CATEGORIES.forEach((cat, index) => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = `category-btn py-2 px-2.5 rounded-xl text-xs font-bold border transition-all text-center flex items-center justify-center gap-1.5 ${index === 0 ? 'bg-teal-500 text-white border-teal-500 shadow-sm' : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'}`;
+        btn.dataset.category = cat.name;
+        btn.innerHTML = `
+          <span class="w-2 h-2 rounded-full" style="background-color: ${cat.dot}"></span>
+          ${cat.name}
+        `;
+        btn.onclick = () => selectCategory(cat.name);
+        container.appendChild(btn);
+      });
+    }
+
+    function selectCategory(categoryName) {
+      document.getElementById('supple-category').value = categoryName;
+      document.querySelectorAll('.category-btn').forEach(btn => {
+        if (btn.dataset.category === categoryName) {
+          btn.className = 'category-btn py-2 px-2.5 rounded-xl text-xs font-bold border transition-all text-center flex items-center justify-center gap-1.5 bg-teal-500 text-white border-teal-500 shadow-sm';
+        } else {
+          btn.className = 'category-btn py-2 px-2.5 rounded-xl text-xs font-bold border transition-all text-center flex items-center justify-center gap-1.5 bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100';
+        }
+      });
+    }
+
+    function initPresetIcons() {
+      const container = document.getElementById('preset-icons-container');
+      container.innerHTML = '';
+
+      PRESET_ICONS.forEach((preset, index) => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'preset-btn w-9 h-9 rounded-xl flex items-center justify-center text-base border-2 transition-all hover:scale-105 active:scale-95';
+        btn.style.backgroundColor = preset.bg;
+        btn.style.borderColor = index === 0 ? '#0d9488' : 'transparent';
+        btn.title = preset.label;
+        btn.innerHTML = preset.emoji;
+        btn.onclick = () => selectPresetIcon(preset.id);
+        container.appendChild(btn);
+      });
+    }
+
+    function selectPresetIcon(presetId) {
+      document.getElementById('supple-photo-data').value = presetId;
+      
+      const preview = document.getElementById('supple-photo-preview');
+      const placeholder = document.getElementById('supple-photo-placeholder');
+      const clearBtn = document.getElementById('btn-clear-photo');
+
+      preview.classList.add('hidden');
+      preview.src = '';
+      placeholder.classList.remove('hidden');
+
+      const preset = PRESET_ICONS.find(p => p.id === presetId);
+      if (preset) {
+        placeholder.innerHTML = `<span class="text-2xl">${preset.emoji}</span><span class="text-[9px] font-bold text-slate-500">${preset.label}</span>`;
+      }
+      clearBtn.classList.remove('hidden');
+
+      document.querySelectorAll('.preset-btn').forEach((btn, idx) => {
+        if (PRESET_ICONS[idx].id === presetId) {
+          btn.style.borderColor = '#0d9488';
+        } else {
+          btn.style.borderColor = 'transparent';
+        }
+      });
+    }
+
+    function handlePhotoUpload(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        const img = new Image();
+        img.onload = function() {
+          const canvas = document.createElement('canvas');
+          const maxDim = 200;
+          let width = img.width;
+          let height = img.height;
+
+          if (width > height) {
+            if (width > maxDim) {
+              height = Math.round((height * maxDim) / width);
+              width = maxDim;
+            }
+          } else {
+            if (height > maxDim) {
+              width = Math.round((width * maxDim) / height);
+              height = maxDim;
+            }
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, width, height);
+
+          const compressedBase64 = canvas.toDataURL('image/jpeg', 0.85);
+
+          document.getElementById('supple-photo-data').value = compressedBase64;
+          const preview = document.getElementById('supple-photo-preview');
+          const placeholder = document.getElementById('supple-photo-placeholder');
+          const clearBtn = document.getElementById('btn-clear-photo');
+
+          preview.src = compressedBase64;
+          preview.classList.remove('hidden');
+          placeholder.classList.add('hidden');
+          clearBtn.classList.remove('hidden');
+
+          document.querySelectorAll('.preset-btn').forEach(btn => btn.style.borderColor = 'transparent');
+        };
+        img.src = e.target.result;
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function clearPhoto() {
+      document.getElementById('supple-photo-data').value = '';
+      const c1 = document.getElementById('supple-photo-camera');
+      if (c1) c1.value = '';
+      const c2 = document.getElementById('supple-photo-gallery');
+      if (c2) c2.value = '';
+      const preview = document.getElementById('supple-photo-preview');
+      const placeholder = document.getElementById('supple-photo-placeholder');
+      const clearBtn = document.getElementById('btn-clear-photo');
+
+      preview.classList.add('hidden');
+      preview.src = '';
+      placeholder.classList.remove('hidden');
+      placeholder.innerHTML = `
+        <i data-lucide="image" class="w-6 h-6"></i>
+        <span class="text-[10px] font-medium">未設定</span>
+      `;
+      clearBtn.classList.add('hidden');
+      document.querySelectorAll('.preset-btn').forEach(btn => btn.style.borderColor = 'transparent');
+      lucide.createIcons();
+    }
+
+    function openMasterModal() {
+      document.getElementById('supple-name').value = '';
+      document.getElementById('supple-barcode').value = '';
+      document.getElementById('supple-standard-dose').value = '';
+      selectCategory('ビタミン');
+      selectPresetIcon('preset_vitamin');
+
+      document.getElementById('modal-master').classList.remove('hidden');
+      lucide.createIcons();
+    }
+
+    function closeMasterModal() {
+      document.getElementById('modal-master').classList.add('hidden');
+    }
+
+    function submitMasterSupplement() {
+      const name = document.getElementById('supple-name').value.trim();
+      const barcode = document.getElementById('supple-barcode').value.trim();
+      const category = document.getElementById('supple-category').value;
+      const photo = document.getElementById('supple-photo-data').value || 'preset_capsule';
+      const dose = document.getElementById('supple-standard-dose').value.trim();
+
+      if (!name) {
+        alert('サプリ名を入力してください');
+        return;
+      }
+
+      // 重複チェック
+      if (barcode) {
+        const exist = supplements.find(s => s.barcode && s.barcode.trim() === barcode);
+        if (exist) {
+          const proceed = confirm(`バーコード「${barcode}」は既にサプリ「${exist.name}」に登録されています。上書きまたは重複登録しますか？`);
+          if (!proceed) return;
+        }
+      }
+
+      const newSupple = {
+        id: 'supple_' + Date.now(),
+        name: name,
+        barcode: barcode,
+        category: category,
+        photo: photo,
+        dose: dose,
+        createdAt: new Date().toISOString()
+      };
+
+      supplements.push(newSupple);
+      saveMasters(supplements);
+
+      renderSupplementDropdown();
+      selectSupplementForIntake(newSupple.id);
+
+      closeMasterModal();
+      renderSummaryCards();
+      showToast(`「${name}」を登録しました！`);
+    }
+
+    // ==========================================
+    // ユーティリティ
+    // ==========================================
+    function showToast(message) {
+      const toast = document.getElementById('toast');
+      const msgEl = document.getElementById('toast-message');
+      msgEl.textContent = message;
+      toast.classList.remove('hidden');
+      setTimeout(() => {
+        toast.classList.add('hidden');
+      }, 3000);
+    }
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+  </script>
+</body>
+</html>

@@ -2889,13 +2889,14 @@
     @media (max-width: 639px) {
       #modal-supple-intake,
       #modal-supple-master {
-        height: 100dvh !important;
+        height: 100% !important;
         width: 100% !important;
       }
       #modal-supple-intake > div,
       #modal-supple-master > div {
-        height: 100dvh !important;
-        max-height: 100dvh !important;
+        height: 100% !important;
+        max-height: 100% !important;
+        min-height: 0 !important;
         width: 100% !important;
         border-radius: 0 !important;
       }
@@ -9012,8 +9013,8 @@
     </div>
 
     <!-- ===== ◯ 摂取したサプリ 登録・編集モーダル ===== -->
-    <div id="modal-supple-intake" class="fixed inset-0 hidden bg-black/85 backdrop-blur-sm flex-col justify-start sm:justify-center items-center p-0 sm:p-4 w-full h-[100dvh]" style="z-index: 10000; display: none;">
-      <div class="bg-[#0b1021] w-full max-w-xl h-[100dvh] sm:h-auto sm:max-h-[92vh] rounded-none sm:rounded-3xl shadow-2xl border-0 sm:border border-cyan-800/60 flex flex-col overflow-hidden text-slate-100">
+    <div id="modal-supple-intake" class="fixed inset-0 hidden bg-black/85 backdrop-blur-sm flex-col justify-start sm:justify-center items-center p-0 sm:p-4 w-full h-full" style="z-index: 10000; display: none;">
+      <div class="bg-[#0b1021] w-full max-w-xl h-full sm:h-auto sm:max-h-[92vh] min-h-0 rounded-none sm:rounded-3xl shadow-2xl border-0 sm:border border-cyan-800/60 flex flex-col overflow-hidden text-slate-100">
         
         <!-- ヘッダー -->
         <div class="px-5 pt-[calc(1.2rem+env(safe-area-inset-top,0px))] pb-4 border-b border-cyan-900/40 flex items-center justify-between bg-[#070a14]/95 shrink-0">
@@ -9029,8 +9030,8 @@
           <button type="button" onclick="closeSuppleIntakeModal()" class="w-8 h-8 rounded-full bg-slate-800 text-slate-400 hover:text-white flex items-center justify-center transition-colors">✕</button>
         </div>
 
-        <!-- ボディ（いっぱいまで展開: flex-1） -->
-        <div class="flex-1 p-5 space-y-4 overflow-y-auto">
+        <!-- ボディ（いっぱいまで展開: flex-1 min-h-0） -->
+        <div class="flex-1 min-h-0 p-5 space-y-4 overflow-y-auto">
           <!-- 編集中のID保持 hidden -->
           <input type="hidden" id="supple-edit-intake-id" value="" />
           
@@ -9144,29 +9145,34 @@
     </div>
 
     <!-- ===== ◯ サプリマスター新規登録モーダル ===== -->
-    <div id="modal-supple-master" class="fixed inset-0 hidden bg-black/85 backdrop-blur-sm flex-col justify-start sm:justify-center items-center p-0 sm:p-4 w-full h-[100dvh]" style="z-index: 10010; display: none;">
-      <div class="bg-[#0b1021] w-full max-w-xl h-[100dvh] sm:h-auto sm:max-h-[92vh] rounded-none sm:rounded-3xl shadow-2xl border-0 sm:border border-cyan-800/60 flex flex-col overflow-hidden text-slate-100">
+    <div id="modal-supple-master" class="fixed inset-0 hidden bg-black/85 backdrop-blur-sm flex-col justify-start sm:justify-center items-center p-0 sm:p-4 w-full h-full" style="z-index: 10010; display: none;">
+      <div class="bg-[#0b1021] w-full max-w-xl h-full sm:h-auto sm:max-h-[92vh] min-h-0 rounded-none sm:rounded-3xl shadow-2xl border-0 sm:border border-cyan-800/60 flex flex-col overflow-hidden text-slate-100">
         
-        <!-- ヘッダー -->
-        <div class="px-5 pt-[calc(1.2rem+env(safe-area-inset-top,0px))] pb-4 border-b border-cyan-900/40 flex items-center justify-between bg-[#070a14]/90 shrink-0">
-          <div class="flex items-center gap-2.5">
-            <div class="w-8 h-8 rounded-xl bg-teal-950 text-teal-400 border border-teal-700/50 flex items-center justify-center text-sm font-bold">
+        <!-- ヘッダー（右上にも登録ボタンを常設） -->
+        <div class="px-5 pt-[calc(1rem+env(safe-area-inset-top,0px))] pb-3.5 border-b border-cyan-900/40 flex items-center justify-between bg-[#070a14]/90 shrink-0 gap-2">
+          <div class="flex items-center gap-2.5 min-w-0">
+            <div class="w-8 h-8 rounded-xl bg-teal-950 text-teal-400 border border-teal-700/50 flex items-center justify-center text-sm font-bold shrink-0">
               ✨
             </div>
-            <div>
-              <h3 class="font-extrabold text-cyan-50 text-base">新しいサプリを登録</h3>
-              <p class="text-[11px] text-cyan-400/80">バーコード・写真・名前・カテゴリを設定</p>
+            <div class="min-w-0">
+              <h3 class="font-extrabold text-cyan-50 text-base truncate">新しいサプリを登録</h3>
+              <p class="text-[11px] text-cyan-400/80 truncate">バーコード・写真・名前・カテゴリを設定</p>
             </div>
           </div>
-          <button type="button" onclick="closeSuppleMasterModal()" class="w-8 h-8 rounded-full bg-slate-800 text-slate-400 hover:text-white flex items-center justify-center transition-colors">✕</button>
+          <div class="flex items-center gap-2 shrink-0">
+            <button type="button" onclick="submitSuppleMaster()" class="px-3 py-1.5 rounded-xl bg-gradient-to-r from-teal-500 to-emerald-500 text-white text-xs font-extrabold shadow-md active:scale-95 transition-all">
+              💾 登録
+            </button>
+            <button type="button" onclick="closeSuppleMasterModal()" class="w-8 h-8 rounded-full bg-slate-800 text-slate-400 hover:text-white flex items-center justify-center transition-colors">✕</button>
+          </div>
         </div>
 
-        <!-- フォーム -->
-        <div class="flex-1 p-5 space-y-4 overflow-y-auto">
+        <!-- フォーム（スクロール領域: flex-1 min-h-0） -->
+        <div class="flex-1 min-h-0 p-5 space-y-4 overflow-y-auto">
 
-          <!-- バーコード登録 -->
-          <div class="bg-black/30 p-3 rounded-2xl border border-cyan-900/40">
-            <div class="flex items-center justify-between mb-1.5">
+          <!-- バーコード登録 & JAN検索 -->
+          <div class="bg-black/30 p-3 rounded-2xl border border-cyan-900/40 space-y-2">
+            <div class="flex items-center justify-between">
               <label class="block text-xs font-bold text-cyan-200">🏷️ バーコード (JANコード)</label>
               <span class="text-[10px] text-slate-400 font-medium">パッケージのバーコード</span>
             </div>
@@ -9175,7 +9181,7 @@
                 type="text"
                 id="supple-master-barcode"
                 placeholder="スキャンまたは番号入力 (例: 4987035...)"
-                class="flex-1 px-3 py-2 rounded-xl bg-black/40 border border-cyan-800/60 text-white text-xs font-mono font-bold focus:outline-hidden focus:border-cyan-400"
+                class="flex-1 min-w-0 px-3 py-2 rounded-xl bg-black/40 border border-cyan-800/60 text-white text-xs font-mono font-bold focus:outline-hidden focus:border-cyan-400"
               />
               <button
                 type="button"
@@ -9185,6 +9191,26 @@
                 📷 スキャン
               </button>
             </div>
+            <div class="flex items-center gap-2 pt-0.5">
+              <button
+                type="button"
+                onclick="searchSuppleByJan()"
+                class="flex-1 py-1.5 px-2.5 rounded-xl bg-cyan-950/80 hover:bg-cyan-900 border border-cyan-700/60 text-cyan-200 text-[11px] font-bold flex items-center justify-center gap-1.5 transition-all active:scale-95"
+              >
+                <span>🔍</span>
+                <span>JANコードから商品名・画像を自動取得</span>
+              </button>
+              <button
+                type="button"
+                onclick="openSuppleJanGoogleImageSearch()"
+                class="py-1.5 px-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 text-[11px] font-bold flex items-center justify-center gap-1 transition-all active:scale-95 shrink-0"
+                title="Google画像検索を別画面で開く"
+              >
+                <span>🌐</span>
+                <span>Web画像検索</span>
+              </button>
+            </div>
+            <p id="supple-jan-fetch-status" class="hidden text-[11px] text-cyan-300 font-medium px-1"></p>
           </div>
 
           <!-- 写真設定 -->
@@ -9198,27 +9224,33 @@
                   <span class="text-[9px] font-medium text-slate-500">未設定</span>
                 </div>
               </div>
-              <div class="flex-1 space-y-2">
-                <div class="flex flex-wrap items-center gap-2">
+              <div class="flex-1 space-y-2 min-w-0">
+                <div class="flex flex-wrap items-center gap-1.5">
                   <!-- カメラ起動 -->
-                  <label class="cursor-pointer px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-cyan-200 text-xs font-bold flex items-center gap-1.5 border border-cyan-900/40 transition-colors active:scale-95 shadow-2xs">
+                  <label class="cursor-pointer px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-cyan-200 text-xs font-bold flex items-center gap-1 border border-cyan-900/40 transition-colors active:scale-95 shadow-2xs">
                     <span>📷</span>
                     <span>カメラ起動</span>
                     <input type="file" id="supple-master-file-camera" accept="image/*" capture="environment" class="hidden" onchange="handleSupplePhotoUpload(event)" />
                   </label>
                   
                   <!-- ギャラリーから選ぶ -->
-                  <label class="cursor-pointer px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-cyan-200 text-xs font-bold flex items-center gap-1.5 border border-cyan-900/40 transition-colors active:scale-95 shadow-2xs">
+                  <label class="cursor-pointer px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-cyan-200 text-xs font-bold flex items-center gap-1 border border-cyan-900/40 transition-colors active:scale-95 shadow-2xs">
                     <span>🖼️</span>
                     <span>ギャラリーから選ぶ</span>
                     <input type="file" id="supple-master-file-gallery" accept="image/*" class="hidden" onchange="handleSupplePhotoUpload(event)" />
                   </label>
 
+                  <!-- 画像URLを貼る -->
+                  <button type="button" onclick="promptSuppleImageUrl()" class="px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-cyan-200 text-xs font-bold flex items-center gap-1 border border-cyan-900/40 transition-colors active:scale-95 shadow-2xs">
+                    <span>🔗</span>
+                    <span>URL</span>
+                  </button>
+
                   <!-- 削除 -->
                   <button type="button" onclick="clearSupplePhoto()" id="supple-btn-clear-photo" class="hidden text-xs text-rose-400 hover:text-rose-300 font-bold px-1.5 py-1">削除</button>
                 </div>
                 <p class="text-[10px] text-slate-400">またはプリセットから選択：</p>
-                <div class="flex gap-2" id="supple-preset-container"></div>
+                <div class="flex gap-2 flex-wrap" id="supple-preset-container"></div>
               </div>
             </div>
             <input type="hidden" id="supple-master-photo-data" value="" />
@@ -9256,18 +9288,19 @@
         </div>
 
         <!-- フッター -->
-        <div class="px-5 pt-3.5 pb-[calc(1.5rem+env(safe-area-inset-bottom,0px))] border-t border-cyan-900/40 bg-[#070a14]/95 flex items-center gap-2.5 shrink-0">
+        <div class="px-5 pt-3 pb-[calc(1.2rem+env(safe-area-inset-bottom,0px))] border-t border-cyan-900/40 bg-[#070a14]/95 flex items-center gap-2.5 shrink-0">
           <button
             type="button"
             onclick="closeSuppleMasterModal()"
-            class="flex-1 py-2.5 px-4 rounded-xl bg-slate-800 border border-slate-700 text-slate-300 text-xs font-bold hover:bg-slate-700 transition-colors"
+            class="flex-1 py-3 px-4 rounded-xl bg-slate-800 border border-slate-700 text-slate-300 text-xs font-bold hover:bg-slate-700 transition-colors"
           >
             戻る
           </button>
           <button
             type="button"
             onclick="submitSuppleMaster()"
-            class="flex-2 py-2.5 px-4 rounded-xl bg-gradient-to-r from-teal-500 to-emerald-500 text-white text-xs font-extrabold shadow-lg shadow-teal-500/25 active:scale-[0.99] transition-all flex items-center justify-center gap-1.5"
+            style="flex: 2;"
+            class="py-3 px-4 rounded-xl bg-gradient-to-r from-teal-500 to-emerald-500 text-white text-sm font-extrabold shadow-lg shadow-teal-500/25 active:scale-[0.99] transition-all flex items-center justify-center gap-1.5"
           >
             💾 サプリを登録
           </button>
@@ -59704,7 +59737,7 @@ initFortuneHub();
       if (!photoRef) {
         return '<div class="rounded-lg bg-slate-800 flex items-center justify-center text-xs" style="width:' + size + 'px;height:' + size + 'px;">💊</div>';
       }
-      if (photoRef.startsWith('data:image')) {
+      if (photoRef.startsWith('data:image') || photoRef.startsWith('http://') || photoRef.startsWith('https://')) {
         return '<img src="' + photoRef + '" class="rounded-lg object-cover border border-cyan-800 shrink-0" style="width:' + size + 'px;height:' + size + 'px;" />';
       }
       const preset = SUPPLE_PRESET_ICONS.find(p => p.id === photoRef) || SUPPLE_PRESET_ICONS[1];
@@ -60040,6 +60073,8 @@ initFortuneHub();
       document.getElementById('supple-master-dose').value = '';
       selectSuppleCategory('ビタミン');
       selectSupplePresetIcon('preset_vitamin');
+      const stEl = document.getElementById('supple-jan-fetch-status');
+      if (stEl) { stEl.classList.add('hidden'); stEl.textContent = ''; }
       const modal = document.getElementById('modal-supple-master');
       if (modal) {
         modal.classList.remove('hidden');
@@ -60199,19 +60234,97 @@ initFortuneHub();
       onSuppleBarcodeScanned(val);
     }
 
-    async function trySuppleAutoFetch(barcode) {
-      try {
-        const res = await fetch('https://world.openfoodfacts.org/api/v0/product/' + barcode + '.json');
-        if (res.ok) {
+    function setSupplePhotoPreviewUrl(url) {
+      if (!url) return;
+      document.getElementById('supple-master-photo-data').value = url;
+      const preview = document.getElementById('supple-master-preview');
+      const placeholder = document.getElementById('supple-master-placeholder');
+      const clearBtn = document.getElementById('supple-btn-clear-photo');
+      if (preview) {
+        preview.src = url;
+        preview.classList.remove('hidden');
+      }
+      if (placeholder) placeholder.classList.add('hidden');
+      if (clearBtn) clearBtn.classList.remove('hidden');
+      document.querySelectorAll('.supple-preset-btn').forEach(btn => btn.style.borderColor = 'transparent');
+    }
+
+    function promptSuppleImageUrl() {
+      const url = prompt('画像のURL (https://...) を貼り付けてください：');
+      if (url && (url.trim().startsWith('http://') || url.trim().startsWith('https://') || url.trim().startsWith('data:image'))) {
+        setSupplePhotoPreviewUrl(url.trim());
+      } else if (url && url.trim()) {
+        alert('有効な画像URL (https://...) を入力してください');
+      }
+    }
+
+    function openSuppleJanGoogleImageSearch() {
+      const code = (document.getElementById('supple-master-barcode').value || '').trim();
+      if (!code) {
+        alert('先にバーコード(JANコード)を入力またはスキャンしてください');
+        return;
+      }
+      const url = 'https://www.google.com/search?tbm=isch&q=' + encodeURIComponent(code);
+      window.open(url, '_blank', 'noopener,noreferrer');
+    }
+
+    async function searchSuppleByJan() {
+      const code = (document.getElementById('supple-master-barcode').value || '').trim();
+      if (!code) {
+        alert('先にバーコード(JANコード)を入力またはスキャンしてください');
+        return;
+      }
+      const stEl = document.getElementById('supple-jan-fetch-status');
+      if (stEl) {
+        stEl.textContent = '🔍 データベースから検索中...';
+        stEl.classList.remove('hidden');
+      }
+      const found = await trySuppleAutoFetch(code, true);
+      if (!found && stEl) {
+        stEl.innerHTML = '見つかりませんでした。右の「🌐 Web画像検索」から画像を探して保存またはURLコピーしてください。';
+      }
+    }
+
+    async function trySuppleAutoFetch(barcode, manualTrigger = false) {
+      const cleanCode = (barcode || '').trim();
+      if (!cleanCode) return false;
+      const stEl = document.getElementById('supple-jan-fetch-status');
+      const endpoints = [
+        'https://world.openfoodfacts.org/api/v0/product/' + encodeURIComponent(cleanCode) + '.json',
+        'https://world.openproductsfacts.org/api/v0/product/' + encodeURIComponent(cleanCode) + '.json'
+      ];
+      for (const ep of endpoints) {
+        try {
+          const res = await fetch(ep);
+          if (!res.ok) continue;
           const d = await res.json();
-          if (d && d.status === 1 && d.product && d.product.product_name) {
-            const nameInput = document.getElementById('supple-master-name');
-            if (nameInput && !nameInput.value.trim()) {
-              nameInput.value = d.product.product_name;
+          if (d && d.status === 1 && d.product) {
+            const p = d.product;
+            const pName = p.product_name_ja || p.product_name || p.generic_name || '';
+            const pImg = p.image_front_small_url || p.image_front_url || p.image_url || '';
+            let updatedAny = false;
+            if (pName) {
+              const nameInput = document.getElementById('supple-master-name');
+              if (nameInput && (!nameInput.value.trim() || manualTrigger)) {
+                nameInput.value = pName;
+                updatedAny = true;
+              }
+            }
+            if (pImg) {
+              setSupplePhotoPreviewUrl(pImg);
+              updatedAny = true;
+            }
+            if (updatedAny) {
+              if (stEl) {
+                stEl.textContent = pImg ? '✅ 商品名と画像を自動取得しました！' : '✅ 商品名を取得しました（画像は未登録のためWeb画像検索をご利用ください）';
+                stEl.classList.remove('hidden');
+              }
+              return true;
             }
           }
-        }
-      } catch (e) {}
+        } catch (e) {}
+      }
+      return false;
     }
 </script>
 </body>

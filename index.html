@@ -2890,6 +2890,12 @@
       display: none !important;
     }
 
+    body:has(#modal-supple-intake:not(.hidden)) #supple-fab-add,
+    body:has(#modal-supple-master:not(.hidden)) #supple-fab-add,
+    body:has(#modal-supple-scanner:not(.hidden)) #supple-fab-add {
+      display: none !important;
+    }
+
     /* サプリモーダルの hidden は display: none !important を保証 */
     #modal-supple-intake.hidden,
     #modal-supple-master.hidden,
@@ -44006,9 +44012,13 @@ initFortuneHub();
         }
       }
       // サプリFABの表示制御
-      const _sFab = document.getElementById('supple-fab-add');
-      if (_sFab) {
-        _sFab.style.setProperty('display', mainTab === 'supplement-mode' ? 'flex' : 'none', 'important');
+      if (typeof syncSuppleFabVisibility === 'function') {
+        syncSuppleFabVisibility();
+      } else {
+        const _sFab = document.getElementById('supple-fab-add');
+        if (_sFab) {
+          _sFab.style.setProperty('display', mainTab === 'supplement-mode' ? 'flex' : 'none', 'important');
+        }
       }
       // サプリタブ以外に移動したときはサプリモーダルをすべて閉じる
       if (mainTab !== 'supplement-mode') {
@@ -59704,9 +59714,20 @@ initFortuneHub();
     var suppleCurrentScannerTarget = 'intake';
     var suppleTabInitialized = false;
 
+    function syncSuppleFabVisibility() {
+      const fab = document.getElementById('supple-fab-add');
+      if (!fab) return;
+      const suppleTab = document.getElementById('supplement-mode');
+      const isSuppleActive = !!(suppleTab && suppleTab.classList.contains('active'));
+      const anyModalOpen = ['modal-supple-intake', 'modal-supple-master', 'modal-supple-scanner'].some((id) => {
+        const el = document.getElementById(id);
+        return el && !el.classList.contains('hidden');
+      });
+      fab.style.setProperty('display', (isSuppleActive && !anyModalOpen) ? 'flex' : 'none', 'important');
+    }
+
     function initSupplementTab() {
-      const _sFab = document.getElementById('supple-fab-add');
-      if (_sFab) _sFab.style.setProperty('display', 'flex', 'important');
+      syncSuppleFabVisibility();
       const _syncBtn = document.getElementById('cross-device-sync-btn');
       if (_syncBtn) _syncBtn.style.setProperty('display', 'none', 'important');
 
@@ -59973,6 +59994,7 @@ initFortuneHub();
         modal.classList.add('flex');
         modal.style.setProperty('display', 'flex', 'important');
       }
+      syncSuppleFabVisibility();
     }
 
     // ◯ 摂取記録の編集モーダルを開く
@@ -60003,6 +60025,7 @@ initFortuneHub();
         modal.classList.remove('hidden');
         modal.style.setProperty('display', 'flex', 'important');
       }
+      syncSuppleFabVisibility();
     }
 
     
@@ -60019,6 +60042,7 @@ initFortuneHub();
           el.style.setProperty('display', 'none', 'important');
         }
       });
+      syncSuppleFabVisibility();
     }
 
     function closeSuppleIntakeModal() {
@@ -60029,6 +60053,7 @@ initFortuneHub();
         modal.style.setProperty('display', 'none', 'important');
       }
       closeSuppleDropdown();
+      syncSuppleFabVisibility();
     }
 
     // 編集モーダル内の「🗑️ 削除」ボタン
@@ -60361,6 +60386,7 @@ initFortuneHub();
         modal.classList.add('flex');
         modal.style.setProperty('display', 'flex', 'important');
       }
+      syncSuppleFabVisibility();
     }
 
     function closeSuppleMasterModal() {
@@ -60370,6 +60396,7 @@ initFortuneHub();
         modal.classList.remove('flex');
         modal.style.setProperty('display', 'none', 'important');
       }
+      syncSuppleFabVisibility();
     }
 
     function submitSuppleMaster() {
@@ -60444,6 +60471,7 @@ initFortuneHub();
 
       modal.classList.remove('hidden');
       modal.style.setProperty('display', 'flex', 'important');
+      syncSuppleFabVisibility();
 
       try {
         if (!suppleHtml5QrScanner && typeof Html5Qrcode !== 'undefined') {
@@ -60485,6 +60513,7 @@ initFortuneHub();
       if (suppleHtml5QrScanner) {
         try { await suppleHtml5QrScanner.stop(); } catch (e) {}
       }
+      syncSuppleFabVisibility();
     }
 
     let suppleBarcodeLookupSeq = 0;

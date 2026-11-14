@@ -26,10 +26,14 @@
       display: flex; flex-direction: column; align-items: center; justify-content: center;
       transition: opacity 0.45s cubic-bezier(0.16, 1, 0.3, 1), transform 0.45s cubic-bezier(0.16, 1, 0.3, 1);
       opacity: 1;
+      will-change: opacity, transform;
+      transform: translateZ(0);
+      backface-visibility: hidden;
+      contain: layout style paint;
     }
     #boot-splash.splash-out {
       opacity: 0 !important;
-      transform: scale(1.02);
+      transform: scale3d(1.02, 1.02, 1);
       pointer-events: none !important;
     }
     #boot-splash.is-gone {
@@ -41,6 +45,10 @@
     .boot-logo {
       font-size: 26px; font-weight: 900; letter-spacing: 0.45em; padding-left: 0.45em;
       color: #67e8f9; font-family: ui-sans-serif, system-ui, sans-serif;
+    }
+    html:not(.ui-ready) body > *:not(#boot-splash),
+    html:not(.ui-ready) body > *:not(#boot-splash) * {
+      animation-play-state: paused !important;
     }
   </style>
   <script>
@@ -1591,10 +1599,14 @@
       display: flex; flex-direction: column; align-items: center; justify-content: center;
       transition: opacity 0.45s cubic-bezier(0.16, 1, 0.3, 1), transform 0.45s cubic-bezier(0.16, 1, 0.3, 1);
       opacity: 1;
+      will-change: opacity, transform;
+      transform: translateZ(0);
+      backface-visibility: hidden;
+      contain: layout style paint;
     }
     #boot-splash.splash-out {
       opacity: 0 !important;
-      transform: scale(1.02);
+      transform: scale3d(1.02, 1.02, 1);
       pointer-events: none !important;
     }
     #boot-splash.is-gone {
@@ -1604,29 +1616,36 @@
       display: none !important;
     }
     .splash-fade-in {
+      will-change: transform, opacity;
       animation: splashFadeInDark 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
     }
     @keyframes splashFadeInDark {
-      0% { opacity: 0; transform: scale(0.97); }
-      100% { opacity: 1; transform: scale(1); }
+      0% { opacity: 0; transform: scale3d(0.97, 0.97, 1); }
+      100% { opacity: 1; transform: scale3d(1, 1, 1); }
     }
-    .boot-ring { position: relative; width: 96px; height: 96px; }
+    .boot-ring { position: relative; width: 96px; height: 96px; contain: layout style; }
     .boot-ring::before {
       content: ""; position: absolute; inset: 0; border-radius: 9999px;
       border: 3px solid transparent;
       border-top-color: #22d3ee; border-bottom-color: #818cf8;
+      box-shadow: 0 0 14px rgba(34, 211, 238, 0.35);
+      will-change: transform;
+      transform: translateZ(0);
       animation: boot-spin 1.2s linear infinite;
-      filter: drop-shadow(0 0 8px rgba(34, 211, 238, 0.8));
     }
     .boot-ring::after {
       content: ""; position: absolute; inset: -10px; border-radius: 9999px;
       border: 2px solid rgba(34, 211, 238, 0.35);
+      will-change: transform, opacity;
+      transform: translateZ(0);
       animation: boot-ping 1.8s cubic-bezier(0, 0, 0.2, 1) infinite;
     }
     .boot-core {
       position: absolute; inset: 0; margin: auto; width: 20px; height: 20px;
       border-radius: 9999px; background: #fff;
       box-shadow: 0 0 24px 10px rgba(34, 211, 238, 0.75);
+      will-change: opacity;
+      transform: translateZ(0);
       animation: boot-glow 1.6s ease-in-out infinite;
     }
     .boot-logo {
@@ -1637,8 +1656,8 @@
       text-shadow: 0 0 22px rgba(34, 211, 238, 0.45);
       font-family: ui-sans-serif, system-ui, sans-serif;
     }
-    @keyframes boot-spin { to { transform: rotate(360deg); } }
-    @keyframes boot-ping { 0% { transform: scale(0.8); opacity: 1; } 100% { transform: scale(1.6); opacity: 0; } }
+    @keyframes boot-spin { from { transform: rotate3d(0, 0, 1, 0deg); } to { transform: rotate3d(0, 0, 1, 360deg); } }
+    @keyframes boot-ping { 0% { transform: scale3d(0.8, 0.8, 1); opacity: 1; } 100% { transform: scale3d(1.6, 1.6, 1); opacity: 0; } }
     @keyframes boot-glow { 0%, 100% { opacity: 1; } 50% { opacity: 0.55; } }
 
     /* ===== ブートスプラッシュ演出スタイル群 ===== */
@@ -4740,12 +4759,35 @@
         }
       };
 
+      var afterSplashQueue = [];
+      var afterSplashFlushed = false;
+      function flushAfterBootSplash() {
+        if (afterSplashFlushed) return;
+        afterSplashFlushed = true;
+        var q = afterSplashQueue.splice(0, afterSplashQueue.length);
+        q.forEach(function (item, idx) {
+          setTimeout(function () {
+            try { item(); } catch (_) {}
+          }, idx * 80);
+        });
+      }
+      window.__afterBootSplash = function (fn) {
+        if (typeof fn !== 'function') return;
+        if (afterSplashFlushed || hardRemoved) {
+          setTimeout(function () { try { fn(); } catch (_) {} }, 50);
+          return;
+        }
+        afterSplashQueue.push(fn);
+      };
+
       // 即時起動の場合は即座に非表示、それ以外は暗闇から演出を展開
       if (currentSplashStyle === 'instant') {
+        document.documentElement.classList.add('ui-ready');
         if (s0) {
           s0.style.display = 'none';
           hardRemoved = true;
         }
+        flushAfterBootSplash();
       } else if (s0) {
         window.__renderSplashContent(s0, currentSplashStyle);
       }
@@ -4794,7 +4836,7 @@
         var durationLeft = minShowUntil - Date.now();
         // 演出の所定時間が終わるまで待機し、演出のブツ切りを防ぐ
         if (!force && !timedOut && (durationLeft > 0 || !bootLayoutReady || !utilitiesReady())) {
-          var waitTime = Math.max(30, durationLeft > 0 ? durationLeft : 30);
+          var waitTime = Math.max(80, durationLeft > 0 ? durationLeft : 80);
           setTimeout(function () { scheduleReveal(false); }, waitTime);
           return;
         }
@@ -4816,6 +4858,7 @@
           if (s.parentNode) s.parentNode.removeChild(s);
         } catch (_) {}
         hardRemoved = true;
+        flushAfterBootSplash();
       }
 
       function dismissBootSplash(force) {
@@ -9302,9 +9345,9 @@
           <div class="bg-black/30 p-3.5 rounded-2xl border border-cyan-900/40 space-y-2">
             <div class="flex items-center justify-between">
               <label class="block text-xs font-bold text-cyan-200">🏷️ バーコード (JANコード)</label>
-              <span class="text-[10px] text-slate-400 font-medium">パッケージのバーコード</span>
+              <span class="text-[10px] text-slate-400 font-medium">読み取りで商品名を自動入力</span>
             </div>
-            <div class="flex gap-2">
+            <div class="flex gap-1.5">
               <input
                 type="text"
                 id="supple-master-barcode"
@@ -9313,12 +9356,21 @@
               />
               <button
                 type="button"
+                onclick="lookupSuppleNameByBarcode(document.getElementById('supple-master-barcode').value, { overwrite: true })"
+                class="px-2.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-cyan-800/60 text-cyan-200 text-xs font-bold flex items-center gap-1 active:scale-95 transition-all whitespace-nowrap shrink-0"
+                title="バーコードから商品名を取得してサプリ名に入力"
+              >
+                🔍
+              </button>
+              <button
+                type="button"
                 onclick="openSuppleBarcodeScanner('master')"
                 class="px-3 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-600 text-white text-xs font-bold flex items-center gap-1 shadow-xs active:scale-95 transition-all whitespace-nowrap shrink-0"
               >
                 📷 スキャン
               </button>
             </div>
+            <p id="supple-barcode-lookup-status" class="hidden text-[11px] font-medium px-0.5 leading-snug"></p>
           </div>
 
           <!-- 写真設定 -->
@@ -13499,28 +13551,9 @@
           initMainTabLayout();
           applyDumpDeepLinkFromUrl_();
           switchTab('memo-mode', { skipHelp: true, skipAutoFocus: true });
-          initAbstinenceHub();
-initFortuneHub();
-          initBirthPartControls();
-          if (typeof loadHistoryTombstones === 'function') loadHistoryTombstones();
-          if (typeof loadInputHistoryResurrectedKeys === 'function') loadInputHistoryResurrectedKeys();
-          if (typeof purgeCorruptLocalInputHistory === 'function') purgeCorruptLocalInputHistory();
-          if (typeof pruneStaleLocalInputHistory === 'function') pruneStaleLocalInputHistory();
-          migrateInputHistoryFromOperations();
-          migrateLocalInputHistoryToCloud();
-          if (typeof loadStats === 'function') loadStats();
-          initContextualInfo();
           toggleDirectDestinationUI();
-          startCrossDeviceSyncWatchers();
           if (typeof bindInputContentEditorKeys === 'function') bindInputContentEditorKeys();
           if (typeof bindDumpComposeImageUi === 'function') bindDumpComposeImageUi();
-          if (typeof resumePendingInboxWrites === 'function') resumePendingInboxWrites({ silent: true });
-          setTimeout(function () {
-            requestCrossDeviceSync({ force: true, reason: 'boot' });
-          }, 700);
-          setTimeout(function () {
-            if (typeof warmDuplicateIndexes === 'function') warmDuplicateIndexes();
-          }, 500);
         } catch (err) {
           console.error('boot init failed', err);
         } finally {
@@ -13532,6 +13565,45 @@ initFortuneHub();
             if (typeof forceHideLoader === 'function') forceHideLoader();
           } catch (_) {}
         }
+
+        const schedulePostSplash = typeof window.__afterBootSplash === 'function'
+          ? window.__afterBootSplash
+          : function (fn) { setTimeout(fn, 1400); };
+
+        schedulePostSplash(function () {
+          try {
+            initAbstinenceHub();
+            initFortuneHub();
+            initBirthPartControls();
+            initContextualInfo();
+          } catch (e) { console.error('post-splash ui init failed', e); }
+        });
+
+        schedulePostSplash(function () {
+          try {
+            if (typeof loadHistoryTombstones === 'function') loadHistoryTombstones();
+            if (typeof loadInputHistoryResurrectedKeys === 'function') loadInputHistoryResurrectedKeys();
+            if (typeof purgeCorruptLocalInputHistory === 'function') purgeCorruptLocalInputHistory();
+            if (typeof pruneStaleLocalInputHistory === 'function') pruneStaleLocalInputHistory();
+            migrateInputHistoryFromOperations();
+            migrateLocalInputHistoryToCloud();
+            if (typeof loadStats === 'function') loadStats();
+          } catch (e) { console.error('post-splash history init failed', e); }
+        });
+
+        schedulePostSplash(function () {
+          try {
+            if (typeof warmDuplicateIndexes === 'function') warmDuplicateIndexes();
+            startCrossDeviceSyncWatchers();
+            if (typeof resumePendingInboxWrites === 'function') resumePendingInboxWrites({ silent: true });
+          } catch (e) { console.error('post-splash index init failed', e); }
+        });
+
+        schedulePostSplash(function () {
+          try {
+            requestCrossDeviceSync({ force: true, reason: 'boot' });
+          } catch (e) { console.error('post-splash sync failed', e); }
+        });
       }
       setTimeout(runBootInit, 0);
     };
@@ -60282,6 +60354,7 @@ initFortuneHub();
       const pasteZone = document.getElementById('supple-paste-zone');
       if (pasteZone) pasteZone.innerHTML = '';
       setSupplePasteStatus('');
+      if (typeof setSuppleBarcodeLookupStatus === 'function') setSuppleBarcodeLookupStatus('');
       const modal = document.getElementById('modal-supple-master');
       if (modal) {
         modal.classList.remove('hidden');
@@ -60414,12 +60487,106 @@ initFortuneHub();
       }
     }
 
+    let suppleBarcodeLookupSeq = 0;
+
+    function setSuppleBarcodeLookupStatus(msg, type = 'info') {
+      const el = document.getElementById('supple-barcode-lookup-status');
+      if (!el) return;
+      if (!msg) {
+        el.classList.add('hidden');
+        el.textContent = '';
+        return;
+      }
+      el.textContent = msg;
+      el.classList.remove('hidden', 'text-cyan-300', 'text-emerald-300', 'text-amber-300', 'text-rose-400');
+      if (type === 'success') el.classList.add('text-emerald-300');
+      else if (type === 'warn') el.classList.add('text-amber-300');
+      else if (type === 'error') el.classList.add('text-rose-400');
+      else el.classList.add('text-cyan-300');
+    }
+
+    async function lookupSuppleNameFromOpenFoodFactsDirect(code) {
+      const candidates = [code];
+      if (code.length === 13 && code.startsWith('0')) candidates.push(code.slice(1));
+      for (const c of candidates) {
+        try {
+          const controller = new AbortController();
+          const timer = setTimeout(() => controller.abort(), 5000);
+          const resp = await fetch(
+            'https://world.openfoodfacts.org/api/v2/product/' + encodeURIComponent(c) + '.json?fields=product_name,product_name_ja,brands',
+            { signal: controller.signal }
+          );
+          clearTimeout(timer);
+          if (!resp.ok) continue;
+          const json = await resp.json();
+          if (json && json.status === 1 && json.product) {
+            const p = json.product;
+            const baseName = (p.product_name_ja || p.product_name || '').trim();
+            const brand = (p.brands || '').split(',')[0].trim();
+            let fullName = baseName;
+            if (brand && baseName && !baseName.toLowerCase().includes(brand.toLowerCase())) {
+              fullName = brand + ' ' + baseName;
+            }
+            const cleaned = (fullName || brand || '').replace(/\s+/g, ' ').trim();
+            if (cleaned) return cleaned.slice(0, 80);
+          }
+        } catch (_) {}
+      }
+      return '';
+    }
+
+    async function lookupSuppleNameByBarcode(barcode, opts = {}) {
+      const code = String(barcode || '').replace(/[^\dA-Za-z]/g, '').trim();
+      if (!code) {
+        if (opts.overwrite) setSuppleBarcodeLookupStatus('先にバーコード番号を入力してください', 'warn');
+        return '';
+      }
+      const seq = ++suppleBarcodeLookupSeq;
+      setSuppleBarcodeLookupStatus('🔍 バーコードから商品名を検索中...', 'info');
+
+      let foundName = '';
+      try {
+        if (typeof callAPI === 'function') {
+          const res = await callAPI('lookupJanProduct', { barcode: code }, { silent: true });
+          if (res && res.success && res.name) {
+            foundName = String(res.name).trim();
+          }
+        }
+      } catch (_) {}
+
+      if (!foundName && seq === suppleBarcodeLookupSeq) {
+        foundName = await lookupSuppleNameFromOpenFoodFactsDirect(code);
+      }
+
+      if (seq !== suppleBarcodeLookupSeq) return '';
+
+      const currentCode = (document.getElementById('supple-master-barcode')?.value || '').replace(/[^\dA-Za-z]/g, '').trim();
+      if (currentCode && currentCode !== code) return '';
+
+      if (!foundName) {
+        setSuppleBarcodeLookupStatus('⚠️ 商品名が見つかりませんでした（手動で入力してください）', 'warn');
+        return '';
+      }
+
+      const nameEl = document.getElementById('supple-master-name');
+      if (nameEl) {
+        if (!nameEl.value.trim() || opts.overwrite) {
+          nameEl.value = foundName;
+          setSuppleBarcodeLookupStatus('✅ 商品名を自動入力しました: ' + foundName, 'success');
+        } else {
+          setSuppleBarcodeLookupStatus('ℹ️ 取得候補: ' + foundName, 'info');
+        }
+      }
+      return foundName;
+    }
+
     function onSuppleBarcodeScanned(barcode) {
       playSuppleBeep();
       closeSupplementBarcodeScanner();
 
       if (suppleCurrentScannerTarget === 'master') {
         document.getElementById('supple-master-barcode').value = barcode;
+        lookupSuppleNameByBarcode(barcode, { overwrite: false });
       } else {
         const matched = suppleMasters.find(s => s.barcode && s.barcode.trim() === barcode.trim());
         if (matched) {
@@ -60428,6 +60595,7 @@ initFortuneHub();
           if (confirm('バーコード「' + barcode + '」に一致するサプリは未登録です。新しくサプリを登録しますか？')) {
             openSuppleMasterModal();
             document.getElementById('supple-master-barcode').value = barcode;
+            lookupSuppleNameByBarcode(barcode, { overwrite: false });
           }
         }
       }

@@ -130,6 +130,8 @@ function dispatchAction(params) {
     return deleteGanttCalendarEvent(params.googleEventId);
   } else if (action === 'syncAllGanttToCalendar') {
     return syncAllGanttToCalendar(params.tasks || []);
+  } else if (action === 'lookupJanProduct') {
+    return lookupJanProduct(params.barcode || params.code || '');
   } else if (action === 'keepWarm') {
     return keepWarm();
   }
@@ -1122,4 +1124,84 @@ function syncAllGanttToCalendar(tasks) {
     }
   }
   return { success: true, results: results };
+}
+
+function cleanJanProductName_(raw) {
+  let s = String(raw || '').replace(/<[^>]*>/g, ' ').replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>');
+  s = s.replace(/【[^】]*】/g, ' ').replace(/\[[^\]]*\]/g, ' ').replace(/\s+/g, ' ').trim();
+  if (s.length > 80) s = s.slice(0, 80).trim();
+  return s;
+}
+
+function lookupJanProduct(barcode) {
+  const code = String(barcode || '').replace(/[^\dA-Za-z]/g, '').trim();
+  if (!code) return { success: false, name: '', source: '' };
+
+  const candidates = [code];
+  if (code.length === 13 && code.charAt(0) === '0') {
+    candidates.push(code.slice(1));
+  }
+
+  // 1. OpenFoodFacts API
+  for (let i = 0; i < candidates.length; i++) {
+    try {
+      const url = 'https://world.openfoodfacts.org/api/v2/product/' + encodeURIComponent(candidates[i]) + '.json?fields=product_name,product_name_ja,brands';
+      const res = UrlFetchApp.fetch(url, { muteHttpExceptions: true });
+      if (res.getResponseCode() === 200) {
+        const json = JSON.parse(res.getContentText() || '{}');
+        if (json && json.status === 1 && json.product) {
+          const p = json.product;
+          const baseName = (p.product_name_ja || p.product_name || '').trim();
+          const brand = (p.brands || '').split(',')[0].trim();
+          let fullName = baseName;
+          if (brand && baseName && baseName.toLowerCase().indexOf(brand.toLowerCase()) === -1) {
+            fullName = brand + ' ' + baseName;
+          }
+          const cleaned = cleanJanProductName_(fullName || brand);
+          if (cleaned) return { success: true, name: cleaned, source: 'openfoodfacts' };
+        }
+      }
+    } catch (e) {}
+  }
+
+  // 2. UPCitemdb Trial API
+  for (let i = 0; i < candidates.length; i++) {
+    try {
+      const url = 'https://api.upcitemdb.com/prod/trial/lookup?upc=' + encodeURIComponent(candidates[i]);
+      const res = UrlFetchApp.fetch(url, { muteHttpExceptions: true });
+      if (res.getResponseCode() === 200) {
+        const json = JSON.parse(res.getContentText() || '{}');
+        if (json && json.items && json.items.length > 0 && json.items[0].title) {
+          const cleaned = cleanJanProductName_(json.items[0].title);
+          if (cleaned) return { success: true, name: cleaned, source: 'upcitemdb' };
+        }
+      }
+    } catch (e) {}
+  }
+
+  // 3. Yahoo!ショッピング検索 (国内JANコード向け)
+  try {
+    const url = 'https://shopping.yahoo.co.jp/search?p=' + encodeURIComponent(code);
+    const res = UrlFetchApp.fetch(url, {
+      muteHttpExceptions: true,
+      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; DumpApp/1.0)' }
+    });
+    if (res.getResponseCode() === 200) {
+      const html = res.getContentText() || '';
+      const nextMatch = html.match(/<script id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/);
+      if (nextMatch && nextMatch[1]) {
+        const data = JSON.parse(nextMatch[1]);
+        const str = JSON.stringify(data);
+        const nameMatch = str.match(/"name":"([^"]{4,120})"/);
+        if (nameMatch && nameMatch[1]) {
+          const cleaned = cleanJanProductName_(nameMatch[1]);
+          if (cleaned && cleaned.indexOf('Yahoo') === -1) {
+            return { success: true, name: cleaned, source: 'yahoo_shopping' };
+          }
+        }
+      }
+    }
+  } catch (e) {}
+
+  return { success: false, name: '', source: '' };
 }

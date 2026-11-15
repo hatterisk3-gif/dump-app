@@ -46,13 +46,14 @@
       font-size: 26px; font-weight: 900; letter-spacing: 0.45em; padding-left: 0.45em;
       color: #67e8f9; font-family: ui-sans-serif, system-ui, sans-serif;
     }
-    html:not(.ui-ready) body > *:not(#boot-splash),
-    html:not(.ui-ready) body > *:not(#boot-splash) * {
+    html:not(.ui-ready) #space-background,
+    html:not(.ui-ready) #space-background *,
+    html:not(.ui-ready) .tab-content {
       animation-play-state: paused !important;
     }
   </style>
   <script>
-    window.__DUMP_BUILD__ = 'v445';
+    window.__DUMP_BUILD__ = 'v446';
     // かつてここで「既知の最新ビルドより古い＝巻き戻り」と判定し、キャッシュ全消し＋SW登録解除を
     // していたが、その直後はオフライン用の控えが無く、ネットワークが不調だと起動不能になった。
     // 判定値(dump_known_good_build)は下がらない一方通行のため、一度ずれると毎回自己破壊を繰り返す。
@@ -118,9 +119,27 @@
   </script>
   <!-- Tailwind は defer（同期だと CDN 不通時に body まで到達せず起動不能） -->
   <script src="https://cdn.tailwindcss.com" defer></script>
-  <script src="./iztro.min.js" defer></script>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js" defer></script>
-  <script src="https://unpkg.com/html5-qrcode" defer></script>
+  <!-- iztro / Chart.js / html5-qrcode は起動アニメーションの突っかかり防止のためスプラッシュ後・必要時に遅延読込 -->
+  <script>
+    (function () {
+      var loadingScripts = {};
+      window.__ensureExternalScript = function (src, isReady) {
+        try {
+          if (typeof isReady === 'function' && isReady()) return Promise.resolve(true);
+        } catch (_) {}
+        if (loadingScripts[src]) return loadingScripts[src];
+        loadingScripts[src] = new Promise(function (resolve) {
+          var s = document.createElement('script');
+          s.src = src;
+          s.async = true;
+          s.onload = function () { resolve(true); };
+          s.onerror = function () { resolve(false); };
+          document.head.appendChild(s);
+        });
+        return loadingScripts[src];
+      };
+    })();
+  </script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@500;700;800&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap" rel="stylesheet">
@@ -1617,19 +1636,27 @@
     }
     .splash-fade-in {
       will-change: transform, opacity;
-      animation: splashFadeInDark 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+      backface-visibility: hidden;
+      transform: translateZ(0);
+      animation: splashFadeInDark 0.36s cubic-bezier(0.16, 1, 0.3, 1) forwards;
     }
     @keyframes splashFadeInDark {
       0% { opacity: 0; transform: scale3d(0.97, 0.97, 1); }
       100% { opacity: 1; transform: scale3d(1, 1, 1); }
     }
-    .boot-ring { position: relative; width: 96px; height: 96px; contain: layout style; }
+    .boot-ring {
+      position: relative; width: 96px; height: 96px;
+      contain: layout style;
+      transform: translateZ(0);
+      isolation: isolate;
+    }
     .boot-ring::before {
       content: ""; position: absolute; inset: 0; border-radius: 9999px;
       border: 3px solid transparent;
       border-top-color: #22d3ee; border-bottom-color: #818cf8;
       box-shadow: 0 0 14px rgba(34, 211, 238, 0.35);
       will-change: transform;
+      backface-visibility: hidden;
       transform: translateZ(0);
       animation: boot-spin 1.2s linear infinite;
     }
@@ -1637,6 +1664,7 @@
       content: ""; position: absolute; inset: -10px; border-radius: 9999px;
       border: 2px solid rgba(34, 211, 238, 0.35);
       will-change: transform, opacity;
+      backface-visibility: hidden;
       transform: translateZ(0);
       animation: boot-ping 1.8s cubic-bezier(0, 0, 0.2, 1) infinite;
     }
@@ -1645,6 +1673,7 @@
       border-radius: 9999px; background: #fff;
       box-shadow: 0 0 24px 10px rgba(34, 211, 238, 0.75);
       will-change: opacity;
+      backface-visibility: hidden;
       transform: translateZ(0);
       animation: boot-glow 1.6s ease-in-out infinite;
     }
@@ -1665,23 +1694,26 @@
     .splash-neon-logo {
       font-size: 38px; font-weight: 900; letter-spacing: 0.35em; padding-left: 0.35em;
       color: #fff;
-      text-shadow: 0 0 10px #22d3ee, 0 0 20px #22d3ee, 0 0 40px #06b6d4, 0 0 80px #0891b2;
+      text-shadow: 0 0 10px #22d3ee, 0 0 25px #06b6d4, 0 0 50px #0891b2, -2px 0 #f43f5e, 2px 0 #06b6d4;
+      will-change: opacity, transform;
+      backface-visibility: hidden;
       animation: neonFlicker 1.4s ease-in-out infinite alternate;
       position: relative;
     }
     .splash-neon-sub {
       margin-top: 14px; font-size: 11px; font-weight: 800; letter-spacing: 0.3em;
       color: #38bdf8; text-shadow: 0 0 8px rgba(56, 189, 248, 0.8);
+      will-change: opacity;
       animation: pulseSub 1.2s ease-in-out infinite;
     }
     @keyframes neonFlicker {
       0%, 19%, 21%, 23%, 25%, 54%, 56%, 100% {
         opacity: 1;
-        text-shadow: 0 0 10px #22d3ee, 0 0 25px #06b6d4, 0 0 50px #0891b2, -2px 0 #f43f5e, 2px 0 #06b6d4;
+        transform: translate3d(0, 0, 0);
       }
       20%, 24%, 55% {
         opacity: 0.25;
-        text-shadow: none;
+        transform: translate3d(1px, 0, 0);
       }
     }
     @keyframes pulseSub { 0%, 100% { opacity: 0.5; } 50% { opacity: 1; } }
@@ -2465,6 +2497,55 @@
     }
     .fortune-home-profile-link:active {
       transform: scale(0.98);
+    }
+    /* ミチシルベ：生年月日・出生時間スライダー */
+    .fortune-slider-card {
+      position: relative;
+      animation: fortune-home-rise 0.7s ease-out 0.28s both;
+    }
+    .fortune-range-slider {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 100%;
+      height: 10px;
+      border-radius: 9999px;
+      background: rgba(12, 74, 110, 0.45);
+      border: 1px solid rgba(56, 189, 248, 0.3);
+      outline: none;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .fortune-range-slider:hover {
+      background: rgba(12, 74, 110, 0.65);
+      border-color: rgba(56, 189, 248, 0.5);
+    }
+    .fortune-range-slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 35% 35%, #e0f2fe, #0284c7);
+      box-shadow: 0 0 10px rgba(56, 189, 248, 0.65), 0 2px 4px rgba(0, 0, 0, 0.4);
+      border: 2px solid #ffffff;
+      cursor: pointer;
+      transition: transform 0.1s ease, box-shadow 0.1s ease;
+    }
+    .fortune-range-slider::-webkit-slider-thumb:active {
+      transform: scale(1.18);
+      box-shadow: 0 0 16px rgba(56, 189, 248, 0.95), 0 2px 6px rgba(0, 0, 0, 0.6);
+    }
+    .fortune-range-slider::-moz-range-thumb {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 35% 35%, #e0f2fe, #0284c7);
+      box-shadow: 0 0 10px rgba(56, 189, 248, 0.65);
+      border: 2px solid #ffffff;
+      cursor: pointer;
+    }
+    .fortune-slider-btn {
+      touch-action: manipulation;
     }
     @keyframes fortune-home-rise {
       from { opacity: 0; transform: translateY(12px); }
@@ -4798,7 +4879,9 @@
         window.__renderSplashContent(s0, currentSplashStyle);
       }
 
+      var twReadyCached = false;
       function utilitiesReady() {
+        if (twReadyCached) return true;
         try {
           var probe = document.getElementById('tw-ready-probe');
           if (!probe) {
@@ -4809,26 +4892,50 @@
             probe.style.cssText = 'left:0;top:0;width:0;height:0;overflow:hidden;pointer-events:none;';
             document.documentElement.appendChild(probe);
           }
-          return window.getComputedStyle(probe).position === 'fixed';
+          var ready = window.getComputedStyle(probe).position === 'fixed';
+          if (ready) {
+            twReadyCached = true;
+            if (probe.parentNode) probe.parentNode.removeChild(probe);
+          }
+          return ready;
         } catch (e) {
           return true;
         }
       }
 
+      var fadingStarted = false;
       function smoothFadeSplash() {
-        if (hardRemoved) return;
+        if (hardRemoved || fadingStarted) return;
         var s = document.getElementById('boot-splash');
-        if (!s) { hardRemoved = true; return; }
-        // フェードアウト開始（CSS transition 0.45s）
-        s.classList.add('splash-out');
-        setTimeout(function () {
+        if (!s) {
+          hardRemoved = true;
+          document.documentElement.classList.add('ui-ready');
+          flushAfterBootSplash();
+          return;
+        }
+        fadingStarted = true;
+        var done = false;
+        var finish = function () {
+          if (done) return;
+          done = true;
           removeSplashNow(s);
-        }, 460);
+        };
+        s.addEventListener('transitionend', function onEnd(ev) {
+          if (ev && ev.target === s && ev.propertyName === 'opacity') {
+            s.removeEventListener('transitionend', onEnd);
+            finish();
+          }
+        });
+        // フェードアウト開始（CSS transition 0.45s）。完了後に ui-ready を付与して衝突を防ぐ
+        requestAnimationFrame(function () {
+          if (hardRemoved) return;
+          s.classList.add('splash-out');
+        });
+        setTimeout(finish, 500);
       }
 
       function revealBootSurface() {
         if (hardRemoved) return;
-        document.documentElement.classList.add('ui-ready');
         smoothFadeSplash();
       }
 
@@ -4837,7 +4944,7 @@
       var minShowUntil = Date.now() + styleDuration;
 
       function scheduleReveal(force) {
-        if (hardRemoved) return;
+        if (hardRemoved || fadingStarted) return;
         var timedOut = Date.now() >= revealDeadline;
         var durationLeft = minShowUntil - Date.now();
         // 演出の所定時間が終わるまで待機し、演出のブツ切りを防ぐ
@@ -4853,18 +4960,24 @@
 
       function removeSplashNow(s) {
         s = s || document.getElementById('boot-splash');
-        if (!s) { hardRemoved = true; return; }
-        try {
-          s.classList.add('is-gone');
-          s.style.display = 'none';
-          s.style.opacity = '0';
-          s.style.visibility = 'hidden';
-          s.style.pointerEvents = 'none';
-          s.setAttribute('aria-hidden', 'true');
-          if (s.parentNode) s.parentNode.removeChild(s);
-        } catch (_) {}
+        if (s) {
+          try {
+            s.classList.add('is-gone');
+            s.style.display = 'none';
+            s.style.opacity = '0';
+            s.style.visibility = 'hidden';
+            s.style.pointerEvents = 'none';
+            s.setAttribute('aria-hidden', 'true');
+            if (s.parentNode) s.parentNode.removeChild(s);
+          } catch (_) {}
+        }
+        if (hardRemoved) return;
         hardRemoved = true;
-        flushAfterBootSplash();
+        // スプラッシュ消去後、次フレームで背後UIのアニメーション・後続タスクを段階的に解放
+        requestAnimationFrame(function () {
+          document.documentElement.classList.add('ui-ready');
+          requestAnimationFrame(flushAfterBootSplash);
+        });
       }
 
       function dismissBootSplash(force) {
@@ -8959,7 +9072,7 @@
           <p class="text-[10px] sm:text-[11px] text-sky-300/70 font-bold mt-0.5 tracking-wide">命式で道を読む</p>
         </div>
         <div class="flex items-center gap-2">
-          <button type="button" onclick="openFortuneProfileCard()" aria-label="プロフィール設定" title="プロフィール設定" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-sky-700/60 bg-sky-950/40 text-xs text-sky-200 hover:text-white hover:border-sky-400 transition font-bold shrink-0">
+          <button type="button" onclick="openFortuneProfileModal()" aria-label="プロファイル・名前の管理" title="プロファイル・名前の管理" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-sky-700/60 bg-sky-950/40 text-xs text-sky-200 hover:text-white hover:border-sky-400 transition font-bold shrink-0">
             <span>👤</span>
             <span id="fortune-header-profile-name" class="max-w-[100px] truncate">未設定</span>
           </button>
@@ -8981,23 +9094,137 @@
               <circle cx="280" cy="180" r="1.5" fill="rgba(226,232,240,0.4)"/>
             </svg>
             <div class="fortune-home-inner">
+              <!-- 1. 今日の干支 -->
               <div>
                 <h1 class="fortune-home-brand">ミチシルベ</h1>
                 <p class="fortune-home-kicker">MICHI SHIRUBE</p>
-                <p class="fortune-home-lead mt-4">生年月日から、いまの道筋と整え方を読みます。</p>
-                <div id="fortune-home-kanshi" class="fortune-home-kanshi" aria-label="今日の干支">
+                <div id="fortune-home-kanshi" class="fortune-home-kanshi mt-3" aria-label="今日の干支">
                   <div class="fortune-home-kanshi-head">
                     <span class="fortune-home-kanshi-label">今日の干支</span>
                     <time id="fortune-home-kanshi-date" class="fortune-home-kanshi-date"></time>
                   </div>
                   <div id="fortune-home-kanshi-pillars" class="fortune-home-kanshi-pillars"></div>
                 </div>
-                <div id="fortune-home-status" class="fortune-home-status mt-4 cursor-pointer hover:opacity-80 transition" role="button" tabindex="0" onclick="openFortuneProfileCard()" aria-label="プロフィール設定を開く">
-                  <span class="fortune-home-status-dot" aria-hidden="true"></span>
-                  <span id="fortune-home-status-text">生年月日を登録すると鑑定を開始できます</span>
-                  <span class="text-[10px] text-sky-400/80 ml-1">›</span>
+              </div>
+
+              <!-- 2. 名前（タップで専用ポップアップ） -->
+              <div id="fortune-home-name-wrap" class="w-full">
+                <button type="button" id="fortune-home-name-btn" onclick="openFortuneProfileModal()" class="w-full flex items-center justify-between p-3.5 bg-gradient-to-r from-sky-950/70 via-indigo-950/60 to-slate-950/80 border border-sky-600/40 hover:border-sky-400 rounded-2xl shadow-[0_4px_16px_rgba(2,6,23,0.4)] transition active:scale-[0.99] group text-left">
+                  <div class="flex items-center gap-3 min-w-0">
+                    <span class="text-xl flex-shrink-0">👤</span>
+                    <div class="min-w-0">
+                      <div class="text-[10px] text-sky-400/80 font-extrabold tracking-wider">対象プロファイル</div>
+                      <div id="fortune-home-name-text" class="text-sm sm:text-base font-extrabold text-white truncate">（未設定 - タップして登録・履歴選択）</div>
+                    </div>
+                  </div>
+                  <span class="text-xs px-2.5 py-1 rounded-lg bg-sky-900/60 group-hover:bg-sky-800/80 text-sky-200 border border-sky-500/40 font-bold shrink-0 transition">
+                    登録 / 履歴 ✎
+                  </span>
+                </button>
+              </div>
+
+              <!-- 3. 生年月日と出生時間のスライダー -->
+              <div id="fortune-home-slider-card" class="fortune-slider-card bg-slate-950/75 border border-sky-800/50 rounded-2xl p-4 shadow-[0_4px_24px_rgba(2,6,23,0.55)] space-y-3.5 backdrop-blur-md">
+                <!-- サマリープレビュー -->
+                <div class="flex items-center justify-between gap-2 pb-2.5 border-b border-sky-900/40">
+                  <div class="flex items-center gap-2">
+                    <span class="text-base text-sky-400">📅</span>
+                    <span class="text-xs font-black text-sky-200 tracking-wider">生年月日・時間</span>
+                  </div>
+                  <div id="fortune-slider-preview-badge" class="px-2.5 py-1 rounded-full bg-sky-900/70 border border-sky-500/40 text-[11px] font-mono font-bold text-sky-200">
+                    1995-01-01 12:00
+                  </div>
+                </div>
+
+                <!-- 年スライダー -->
+                <div class="space-y-1">
+                  <div class="flex items-center justify-between text-xs">
+                    <span class="font-bold text-sky-300/80">年</span>
+                    <span id="fortune-slider-year-val" class="font-mono font-extrabold text-sky-100 text-sm">1995年</span>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <button type="button" onclick="adjustFortuneSlider('year', -1)" class="fortune-slider-btn w-9 h-8 rounded-lg bg-sky-950/80 hover:bg-sky-900 border border-sky-700/50 text-sky-200 font-black text-sm flex items-center justify-center shrink-0 active:scale-95" aria-label="1年減らす">−1</button>
+                    <input type="range" id="fortune-slider-year" min="1920" max="2035" value="1995" class="fortune-range-slider flex-1" oninput="onFortuneSliderInput('year')">
+                    <button type="button" onclick="adjustFortuneSlider('year', 1)" class="fortune-slider-btn w-9 h-8 rounded-lg bg-sky-950/80 hover:bg-sky-900 border border-sky-700/50 text-sky-200 font-black text-sm flex items-center justify-center shrink-0 active:scale-95" aria-label="1年増やす">＋1</button>
+                  </div>
+                </div>
+
+                <!-- 月スライダー -->
+                <div class="space-y-1">
+                  <div class="flex items-center justify-between text-xs">
+                    <span class="font-bold text-sky-300/80">月</span>
+                    <span id="fortune-slider-month-val" class="font-mono font-extrabold text-sky-100 text-sm">1月</span>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <button type="button" onclick="adjustFortuneSlider('month', -1)" class="fortune-slider-btn w-9 h-8 rounded-lg bg-sky-950/80 hover:bg-sky-900 border border-sky-700/50 text-sky-200 font-black text-sm flex items-center justify-center shrink-0 active:scale-95" aria-label="1月減らす">−1</button>
+                    <input type="range" id="fortune-slider-month" min="1" max="12" value="1" class="fortune-range-slider flex-1" oninput="onFortuneSliderInput('month')">
+                    <button type="button" onclick="adjustFortuneSlider('month', 1)" class="fortune-slider-btn w-9 h-8 rounded-lg bg-sky-950/80 hover:bg-sky-900 border border-sky-700/50 text-sky-200 font-black text-sm flex items-center justify-center shrink-0 active:scale-95" aria-label="1月増やす">＋1</button>
+                  </div>
+                </div>
+
+                <!-- 日スライダー -->
+                <div class="space-y-1">
+                  <div class="flex items-center justify-between text-xs">
+                    <span class="font-bold text-sky-300/80">日</span>
+                    <span id="fortune-slider-day-val" class="font-mono font-extrabold text-sky-100 text-sm">1日</span>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <button type="button" onclick="adjustFortuneSlider('day', -1)" class="fortune-slider-btn w-9 h-8 rounded-lg bg-sky-950/80 hover:bg-sky-900 border border-sky-700/50 text-sky-200 font-black text-sm flex items-center justify-center shrink-0 active:scale-95" aria-label="1日減らす">−1</button>
+                    <input type="range" id="fortune-slider-day" min="1" max="31" value="1" class="fortune-range-slider flex-1" oninput="onFortuneSliderInput('day')">
+                    <button type="button" onclick="adjustFortuneSlider('day', 1)" class="fortune-slider-btn w-9 h-8 rounded-lg bg-sky-950/80 hover:bg-sky-900 border border-sky-700/50 text-sky-200 font-black text-sm flex items-center justify-center shrink-0 active:scale-95" aria-label="1日増やす">＋1</button>
+                  </div>
+                </div>
+
+                <!-- 出生時間 & 時間不明トグル -->
+                <div class="pt-2.5 border-t border-sky-900/40 space-y-2">
+                  <div class="flex items-center justify-between">
+                    <div class="text-xs font-bold text-sky-300/80">出生時間</div>
+                    <label class="inline-flex items-center gap-1.5 cursor-pointer text-xs text-sky-300 font-bold">
+                      <input type="checkbox" id="fortune-slider-unknown-time" class="accent-sky-500 rounded" onchange="onFortuneUnknownTimeChange()">
+                      <span>時間不明（正午扱い）</span>
+                    </label>
+                  </div>
+
+                  <div id="fortune-slider-time-controls" class="space-y-2">
+                    <!-- 時スライダー -->
+                    <div class="space-y-1">
+                      <div class="flex items-center justify-between text-xs">
+                        <span class="text-slate-400 font-bold">時</span>
+                        <span id="fortune-slider-hour-val" class="font-mono font-extrabold text-sky-100 text-sm">12時</span>
+                      </div>
+                      <div class="flex items-center gap-2">
+                        <button type="button" onclick="adjustFortuneSlider('hour', -1)" class="fortune-slider-btn w-9 h-8 rounded-lg bg-sky-950/80 hover:bg-sky-900 border border-sky-700/50 text-sky-200 font-black text-sm flex items-center justify-center shrink-0 active:scale-95">−1</button>
+                        <input type="range" id="fortune-slider-hour" min="0" max="23" value="12" class="fortune-range-slider flex-1" oninput="onFortuneSliderInput('hour')">
+                        <button type="button" onclick="adjustFortuneSlider('hour', 1)" class="fortune-slider-btn w-9 h-8 rounded-lg bg-sky-950/80 hover:bg-sky-900 border border-sky-700/50 text-sky-200 font-black text-sm flex items-center justify-center shrink-0 active:scale-95">＋1</button>
+                      </div>
+                    </div>
+
+                    <!-- 分スライダー -->
+                    <div class="space-y-1">
+                      <div class="flex items-center justify-between text-xs">
+                        <span class="text-slate-400 font-bold">分</span>
+                        <span id="fortune-slider-minute-val" class="font-mono font-extrabold text-sky-100 text-sm">00分</span>
+                      </div>
+                      <div class="flex items-center gap-2">
+                        <button type="button" onclick="adjustFortuneSlider('minute', -5)" class="fortune-slider-btn w-9 h-8 rounded-lg bg-sky-950/80 hover:bg-sky-900 border border-sky-700/50 text-sky-200 font-black text-xs flex items-center justify-center shrink-0 active:scale-95">−5</button>
+                        <input type="range" id="fortune-slider-minute" min="0" max="55" step="5" value="0" class="fortune-range-slider flex-1" oninput="onFortuneSliderInput('minute')">
+                        <button type="button" onclick="adjustFortuneSlider('minute', 5)" class="fortune-slider-btn w-9 h-8 rounded-lg bg-sky-950/80 hover:bg-sky-900 border border-sky-700/50 text-sky-200 font-black text-xs flex items-center justify-center shrink-0 active:scale-95">＋5</button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- 性別スイッチ -->
+                <div class="pt-2.5 border-t border-sky-900/40 flex items-center justify-between">
+                  <span class="text-xs font-bold text-sky-300">性別（大運・命盤用）</span>
+                  <div class="inline-flex rounded-lg border border-sky-700/50 p-0.5 bg-black/60">
+                    <button type="button" id="fortune-gender-male-btn" onclick="setFortuneSliderGender('male')" class="px-3 py-1 text-xs font-bold rounded-md transition bg-sky-600 text-white">♂ 男性</button>
+                    <button type="button" id="fortune-gender-female-btn" onclick="setFortuneSliderGender('female')" class="px-3 py-1 text-xs font-bold rounded-md transition text-slate-400 hover:text-white">♀ 女性</button>
+                  </div>
                 </div>
               </div>
+
+              <!-- 4. 各占い項目 -->
               <div class="fortune-home-cta" role="navigation" aria-label="鑑定メニュー">
                 <button type="button" class="fortune-hub-btn fortune-hub-unified" data-fortune-key="unified" aria-pressed="false" onclick="openFortuneFeature('unified')">
                   <span class="fortune-hub-title">総合鑑定</span>
@@ -9016,12 +9243,64 @@
                   <span class="fortune-hub-desc">役割の星・今の流れ・相性</span>
                 </button>
               </div>
-              <button type="button" class="fortune-home-profile-link self-start" onclick="openFortuneProfileCard()">プロフィール・生年月日を設定</button>
             </div>
           </section>
         </div>
       </div>
       <div id="fortune-panel-root" class="fortune-panel-root settings-acc-list space-y-2"></div>
+
+      <!-- プロファイル・名前管理 専用ポップアップモーダル -->
+      <div id="fortune-profile-modal" class="hidden fixed inset-0 z-[99] bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4" onclick="if(event.target===this)closeFortuneProfileModal()">
+        <div class="bg-[#0b1329] border border-sky-600/50 w-full max-w-md rounded-2xl p-5 shadow-[0_0_40px_rgba(14,165,233,0.25)] space-y-4 max-h-[90vh] overflow-y-auto">
+          <!-- モーダルヘッダー -->
+          <div class="flex items-center justify-between pb-3 border-b border-sky-800/40">
+            <div class="flex items-center gap-2">
+              <span class="text-xl">👤</span>
+              <h3 class="text-base font-black text-sky-100">対象プロファイル・名前の管理</h3>
+            </div>
+            <button type="button" onclick="closeFortuneProfileModal()" class="w-8 h-8 rounded-full bg-slate-900 border border-slate-700 text-slate-300 hover:text-white flex items-center justify-center text-sm font-bold" aria-label="閉じる">✕</button>
+          </div>
+
+          <!-- セクション1: 現在のスライダー設定で名前を登録 -->
+          <div class="bg-black/50 border border-sky-700/40 rounded-xl p-3.5 space-y-2.5">
+            <div class="text-xs font-black text-sky-300 flex items-center gap-1.5">
+              <span>✨</span>
+              <span>現在のスライダー設定で登録</span>
+            </div>
+            <div id="fortune-modal-current-target-summary" class="text-xs font-mono font-bold text-sky-200/90 bg-sky-950/60 border border-sky-800/40 px-2.5 py-1.5 rounded-lg">
+              1995年 1月 1日 12:00（男性）
+            </div>
+            <div>
+              <label class="block text-[11px] font-bold text-slate-400 mb-1">名前</label>
+              <input type="text" id="fortune-modal-name-input" maxlength="20" placeholder="例: 自分 / パートナー / 田中さん" class="w-full h-10 px-3 rounded-lg bg-black/60 border border-sky-700/60 text-sky-50 text-sm font-bold focus:outline-none focus:border-sky-400" onkeydown="if(event.key==='Enter')registerCurrentFortuneSliderProfile()">
+            </div>
+            <button type="button" onclick="registerCurrentFortuneSliderProfile()" class="w-full py-2.5 rounded-lg bg-gradient-to-r from-sky-600 to-indigo-600 hover:from-sky-500 hover:to-indigo-500 text-white font-extrabold text-xs shadow-md transition active:scale-[0.98]">
+              この設定で名前を登録して適用
+            </button>
+          </div>
+
+          <!-- 名前クリア（未設定に戻す）ボタン -->
+          <div class="flex justify-end">
+            <button type="button" onclick="clearFortuneActiveName()" class="text-[11px] font-bold text-slate-400 hover:text-slate-200 underline">
+              名前を未設定（空白）に戻す
+            </button>
+          </div>
+
+          <!-- セクション2: 登録履歴から呼び出す -->
+          <div class="space-y-2 pt-2 border-t border-sky-900/40">
+            <div class="flex items-center justify-between text-xs font-black text-sky-300">
+              <span class="flex items-center gap-1.5">
+                <span>📜</span>
+                <span>登録済みの履歴から選択</span>
+              </span>
+              <span id="fortune-modal-history-count" class="text-[10px] font-normal text-slate-400"></span>
+            </div>
+            <div id="fortune-modal-history-list" class="space-y-2 max-h-56 overflow-y-auto pr-1">
+              <!-- JSで動的レンダリング -->
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
 
     <div id="abstinence-mode" class="tab-content abstinence-shell">
@@ -9222,28 +9501,9 @@
             />
           </div>
 
-          <!-- 2. サプリ選択 & バーコードスキャン -->
+          <!-- 2. サプリ選択（一覧の下に＋新規登録枠を配置） -->
           <div>
-            <div class="flex items-center justify-between mb-1.5">
-              <label class="block text-xs font-bold text-cyan-200">📦 摂取したサプリを選択</label>
-              <button
-                type="button"
-                onclick="openSuppleMasterModal()"
-                class="text-xs font-bold text-emerald-400 hover:text-emerald-300 flex items-center gap-1 hover:underline"
-              >
-                ＋ サプリを新規登録
-              </button>
-            </div>
-
-            <!-- バーコードで一発選択ボタン -->
-            <button
-              type="button"
-              onclick="openSuppleBarcodeScanner('intake')"
-              class="w-full py-2.5 px-3 mb-2 rounded-2xl bg-emerald-950/40 border border-emerald-600/50 text-emerald-300 hover:bg-emerald-900/40 active:scale-[0.99] transition-all flex items-center justify-center gap-2 text-xs font-extrabold shadow-xs"
-            >
-              <span>📷</span>
-              バーコードをかざして自動選択
-            </button>
+            <label class="block text-xs font-bold text-cyan-200 mb-1.5">📦 摂取したサプリを選択</label>
 
             <!-- カスタムセレクトボックス -->
             <div class="relative">
@@ -9262,7 +9522,7 @@
               <!-- ドロップダウンメニュー -->
               <div
                 id="supple-dropdown-menu"
-                class="hidden absolute left-0 right-0 top-full mt-2 z-50 bg-[#0b1021] rounded-2xl shadow-2xl border border-cyan-700/60 max-h-56 overflow-y-auto p-1.5 space-y-1"
+                class="hidden absolute left-0 right-0 top-full mt-2 z-50 bg-[#0b1021] rounded-2xl shadow-2xl border border-cyan-700/60 max-h-72 overflow-y-auto p-1.5 space-y-1"
               >
               </div>
             </div>
@@ -9325,7 +9585,7 @@
     <div id="modal-supple-master" class="fixed inset-0 hidden bg-black/85 backdrop-blur-sm flex-col justify-start sm:justify-center items-center p-0 sm:p-4 w-full h-full" style="z-index: 10010; display: none;">
       <div class="bg-[#0b1021] w-full max-w-xl h-full sm:h-auto sm:max-h-[92vh] min-h-0 rounded-none sm:rounded-3xl shadow-2xl border-0 sm:border border-cyan-800/60 flex flex-col overflow-hidden text-slate-100">
         
-        <!-- ヘッダー（右上にも登録ボタンを常設） -->
+        <!-- ヘッダー -->
         <div class="px-5 pt-[calc(1rem+env(safe-area-inset-top,0px))] pb-3.5 border-b border-cyan-900/40 flex items-center justify-between bg-[#070a14]/90 shrink-0 gap-2">
           <div class="flex items-center gap-2.5 min-w-0">
             <div class="w-8 h-8 rounded-xl bg-teal-950 text-teal-400 border border-teal-700/50 flex items-center justify-center text-sm font-bold shrink-0">
@@ -9336,12 +9596,7 @@
               <p class="text-[11px] text-cyan-400/80 truncate">バーコード・写真・名前・カテゴリを設定</p>
             </div>
           </div>
-          <div class="flex items-center gap-2 shrink-0">
-            <button type="button" onclick="submitSuppleMaster()" class="px-3 py-1.5 rounded-xl bg-gradient-to-r from-teal-500 to-emerald-500 text-white text-xs font-extrabold shadow-md active:scale-95 transition-all">
-              💾 登録
-            </button>
-            <button type="button" onclick="closeSuppleMasterModal()" class="w-8 h-8 rounded-full bg-slate-800 text-slate-400 hover:text-white flex items-center justify-center transition-colors">✕</button>
-          </div>
+          <button type="button" onclick="closeSuppleMasterModal()" class="w-8 h-8 rounded-full bg-slate-800 text-slate-400 hover:text-white flex items-center justify-center transition-colors shrink-0">✕</button>
         </div>
 
         <!-- フォーム（スクロール領域: flex-1 min-h-0） -->
@@ -9382,7 +9637,7 @@
           <!-- 写真設定 -->
           <div class="bg-black/30 p-3.5 rounded-2xl border border-cyan-900/40 space-y-3">
             <div class="flex items-center justify-between gap-2">
-              <label class="block text-xs font-bold text-cyan-200">📸 サプリの写真 / アイコン</label>
+              <label class="block text-xs font-bold text-cyan-200">📸 サプリの写真 (任意)</label>
               <button type="button" onclick="clearSupplePhoto()" id="supple-btn-clear-photo" class="hidden text-[11px] text-rose-400 hover:text-rose-300 font-bold px-2 py-0.5 rounded-lg bg-rose-950/50 border border-rose-800/40 transition-colors active:scale-95">🗑️ 削除</button>
             </div>
 
@@ -9411,43 +9666,22 @@
                   <input type="file" id="supple-master-file-gallery" accept="image/*" class="hidden" onchange="handleSupplePhotoUpload(event)" />
                 </label>
 
+                <!-- クリップボード貼付 -->
+                <button type="button" onclick="pasteSuppleImageFromClipboard()" class="px-2.5 py-2 rounded-xl bg-cyan-950/80 hover:bg-cyan-900 text-cyan-200 text-xs font-bold flex items-center justify-center gap-1.5 border border-cyan-700/60 transition-colors active:scale-95 shadow-2xs whitespace-nowrap" title="クリップボードから画像を貼り付ける">
+                  <span>📋</span>
+                  <span>貼付</span>
+                </button>
+
                 <!-- Web画像検索 -->
-                <button type="button" onclick="openSuppleJanGoogleImageSearch()" class="col-span-2 px-2.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-cyan-200 text-xs font-bold flex items-center justify-center gap-1.5 border border-cyan-900/40 transition-colors active:scale-95 shadow-2xs whitespace-nowrap" title="Google画像検索を別画面で開く">
+                <button type="button" onclick="openSuppleJanGoogleImageSearch()" class="px-2.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-cyan-200 text-xs font-bold flex items-center justify-center gap-1.5 border border-cyan-900/40 transition-colors active:scale-95 shadow-2xs whitespace-nowrap" title="Google画像検索を別画面で開く">
                   <span>🌐</span>
-                  <span>Web画像検索 (JAN / 名前)</span>
+                  <span>Web検索</span>
                 </button>
               </div>
             </div>
 
-            <!-- 中段: 全幅の画像貼り付けスペース -->
-            <div class="space-y-1.5">
-              <div class="flex items-center gap-2">
-                <div
-                  id="supple-paste-zone"
-                  contenteditable="true"
-                  inputmode="none"
-                  role="textbox"
-                  aria-label="画像をここに貼り付け"
-                  onpaste="handleSuppleImagePaste(event)"
-                  oninput="handleSupplePasteZoneInput(this)"
-                  class="flex-1 min-w-0 min-h-[42px] px-3 py-2 rounded-xl bg-black/45 border border-dashed border-cyan-600/70 hover:border-cyan-400 focus:border-cyan-300 focus:outline-hidden flex items-center justify-center text-center text-[11px] font-semibold cursor-text transition-colors overflow-hidden"
-                  data-placeholder="📋 ここに画像を貼り付け (長押し / Ctrl+V)"
-                ></div>
-                <button
-                  type="button"
-                  onclick="pasteSuppleImageFromClipboard()"
-                  class="px-3 py-2.5 rounded-xl bg-cyan-950/80 hover:bg-cyan-900 border border-cyan-700/60 text-cyan-200 text-xs font-bold whitespace-nowrap shrink-0 active:scale-95 transition-all"
-                  title="クリップボードから画像を貼り付ける"
-                >📋 貼付</button>
-              </div>
-              <p id="supple-paste-status" class="hidden text-[11px] font-medium px-0.5 leading-snug"></p>
-            </div>
+            <p id="supple-paste-status" class="hidden text-[11px] font-medium px-0.5 leading-snug"></p>
 
-            <!-- 下段: プリセットアイコン -->
-            <div class="pt-2 border-t border-cyan-900/30">
-              <p class="text-[10px] text-slate-400 mb-1.5">またはアイコンから選択：</p>
-              <div class="flex gap-2 flex-wrap" id="supple-preset-container"></div>
-            </div>
             <input type="hidden" id="supple-master-photo-data" value="" />
           </div>
 
@@ -9480,25 +9714,25 @@
             />
           </div>
 
-        </div>
+          <!-- 登録・戻るボタン（目安量・メモの下） -->
+          <div class="pt-2 pb-[calc(2rem+env(safe-area-inset-bottom,0px))] flex items-center gap-2.5">
+            <button
+              type="button"
+              onclick="closeSuppleMasterModal()"
+              class="flex-1 py-3 px-4 rounded-xl bg-slate-800 border border-slate-700 text-slate-300 text-xs font-bold hover:bg-slate-700 transition-colors"
+            >
+              戻る
+            </button>
+            <button
+              type="button"
+              onclick="submitSuppleMaster()"
+              style="flex: 2;"
+              class="py-3 px-4 rounded-xl bg-gradient-to-r from-teal-500 to-emerald-500 text-white text-sm font-extrabold shadow-lg shadow-teal-500/25 active:scale-[0.99] transition-all flex items-center justify-center gap-1.5"
+            >
+              💾 サプリを登録
+            </button>
+          </div>
 
-        <!-- フッター -->
-        <div class="px-5 pt-3 pb-[calc(1.2rem+env(safe-area-inset-bottom,0px))] border-t border-cyan-900/40 bg-[#070a14]/95 flex items-center gap-2.5 shrink-0">
-          <button
-            type="button"
-            onclick="closeSuppleMasterModal()"
-            class="flex-1 py-3 px-4 rounded-xl bg-slate-800 border border-slate-700 text-slate-300 text-xs font-bold hover:bg-slate-700 transition-colors"
-          >
-            戻る
-          </button>
-          <button
-            type="button"
-            onclick="submitSuppleMaster()"
-            style="flex: 2;"
-            class="py-3 px-4 rounded-xl bg-gradient-to-r from-teal-500 to-emerald-500 text-white text-sm font-extrabold shadow-lg shadow-teal-500/25 active:scale-[0.99] transition-all flex items-center justify-center gap-1.5"
-          >
-            💾 サプリを登録
-          </button>
         </div>
 
       </div>
@@ -13553,16 +13787,7 @@
       function runBootInit() {
         if (bootOnce) return;
         bootOnce = true;
-        try {
-          initMainTabLayout();
-          applyDumpDeepLinkFromUrl_();
-          switchTab('memo-mode', { skipHelp: true, skipAutoFocus: true });
-          toggleDirectDestinationUI();
-          if (typeof bindInputContentEditorKeys === 'function') bindInputContentEditorKeys();
-          if (typeof bindDumpComposeImageUi === 'function') bindDumpComposeImageUi();
-        } catch (err) {
-          console.error('boot init failed', err);
-        } finally {
+        var finishBootInit = function () {
           try {
             if (typeof window.__bootSplashReady === 'function') window.__bootSplashReady();
             else if (typeof window.__dismissBootSplash === 'function') window.__dismissBootSplash(true);
@@ -13570,7 +13795,26 @@
           try {
             if (typeof forceHideLoader === 'function') forceHideLoader();
           } catch (_) {}
+        };
+        try {
+          initMainTabLayout();
+          applyDumpDeepLinkFromUrl_();
+        } catch (err) {
+          console.error('boot layout init failed', err);
         }
+        // スプラッシュ描画フレームに譲ってから初期タブ構築を実行
+        requestAnimationFrame(function () {
+          try {
+            switchTab('memo-mode', { skipHelp: true, skipAutoFocus: true });
+            toggleDirectDestinationUI();
+            if (typeof bindInputContentEditorKeys === 'function') bindInputContentEditorKeys();
+            if (typeof bindDumpComposeImageUi === 'function') bindDumpComposeImageUi();
+          } catch (err) {
+            console.error('boot init failed', err);
+          } finally {
+            finishBootInit();
+          }
+        });
 
         const schedulePostSplash = typeof window.__afterBootSplash === 'function'
           ? window.__afterBootSplash
@@ -13609,6 +13853,21 @@
           try {
             requestCrossDeviceSync({ force: true, reason: 'boot' });
           } catch (e) { console.error('post-splash sync failed', e); }
+        });
+
+        // スプラッシュ消去後のアイドル時に遅延外部ライブラリを先読み
+        schedulePostSplash(function () {
+          if (typeof window.__ensureExternalScript !== 'function') return;
+          var preload = function () {
+            window.__ensureExternalScript('./iztro.min.js', function () { return typeof iztro !== 'undefined'; });
+            window.__ensureExternalScript('https://cdn.jsdelivr.net/npm/chart.js', function () { return typeof Chart !== 'undefined'; });
+            window.__ensureExternalScript('https://unpkg.com/html5-qrcode', function () { return typeof Html5Qrcode !== 'undefined'; });
+          };
+          if (typeof requestIdleCallback === 'function') {
+            requestIdleCallback(preload, { timeout: 2000 });
+          } else {
+            setTimeout(preload, 300);
+          }
         });
       }
       setTimeout(runBootInit, 0);
@@ -21118,9 +21377,378 @@
       return p ? { ...p } : { id: '', name: '', date: '', time: '', gender: 'male' };
     }
 
-    function getProfileBirth() {
-      return getProfileBirthById(getActiveProfileBirthId());
+    // ===== ミチシルベ：スライダー＆名前管理 =====
+    const fortuneActiveInput = {
+      name: '',             // 起動時は基本的に名前空白（キャッシュしない）
+      year: 1995,
+      month: 1,
+      day: 1,
+      hour: 12,
+      minute: 0,
+      unknownTime: false,
+      gender: 'male',
+      profileId: null
+    };
+
+    function resetFortuneSliderToDefault() {
+      fortuneActiveInput.name = '';
+      fortuneActiveInput.year = 1995;
+      fortuneActiveInput.month = 1;
+      fortuneActiveInput.day = 1;
+      fortuneActiveInput.hour = 12;
+      fortuneActiveInput.minute = 0;
+      fortuneActiveInput.unknownTime = false;
+      fortuneActiveInput.gender = 'male';
+      fortuneActiveInput.profileId = null;
+      syncFortuneSliderUI();
+      updateFortuneActiveBirthSync();
     }
+
+    function syncFortuneSliderUI() {
+      const yEl = document.getElementById('fortune-slider-year');
+      const mEl = document.getElementById('fortune-slider-month');
+      const dEl = document.getElementById('fortune-slider-day');
+      const hEl = document.getElementById('fortune-slider-hour');
+      const minEl = document.getElementById('fortune-slider-minute');
+      const uEl = document.getElementById('fortune-slider-unknown-time');
+      
+      if (yEl) yEl.value = fortuneActiveInput.year;
+      if (mEl) mEl.value = fortuneActiveInput.month;
+      
+      const maxDay = new Date(fortuneActiveInput.year, fortuneActiveInput.month, 0).getDate();
+      if (dEl) {
+        dEl.max = maxDay;
+        if (fortuneActiveInput.day > maxDay) fortuneActiveInput.day = maxDay;
+        dEl.value = fortuneActiveInput.day;
+      }
+      
+      if (hEl) hEl.value = fortuneActiveInput.hour;
+      if (minEl) minEl.value = fortuneActiveInput.minute;
+      if (uEl) uEl.checked = Boolean(fortuneActiveInput.unknownTime);
+
+      updateFortuneSliderLabels();
+      setFortuneSliderGender(fortuneActiveInput.gender, { silent: true });
+      updateFortuneSliderSummary();
+      updateFortuneNameDisplay();
+    }
+
+    function updateFortuneSliderLabels() {
+      const yVal = document.getElementById('fortune-slider-year-val');
+      const mVal = document.getElementById('fortune-slider-month-val');
+      const dVal = document.getElementById('fortune-slider-day-val');
+      const hVal = document.getElementById('fortune-slider-hour-val');
+      const minVal = document.getElementById('fortune-slider-minute-val');
+      const timeControls = document.getElementById('fortune-slider-time-controls');
+
+      if (yVal) yVal.textContent = `${fortuneActiveInput.year}年`;
+      if (mVal) mVal.textContent = `${fortuneActiveInput.month}月`;
+      if (dVal) dVal.textContent = `${fortuneActiveInput.day}日`;
+      if (hVal) hVal.textContent = `${fortuneActiveInput.hour}時`;
+      if (minVal) minVal.textContent = `${String(fortuneActiveInput.minute).padStart(2, '0')}分`;
+      
+      if (timeControls) {
+        timeControls.classList.toggle('opacity-30', fortuneActiveInput.unknownTime);
+        timeControls.classList.toggle('pointer-events-none', fortuneActiveInput.unknownTime);
+      }
+    }
+
+    function updateFortuneSliderSummary() {
+      const badge = document.getElementById('fortune-slider-preview-badge');
+      const modalSummary = document.getElementById('fortune-modal-current-target-summary');
+      const timeText = fortuneActiveInput.unknownTime ? '時間不明（正午扱い）' : `${String(fortuneActiveInput.hour).padStart(2, '0')}:${String(fortuneActiveInput.minute).padStart(2, '0')}`;
+      const genderText = fortuneActiveInput.gender === 'female' ? '女性' : '男性';
+      const dateText = `${fortuneActiveInput.year}-${String(fortuneActiveInput.month).padStart(2, '0')}-${String(fortuneActiveInput.day).padStart(2, '0')}`;
+      
+      if (badge) badge.textContent = `${dateText} ${timeText}`;
+      if (modalSummary) modalSummary.textContent = `${fortuneActiveInput.year}年${fortuneActiveInput.month}月${fortuneActiveInput.day}日 ${timeText}（${genderText}）`;
+    }
+
+    function updateFortuneNameDisplay() {
+      const nameEl = document.getElementById('fortune-home-name-text');
+      const headerName = document.getElementById('fortune-header-profile-name');
+      const currentName = (fortuneActiveInput.name || '').trim();
+      
+      if (nameEl) {
+        if (currentName) {
+          nameEl.textContent = `👤 ${currentName}`;
+          nameEl.className = 'text-sm sm:text-base font-extrabold text-sky-200 truncate';
+        } else {
+          nameEl.textContent = '（名前未設定 - タップして登録・履歴選択）';
+          nameEl.className = 'text-xs sm:text-sm font-bold text-slate-400 truncate';
+        }
+      }
+      if (headerName) {
+        headerName.textContent = currentName || '未設定';
+      }
+    }
+
+    function onFortuneSliderInput(type) {
+      const yEl = document.getElementById('fortune-slider-year');
+      const mEl = document.getElementById('fortune-slider-month');
+      const dEl = document.getElementById('fortune-slider-day');
+      const hEl = document.getElementById('fortune-slider-hour');
+      const minEl = document.getElementById('fortune-slider-minute');
+
+      if (type === 'year' && yEl) fortuneActiveInput.year = Number(yEl.value);
+      if (type === 'month' && mEl) {
+        fortuneActiveInput.month = Number(mEl.value);
+        const maxDay = new Date(fortuneActiveInput.year, fortuneActiveInput.month, 0).getDate();
+        if (dEl) {
+          dEl.max = maxDay;
+          if (fortuneActiveInput.day > maxDay) {
+            fortuneActiveInput.day = maxDay;
+            dEl.value = maxDay;
+          }
+        }
+      }
+      if (type === 'day' && dEl) fortuneActiveInput.day = Number(dEl.value);
+      if (type === 'hour' && hEl) fortuneActiveInput.hour = Number(hEl.value);
+      if (type === 'minute' && minEl) fortuneActiveInput.minute = Number(minEl.value);
+
+      updateFortuneSliderLabels();
+      updateFortuneSliderSummary();
+      updateFortuneActiveBirthSync();
+    }
+
+    function adjustFortuneSlider(type, delta) {
+      const el = document.getElementById(`fortune-slider-${type}`);
+      if (!el) return;
+      let val = Number(el.value) + delta;
+      const min = Number(el.min);
+      const max = Number(el.max);
+      if (val < min) val = min;
+      if (val > max) val = max;
+      el.value = val;
+      onFortuneSliderInput(type);
+    }
+
+    function setFortuneSliderGender(gender, opts) {
+      fortuneActiveInput.gender = gender === 'female' ? 'female' : 'male';
+      const maleBtn = document.getElementById('fortune-gender-male-btn');
+      const femaleBtn = document.getElementById('fortune-gender-female-btn');
+      if (maleBtn && femaleBtn) {
+        if (fortuneActiveInput.gender === 'female') {
+          femaleBtn.className = 'px-3 py-1 text-xs font-bold rounded-md transition bg-rose-600 text-white';
+          maleBtn.className = 'px-3 py-1 text-xs font-bold rounded-md transition text-slate-400 hover:text-white';
+        } else {
+          maleBtn.className = 'px-3 py-1 text-xs font-bold rounded-md transition bg-sky-600 text-white';
+          femaleBtn.className = 'px-3 py-1 text-xs font-bold rounded-md transition text-slate-400 hover:text-white';
+        }
+      }
+      updateFortuneSliderSummary();
+      if (!opts || !opts.silent) {
+        updateFortuneActiveBirthSync();
+      }
+    }
+
+    function onFortuneUnknownTimeChange() {
+      const uEl = document.getElementById('fortune-slider-unknown-time');
+      fortuneActiveInput.unknownTime = uEl ? uEl.checked : false;
+      updateFortuneSliderLabels();
+      updateFortuneSliderSummary();
+      updateFortuneActiveBirthSync();
+    }
+
+    function updateFortuneActiveBirthSync() {
+      const p = getProfileBirth();
+      applyBirthToPanel('sanmei', p, { recalc: false });
+      applyBirthToPanel('ziwei', p, { recalc: false });
+      applyBirthToPanel('bazi', p, { recalc: false });
+      if (typeof updateFortuneProfileSources === 'function') updateFortuneProfileSources();
+      if (typeof refreshProfileBirthSelects === 'function') refreshProfileBirthSelects();
+    }
+
+    function getProfileBirth() {
+      const y = fortuneActiveInput.year || 1995;
+      const m = String(fortuneActiveInput.month || 1).padStart(2, '0');
+      const d = String(fortuneActiveInput.day || 1).padStart(2, '0');
+      const dateStr = `${y}-${m}-${d}`;
+      const timeStr = fortuneActiveInput.unknownTime ? '' : `${String(fortuneActiveInput.hour ?? 12).padStart(2, '0')}:${String(fortuneActiveInput.minute ?? 0).padStart(2, '0')}`;
+      return {
+        id: fortuneActiveInput.profileId || '',
+        name: fortuneActiveInput.name || '',
+        date: dateStr,
+        time: timeStr,
+        gender: fortuneActiveInput.gender || 'male'
+      };
+    }
+
+    function openFortuneProfileModal() {
+      const modal = document.getElementById('fortune-profile-modal');
+      if (!modal) return;
+      updateFortuneSliderSummary();
+      const input = document.getElementById('fortune-modal-name-input');
+      if (input) {
+        input.value = fortuneActiveInput.name || '';
+        setTimeout(() => input.focus(), 80);
+      }
+      renderFortuneProfileHistoryList();
+      modal.classList.remove('hidden');
+    }
+
+    function closeFortuneProfileModal() {
+      const modal = document.getElementById('fortune-profile-modal');
+      if (modal) modal.classList.add('hidden');
+    }
+
+    function registerCurrentFortuneSliderProfile() {
+      const input = document.getElementById('fortune-modal-name-input');
+      const name = input ? input.value.trim() : '';
+      if (!name) {
+        alert('登録する名前を入力してください');
+        if (input) input.focus();
+        return;
+      }
+      const curBirth = getProfileBirth();
+      const list = loadProfileBirthList();
+      
+      let existing = list.find((p) => p.name === name);
+      let targetId = existing ? existing.id : newProfileBirthId();
+      
+      const entry = normalizeProfileBirthEntry({
+        id: targetId,
+        name: name,
+        date: curBirth.date,
+        time: curBirth.time,
+        gender: curBirth.gender
+      });
+      
+      let nextList;
+      if (existing) {
+        nextList = list.map((p) => (p.id === targetId ? entry : p));
+      } else {
+        nextList = [entry, ...list.filter((p) => p.name || p.date)];
+      }
+      
+      saveProfileBirthList(nextList, targetId);
+      fortuneActiveInput.name = name;
+      fortuneActiveInput.profileId = targetId;
+      updateFortuneNameDisplay();
+      updateFortuneActiveBirthSync();
+      closeFortuneProfileModal();
+      if (typeof notifyProfileSaved === 'function') {
+        notifyProfileSaved(name, '登録・適用完了');
+      }
+    }
+
+    function clearFortuneActiveName() {
+      fortuneActiveInput.name = '';
+      fortuneActiveInput.profileId = null;
+      updateFortuneNameDisplay();
+      updateFortuneActiveBirthSync();
+      closeFortuneProfileModal();
+      if (typeof notifyProfileSaved === 'function') {
+        notifyProfileSaved('未設定', '名前をクリアしました');
+      }
+    }
+
+    function renderFortuneProfileHistoryList() {
+      const container = document.getElementById('fortune-modal-history-list');
+      const countEl = document.getElementById('fortune-modal-history-count');
+      if (!container) return;
+      
+      const list = loadProfileBirthList().filter((p) => p.name || p.date);
+      if (countEl) countEl.textContent = `${list.length}件`;
+      
+      if (!list.length) {
+        container.innerHTML = '<div class="text-xs text-slate-500 py-3 text-center">登録された履歴はまだありません</div>';
+        return;
+      }
+      
+      container.innerHTML = list.map((p) => {
+        const isCurrent = fortuneActiveInput.profileId === p.id || (fortuneActiveInput.name && fortuneActiveInput.name === p.name);
+        const genderLabel = p.gender === 'female' ? '女性' : '男性';
+        const timeLabel = p.time ? p.time : '時間不明';
+        const activeBorder = isCurrent ? 'border-sky-400 bg-sky-950/70 shadow-[0_0_12px_rgba(56,189,248,0.2)]' : 'border-sky-900/40 bg-black/40 hover:border-sky-600/60';
+        return `
+          <div class="flex items-center justify-between p-2.5 rounded-xl border ${activeBorder} transition group">
+            <div class="min-w-0 flex-1 cursor-pointer" onclick="applyFortuneProfileFromHistory('${p.id}')">
+              <div class="flex items-center gap-2">
+                <span class="text-xs font-black text-sky-100 truncate">${p.name || '名前なし'}</span>
+                ${isCurrent ? '<span class="text-[10px] px-1.5 py-0.2 rounded bg-sky-500/30 text-sky-300 font-bold">選択中</span>' : ''}
+              </div>
+              <div class="text-[11px] font-mono text-slate-400 mt-0.5 truncate">
+                ${p.date || '日付未設定'} ${timeLabel}・${genderLabel}
+              </div>
+            </div>
+            <div class="flex items-center gap-1.5 ml-2 shrink-0">
+              <button type="button" onclick="applyFortuneProfileFromHistory('${p.id}')" class="px-2.5 py-1 text-xs font-bold rounded-lg bg-sky-900/60 hover:bg-sky-800 text-sky-200 border border-sky-600/40 transition">
+                適用
+              </button>
+              <button type="button" onclick="deleteFortuneProfileFromHistory('${p.id}', event)" class="p-1 text-xs text-rose-400 hover:text-rose-200 hover:bg-rose-950/50 rounded-lg transition" title="削除">
+                🗑
+              </button>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function applyFortuneProfileFromHistory(id) {
+      const p = getProfileBirthById(id);
+      if (!p) return;
+      fortuneActiveInput.name = p.name || '';
+      fortuneActiveInput.profileId = p.id;
+      fortuneActiveInput.gender = p.gender === 'female' ? 'female' : 'male';
+      
+      if (p.date) {
+        const parts = p.date.split('-').map(Number);
+        if (parts.length === 3) {
+          fortuneActiveInput.year = parts[0];
+          fortuneActiveInput.month = parts[1];
+          fortuneActiveInput.day = parts[2];
+        }
+      }
+      if (p.time) {
+        const tParts = p.time.split(':').map(Number);
+        if (tParts.length >= 2) {
+          fortuneActiveInput.hour = tParts[0];
+          fortuneActiveInput.minute = tParts[1];
+          fortuneActiveInput.unknownTime = false;
+        }
+      } else {
+        fortuneActiveInput.hour = 12;
+        fortuneActiveInput.minute = 0;
+        fortuneActiveInput.unknownTime = true;
+      }
+      
+      syncFortuneSliderUI();
+      updateFortuneActiveBirthSync();
+      closeFortuneProfileModal();
+      if (typeof notifyProfileSaved === 'function') {
+        notifyProfileSaved(p.name || '選択', '呼び出し完了');
+      }
+    }
+
+    function deleteFortuneProfileFromHistory(id, event) {
+      if (event) event.stopPropagation();
+      const list = loadProfileBirthList();
+      const target = list.find((p) => p.id === id);
+      const name = target ? (target.name || 'この人物') : 'この履歴';
+      if (!confirm(`「${name}」を履歴から削除してもよろしいですか？`)) return;
+      
+      const nextList = list.filter((p) => p.id !== id);
+      saveProfileBirthList(nextList, nextList.length ? nextList[0].id : null);
+      
+      if (fortuneActiveInput.profileId === id) {
+        fortuneActiveInput.profileId = null;
+        fortuneActiveInput.name = '';
+        updateFortuneNameDisplay();
+        updateFortuneActiveBirthSync();
+      }
+      renderFortuneProfileHistoryList();
+    }
+
+    window.openFortuneProfileModal = openFortuneProfileModal;
+    window.closeFortuneProfileModal = closeFortuneProfileModal;
+    window.adjustFortuneSlider = adjustFortuneSlider;
+    window.onFortuneSliderInput = onFortuneSliderInput;
+    window.setFortuneSliderGender = setFortuneSliderGender;
+    window.onFortuneUnknownTimeChange = onFortuneUnknownTimeChange;
+    window.registerCurrentFortuneSliderProfile = registerCurrentFortuneSliderProfile;
+    window.clearFortuneActiveName = clearFortuneActiveName;
+    window.applyFortuneProfileFromHistory = applyFortuneProfileFromHistory;
+    window.deleteFortuneProfileFromHistory = deleteFortuneProfileFromHistory;
 
     function profileBirthOptionLabel(p) {
       const name = (p.name || '').trim() || '名前なし';
@@ -33553,47 +34181,27 @@
 
     function refreshFortuneHome() {
       renderFortuneHomeKanshi();
-      const status = document.getElementById('fortune-home-status');
-      const text = document.getElementById('fortune-home-status-text');
-      const headerName = document.getElementById('fortune-header-profile-name');
-      const profileBtn = document.querySelector('.fortune-home-profile-link');
-      if (!status || !text) return;
-      const profile = typeof getProfileBirth === 'function' ? getProfileBirth() : null;
-      if (profile && profile.date) {
-        const name = profile.name || '未設定';
-        const time = profile.time ? ` ${profile.time}` : '';
-        const eraAge = typeof calculateJapaneseEraAndAge === 'function' ? calculateJapaneseEraAndAge(profile.date) : null;
-        const ageLabel = eraAge ? ` (${eraAge.age}歳)` : '';
-        text.textContent = `${name}・${profile.date}${ageLabel}${time}`;
-        status.classList.add('is-ready');
-        if (headerName) headerName.textContent = name;
-        if (profileBtn) profileBtn.textContent = '👤 プロフィール設定・人物切替';
-      } else {
-        text.textContent = '✨ 生年月日を登録すると鑑定を開始できます（30秒で完了）';
-        status.classList.remove('is-ready');
-        if (headerName) headerName.textContent = '未設定';
-        if (profileBtn) profileBtn.textContent = '＋ 生年月日・プロフィールを登録';
-      }
+      updateFortuneNameDisplay();
+      updateFortuneSliderSummary();
+      updateFortuneSliderLabels();
+      updateFortuneActiveBirthSync();
     }
 
     function openFortuneProfileCard() {
-      closeFortuneFeature({ silent: true });
-      const profCard = document.getElementById('fortune-card-profile');
-      if (profCard) {
-        profCard.classList.remove('hidden');
-        requestAnimationFrame(() => {
-          profCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
-          const p = typeof getProfileBirth === 'function' ? getProfileBirth() : null;
-          if (!p || !p.date) {
-            const yEl = document.getElementById('profile-birth-year');
-            if (yEl) yEl.focus();
-          }
-        });
-      }
+      openFortuneProfileModal();
     }
 
+    let fortuneHubInitializedOnce = false;
     function initFortuneHub() {
+      if (typeof iztro === 'undefined' && typeof window.__ensureExternalScript === 'function') {
+        window.__ensureExternalScript('./iztro.min.js', () => typeof iztro !== 'undefined');
+      }
       closeFortuneFeature({ silent: true });
+      // 起動時は基本的に名前空白にしておく（前の設定をキャッシュしない）
+      if (!fortuneHubInitializedOnce) {
+        fortuneHubInitializedOnce = true;
+        resetFortuneSliderToDefault();
+      }
       refreshFortuneHome();
       if (typeof refreshUnifiedSourceChips === 'function') refreshUnifiedSourceChips();
     }
@@ -59455,16 +60063,6 @@ initFortuneHub();
       const lightweightMode = localStorage.getItem('setting_lightweight_mode') === 'true';
       applyLightweightMode(lightweightMode);
       applyColorTheme(getColorTheme());
-      migrateDraftsToInboxOnBoot();
-      bindInputContentHistoryLock();
-      if (typeof bindDumpComposeImageUi === 'function') bindDumpComposeImageUi();
-      syncInputTabHistoryLock();
-      bindSimilarThresholdControls();
-      renderAppBuildTag();
-      setupServiceWorkerUpdates();
-      updateSkipInputTopUI();
-      if (typeof bindAppEdgeBackGesture === 'function') bindAppEdgeBackGesture();
-      if (typeof bindAppBrowserBack === 'function') bindAppBrowserBack();
       // 廃止タブが残っていたら退避／フォルダ直接保存設定を無効化
       try {
         const sub = localStorage.getItem('memo_sub_tab');
@@ -59475,26 +60073,44 @@ initFortuneHub();
         }
         localStorage.setItem('setting_direct_destination_enabled', 'false');
       } catch (_) {}
-      // 古いキャッシュHTMLに日記ナビ／画面が残っていても強制撤去
-      try {
-        ['diary-mode', 'memo-sub-diary-mode'].forEach((id) => {
-          const el = document.getElementById(id);
-          if (el) el.remove();
-        });
-        document.querySelectorAll('#memo-sub-nav .memo-sub-btn').forEach((btn) => {
-          const label = String(btn.textContent || '');
-          const onclick = String(btn.getAttribute('onclick') || '');
-          if (label.indexOf('日記') >= 0 || onclick.indexOf('diary-mode') >= 0) btn.remove();
-        });
-        if (typeof contextHelp !== 'undefined' && contextHelp && contextHelp['diary-mode']) {
-          delete contextHelp['diary-mode'];
-        }
-      } catch (_) {}
-      if (typeof toggleDirectDestinationUI === 'function') toggleDirectDestinationUI();
-      // 起動時に入力タブが開いている場合、トップ非表示設定なら入力画面を表示（キーボードは出さない）
+      bindInputContentHistoryLock();
+      if (typeof bindDumpComposeImageUi === 'function') bindDumpComposeImageUi();
+      syncInputTabHistoryLock();
+
+      const afterSplash = typeof window.__afterBootSplash === 'function'
+        ? window.__afterBootSplash
+        : function (fn) { setTimeout(fn, 0); };
+
+      // 起動アニメーションの突っかかりを防ぐため、初期表示に不要なバインド・掃除は分割/遅延実行
       setTimeout(() => {
+        bindSimilarThresholdControls();
+        renderAppBuildTag();
+        updateSkipInputTopUI();
+        if (typeof bindAppEdgeBackGesture === 'function') bindAppEdgeBackGesture();
+        if (typeof bindAppBrowserBack === 'function') bindAppBrowserBack();
+        if (typeof toggleDirectDestinationUI === 'function') toggleDirectDestinationUI();
         if (typeof ensureInputTopPreferenceApplied === 'function') ensureInputTopPreferenceApplied({ skipAutoFocus: true });
       }, 0);
+
+      afterSplash(() => {
+        migrateDraftsToInboxOnBoot();
+        setupServiceWorkerUpdates();
+        // 古いキャッシュHTMLに日記ナビ／画面が残っていても強制撤去
+        try {
+          ['diary-mode', 'memo-sub-diary-mode'].forEach((id) => {
+            const el = document.getElementById(id);
+            if (el) el.remove();
+          });
+          document.querySelectorAll('#memo-sub-nav .memo-sub-btn').forEach((btn) => {
+            const label = String(btn.textContent || '');
+            const onclick = String(btn.getAttribute('onclick') || '');
+            if (label.indexOf('日記') >= 0 || onclick.indexOf('diary-mode') >= 0) btn.remove();
+          });
+          if (typeof contextHelp !== 'undefined' && contextHelp && contextHelp['diary-mode']) {
+            delete contextHelp['diary-mode'];
+          }
+        } catch (_) {}
+      });
     });
 
     const APP_BUILD = 'v438';
@@ -59787,7 +60403,14 @@ initFortuneHub();
 
     function renderSuppleChart() {
       const canvas = document.getElementById('suppleIntakeChart');
-      if (!canvas || typeof Chart === 'undefined') return;
+      if (!canvas) return;
+      if (typeof Chart === 'undefined') {
+        if (typeof window.__ensureExternalScript === 'function') {
+          window.__ensureExternalScript('https://cdn.jsdelivr.net/npm/chart.js', () => typeof Chart !== 'undefined')
+            .then((ok) => { if (ok) renderSuppleChart(); });
+        }
+        return;
+      }
       const ctx = canvas.getContext('2d');
       const dates = [];
       const counts = [];
@@ -60136,6 +60759,32 @@ initFortuneHub();
         `;
         menu.appendChild(item);
       });
+
+      // サプリ一覧の下に「＋ 新しいサプリを登録」枠を配置
+      const addWrap = document.createElement('div');
+      addWrap.className = 'pt-1.5 mt-1.5 border-t border-cyan-900/50 space-y-1.5';
+
+      const addBtn = document.createElement('button');
+      addBtn.type = 'button';
+      addBtn.className = 'w-full px-3 py-2.5 rounded-xl border border-dashed border-emerald-500/60 bg-emerald-950/30 hover:bg-emerald-900/40 text-emerald-300 text-xs font-extrabold flex items-center justify-center gap-1.5 transition-all active:scale-[0.99]';
+      addBtn.innerHTML = '<span class="text-sm leading-none">＋</span><span>新しいサプリを登録</span>';
+      addBtn.onclick = () => {
+        closeSuppleDropdown();
+        openSuppleMasterModal();
+      };
+      addWrap.appendChild(addBtn);
+
+      const scanBtn = document.createElement('button');
+      scanBtn.type = 'button';
+      scanBtn.className = 'w-full px-3 py-2 rounded-xl bg-slate-800/70 hover:bg-slate-800 border border-cyan-800/50 text-cyan-300 text-[11px] font-bold flex items-center justify-center gap-1.5 transition-all active:scale-[0.99]';
+      scanBtn.innerHTML = '<span>📷</span><span>バーコードをかざして自動選択</span>';
+      scanBtn.onclick = () => {
+        closeSuppleDropdown();
+        openSuppleBarcodeScanner('intake');
+      };
+      addWrap.appendChild(scanBtn);
+
+      menu.appendChild(addWrap);
     }
 
     function selectSuppleForIntake(suppleId) {
@@ -60250,6 +60899,7 @@ initFortuneHub();
       document.querySelectorAll('.supple-preset-btn').forEach(btn => btn.style.borderColor = 'transparent');
 
       if (statusMsg) setSupplePasteStatus(statusMsg, 'success');
+      else setSupplePasteStatus('', 'info');
     }
 
     function setSupplePasteStatus(msg, type = 'info') {
@@ -60304,8 +60954,7 @@ initFortuneHub();
         }
       }
 
-      const kb = Math.max(1, Math.round((b64.length * 3) / 4 / 1024));
-      applySupplePhotoDataUrl(b64, `✅ 画像を設定しました (${origW}×${origH} → ${outW}×${outH}, 約${kb}KB)`);
+      applySupplePhotoDataUrl(b64, '');
       return true;
     }
 
@@ -60329,7 +60978,7 @@ initFortuneHub();
           resizeAndApplySuppleImage(img);
         } catch (err) {
           if (allowUrlFallback && (src.startsWith('http://') || src.startsWith('https://'))) {
-            applySupplePhotoDataUrl(src, '✅ 画像URLを設定しました');
+            applySupplePhotoDataUrl(src, '');
           } else {
             setSupplePasteStatus('画像の変換に失敗しました。別の画像を試してください。', 'error');
           }
@@ -60337,7 +60986,7 @@ initFortuneHub();
       };
       img.onerror = function() {
         if (allowUrlFallback && (src.startsWith('http://') || src.startsWith('https://'))) {
-          applySupplePhotoDataUrl(src, '✅ 画像URLを設定しました');
+          applySupplePhotoDataUrl(src, '');
         } else {
           setSupplePasteStatus('画像の読み込みに失敗しました。画像そのものをコピーして貼り付けてください。', 'error');
         }
@@ -60375,7 +61024,7 @@ initFortuneHub();
       document.getElementById('supple-master-barcode').value = '';
       document.getElementById('supple-master-dose').value = '';
       selectSuppleCategory('ビタミン');
-      selectSupplePresetIcon('preset_vitamin');
+      clearSupplePhoto();
       const pasteZone = document.getElementById('supple-paste-zone');
       if (pasteZone) pasteZone.innerHTML = '';
       setSupplePasteStatus('');
@@ -60474,6 +61123,9 @@ initFortuneHub();
       syncSuppleFabVisibility();
 
       try {
+        if (typeof Html5Qrcode === 'undefined' && typeof window.__ensureExternalScript === 'function') {
+          await window.__ensureExternalScript('https://unpkg.com/html5-qrcode', () => typeof Html5Qrcode !== 'undefined');
+        }
         if (!suppleHtml5QrScanner && typeof Html5Qrcode !== 'undefined') {
           suppleHtml5QrScanner = new Html5Qrcode("supple-barcode-reader");
         }
@@ -60711,9 +61363,7 @@ initFortuneHub();
 
     async function pasteSuppleImageFromClipboard() {
       if (!navigator.clipboard || typeof navigator.clipboard.read !== 'function') {
-        const pasteZone = document.getElementById('supple-paste-zone');
-        if (pasteZone) pasteZone.focus();
-        setSupplePasteStatus('上の枠をタップして「ペースト」または Ctrl+V で貼り付けてください。', 'info');
+        setSupplePasteStatus('このブラウザはボタン貼付に未対応です。Ctrl+V またはギャラリーをご利用ください。', 'info');
         return;
       }
       try {
@@ -60735,9 +61385,7 @@ initFortuneHub();
         }
         setSupplePasteStatus('クリップボードに画像がありません。画像検索で画像をコピーしてください。', 'error');
       } catch (err) {
-        const pasteZone = document.getElementById('supple-paste-zone');
-        if (pasteZone) pasteZone.focus();
-        setSupplePasteStatus('上の枠をタップして「ペースト」または Ctrl+V で貼り付けてください。', 'info');
+        setSupplePasteStatus('クリップボードの読み取りが許可されませんでした。', 'error');
       }
     }
 

@@ -13261,6 +13261,25 @@
       </div>
     </form>
   </div>
+  <div id="blank-line-split-confirm-modal" role="dialog" aria-modal="true" aria-labelledby="blank-line-split-confirm-title" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm z-[120] flex items-center justify-center p-4">
+    <div class="bg-[#0b1021] border border-cyan-600/45 w-full max-w-md rounded-3xl p-5 shadow-[0_0_40px_rgba(34,211,238,0.2)] space-y-4">
+      <div class="flex items-start justify-between gap-3">
+        <div>
+          <h3 id="blank-line-split-confirm-title" class="text-cyan-50 font-black text-base">空行でメモが分岐します</h3>
+          <p id="blank-line-split-confirm-desc" class="text-xs text-slate-300 font-bold mt-1 leading-relaxed"></p>
+        </div>
+        <button type="button" id="blank-line-split-close-btn" aria-label="閉じる" class="w-8 h-8 shrink-0 rounded-full border border-slate-700 bg-black/40 text-slate-300 hover:text-white hover:border-cyan-500 transition text-base font-black flex items-center justify-center">×</button>
+      </div>
+      <div id="blank-line-split-confirm-list" class="max-h-60 overflow-y-auto space-y-2 pr-1"></div>
+      <div class="space-y-2 pt-1">
+        <button type="button" id="blank-line-split-ok-btn" class="w-full h-11 rounded-xl bg-gradient-to-r from-cyan-600 to-indigo-700 hover:from-cyan-500 hover:to-indigo-600 text-white text-sm font-extrabold border border-cyan-400/40 shadow-lg transition">分けて保存</button>
+        <div class="grid grid-cols-2 gap-2.5">
+          <button type="button" id="blank-line-split-single-btn" class="h-11 rounded-xl bg-indigo-950/70 hover:bg-indigo-900/80 border border-indigo-600/50 text-indigo-100 text-xs font-extrabold transition">1つにまとめて保存</button>
+          <button type="button" id="blank-line-split-cancel-btn" class="h-11 rounded-xl bg-slate-900/80 hover:bg-slate-800 border border-slate-700 text-slate-300 text-xs font-bold transition">戻って編集</button>
+        </div>
+      </div>
+    </div>
+  </div>
   <div id="profile-add-modal" role="dialog" aria-modal="true" aria-labelledby="profile-add-title" aria-hidden="true" inert class="fixed inset-0 bg-black/80 backdrop-blur-sm z-[85] flex items-center justify-center p-4 sm:p-5 opacity-0 pointer-events-none scale-[0.98] transition-all duration-200">
     <form id="profile-add-form" onsubmit="registerProfileBirth(event)" class="bg-[#0b1021] border border-sky-600/40 w-11/12 max-w-md max-h-[90vh] overflow-y-auto rounded-3xl p-5 sm:p-6 shadow-[0_0_40px_rgba(56,189,248,0.2)] space-y-4">
       <div class="flex items-start justify-between gap-3 border-b border-sky-900/50 pb-3">
@@ -34731,6 +34750,78 @@ initFortuneHub();
         .map((c) => c.trim())
         .filter((c) => c);
     }
+
+    let blankLineSplitConfirmResolve = null;
+    function confirmBlankLineSplitModal(chunks) {
+      const list = Array.isArray(chunks) ? chunks : [];
+      if (list.length < 2) return Promise.resolve('split');
+      const modal = document.getElementById('blank-line-split-confirm-modal');
+      const titleEl = document.getElementById('blank-line-split-confirm-title');
+      const descEl = document.getElementById('blank-line-split-confirm-desc');
+      const listEl = document.getElementById('blank-line-split-confirm-list');
+      const okBtn = document.getElementById('blank-line-split-ok-btn');
+      const singleBtn = document.getElementById('blank-line-split-single-btn');
+      const cancelBtn = document.getElementById('blank-line-split-cancel-btn');
+      const closeBtn = document.getElementById('blank-line-split-close-btn');
+      if (!modal || !listEl || !okBtn || !singleBtn || !cancelBtn) {
+        return Promise.resolve(window.confirm(`空行により ${list.length}件 のメモに分岐します。\n分けて保存しますか？`) ? 'split' : 'cancel');
+      }
+      if (blankLineSplitConfirmResolve) {
+        try { blankLineSplitConfirmResolve('cancel'); } catch (_) {}
+        blankLineSplitConfirmResolve = null;
+      }
+      if (titleEl) titleEl.textContent = `空行で ${list.length}件 に分岐します`;
+      if (descEl) descEl.textContent = `1行以上空いているため、以下の ${list.length}件 のメモに分けて保存されます。`;
+      if (okBtn) okBtn.textContent = `${list.length}件に分けて保存`;
+
+      const esc = (s) => (typeof escapeHtmlText === 'function'
+        ? escapeHtmlText(s)
+        : String(s || '').replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch])));
+      const formatPreview = (raw) => {
+        const cleaned = String(raw || '').replace(/\[img:[^\]]+\]/g, '[📷画像]').trim();
+        return cleaned.length > 200 ? cleaned.slice(0, 200) + '…' : cleaned;
+      };
+      listEl.innerHTML = list.map((chunk, i) => `
+        <div class="rounded-2xl border border-cyan-900/50 bg-black/45 px-3 py-2.5">
+          <div class="text-[10px] font-black tracking-wider text-cyan-400 mb-1">${i + 1}件目</div>
+          <div class="text-xs text-slate-100 font-bold whitespace-pre-wrap break-words leading-relaxed">${esc(formatPreview(chunk))}</div>
+        </div>
+      `).join('');
+
+      modal.classList.remove('hidden');
+      return new Promise((resolve) => {
+        const finish = (choice) => {
+          modal.classList.add('hidden');
+          modal.removeEventListener('click', onBackdrop);
+          document.removeEventListener('keydown', onKey);
+          okBtn.removeEventListener('click', onSplit);
+          singleBtn.removeEventListener('click', onSingle);
+          cancelBtn.removeEventListener('click', onCancel);
+          if (closeBtn) closeBtn.removeEventListener('click', onCancel);
+          if (blankLineSplitConfirmResolve === finish) blankLineSplitConfirmResolve = null;
+          resolve(choice);
+        };
+        const onSplit = () => finish('split');
+        const onSingle = () => finish('single');
+        const onCancel = () => finish('cancel');
+        const onBackdrop = (ev) => {
+          if (ev.target === modal) finish('cancel');
+        };
+        const onKey = (ev) => {
+          if (ev.key === 'Escape') {
+            ev.preventDefault();
+            finish('cancel');
+          }
+        };
+        blankLineSplitConfirmResolve = finish;
+        okBtn.addEventListener('click', onSplit);
+        singleBtn.addEventListener('click', onSingle);
+        cancelBtn.addEventListener('click', onCancel);
+        if (closeBtn) closeBtn.addEventListener('click', onCancel);
+        modal.addEventListener('click', onBackdrop);
+        document.addEventListener('keydown', onKey);
+      });
+    }
     function updateBlankLineSplitUI(enabled) {
       const on = enabled == null ? isBlankLineSplitEnabled() : !!enabled;
       const status = document.getElementById('blank-line-split-status');
@@ -41219,6 +41310,10 @@ initFortuneHub();
       return Math.round((y - TREE_PAD - TREE_ROW_H / 2) / TREE_ROW_H);
     }
 
+    function treeRouteColIndex(x) {
+      return Math.round((x - TREE_PAD - TREE_COL_W / 2) / TREE_COL_W);
+    }
+
     /** 行ノードの下端と、次の行の上端のあいだなら、その上側の行番号。否則 -1 */
     function treeRouteRowGutter(y) {
       const y0 = y - (TREE_PAD + TREE_ROW_H / 2);
@@ -41229,10 +41324,28 @@ initFortuneHub();
       return (y0 > openTop && y0 < openBot) ? r : -1;
     }
 
+    /** 列ノードの右端と、次の列の左端のあいだなら、その左側の列番号。否則 -1 */
+    function treeRouteColGutter(x) {
+      const x0 = x - (TREE_PAD + TREE_COL_W / 2);
+      const half = TREE_NODE_W / 2;
+      const c = Math.floor((x0 - half) / TREE_COL_W);
+      const openLeft = c * TREE_COL_W + half;
+      const openRight = (c + 1) * TREE_COL_W - half;
+      return (x0 > openLeft && x0 < openRight) ? c : -1;
+    }
+
     /** 垂直線の両端が、同じ行間か隣り合う行間にある（行の横をまたぐ立ち上がり） */
     function treeRouteVertInGutters(lo, hi) {
       const ga = treeRouteRowGutter(lo);
       const gb = treeRouteRowGutter(hi);
+      if (ga < 0 || gb < 0) return false;
+      return ga === gb || Math.abs(ga - gb) === 1;
+    }
+
+    /** 水平線の両端が、同じ列間か隣り合う列間にある（列をまたぐ横枝） */
+    function treeRouteHorizInGutters(lo, hi) {
+      const ga = treeRouteColGutter(lo);
+      const gb = treeRouteColGutter(hi);
       if (ga < 0 || gb < 0) return false;
       return ga === gb || Math.abs(ga - gb) === 1;
     }
@@ -41246,30 +41359,62 @@ initFortuneHub();
       return treeRouteVertInGutters(lo, hi) && treeRouteVertInGutters(oA, oB);
     }
 
-    /** 行をまたぐ線が、端点の行に挟まれた行間の外を水平に走る追加コスト */
+    /** 垂直なら両レーンが同じ列間。水平なら両線とも列間をつなぐ横枝 */
+    function treeRouteSameColGutter(horiz, lane, lo, hi, oLane, oA, oB) {
+      if (!horiz) {
+        const g = treeRouteColGutter(lane);
+        return g >= 0 && g === treeRouteColGutter(oLane);
+      }
+      return treeRouteHorizInGutters(lo, hi) && treeRouteHorizInGutters(oA, oB);
+    }
+
+    /** 行／列をまたぐ線が、端点の行／列に挟まれたガターの外を走る追加コスト */
     function treeRouteOutsideGutterExtra(horiz, lane, span, a1, b1) {
-      if (!horiz || !a1 || !b1 || !(span > 0)) return 0;
-      const ra = treeRouteRowIndex(a1.y);
-      const rb = treeRouteRowIndex(b1.y);
-      if (ra === rb) return 0;
-      const g = treeRouteRowGutter(lane);
-      const loR = ra < rb ? ra : rb;
-      const hiR = ra < rb ? rb : ra;
-      if (g >= loR && g < hiR) return 0;
+      if (!a1 || !b1 || !(span > 0)) return 0;
+      if (horiz) {
+        const ra = treeRouteRowIndex(a1.y);
+        const rb = treeRouteRowIndex(b1.y);
+        if (ra === rb) return 0;
+        const g = treeRouteRowGutter(lane);
+        const loR = ra < rb ? ra : rb;
+        const hiR = ra < rb ? rb : ra;
+        if (g >= loR && g < hiR) return 0;
+        return TREE_ROUTE_OUTSIDE_GUTTER_COST * span;
+      }
+      const ca = treeRouteColIndex(a1.x);
+      const cb = treeRouteColIndex(b1.x);
+      if (ca === cb) return 0;
+      const g = treeRouteColGutter(lane);
+      const loC = ca < cb ? ca : cb;
+      const hiC = ca < cb ? cb : ca;
+      if (g >= loC && g < hiC) return 0;
       return TREE_ROUTE_OUTSIDE_GUTTER_COST * span;
     }
 
-    /** 行をまたぐ水平線を、上下の行の中央に寄せる */
+    /** 行間／列間をまたぐ幹線を、上下の行・左右の列の中央に寄せる */
     function treeRouteGutterCenterExtra(horiz, lane, a1, b1) {
-      if (!horiz || !a1 || !b1) return 0;
-      const ra = treeRouteRowIndex(a1.y);
-      const rb = treeRouteRowIndex(b1.y);
-      if (ra === rb) return 0;
-      const g = treeRouteRowGutter(lane);
-      const loR = ra < rb ? ra : rb;
-      const hiR = ra < rb ? rb : ra;
-      if (!(g >= loR && g < hiR)) return 0;
-      const mid = TREE_PAD + (g + 1) * TREE_ROW_H;
+      if (!a1 || !b1) return 0;
+      if (horiz) {
+        const ra = treeRouteRowIndex(a1.y);
+        const rb = treeRouteRowIndex(b1.y);
+        if (ra === rb) return 0;
+        const g = treeRouteRowGutter(lane);
+        const loR = ra < rb ? ra : rb;
+        const hiR = ra < rb ? rb : ra;
+        if (!(g >= loR && g < hiR)) return 0;
+        const mid = TREE_PAD + (g + 1) * TREE_ROW_H;
+        const dist = Math.abs(lane - mid);
+        if (dist <= TREE_ROUTE_LANE_EPS) return 0;
+        return dist * TREE_ROUTE_GUTTER_CENTER_COST;
+      }
+      const ca = treeRouteColIndex(a1.x);
+      const cb = treeRouteColIndex(b1.x);
+      if (ca === cb) return 0;
+      const g = treeRouteColGutter(lane);
+      const loC = ca < cb ? ca : cb;
+      const hiC = ca < cb ? cb : ca;
+      if (!(g >= loC && g < hiC)) return 0;
+      const mid = TREE_PAD + (g + 1) * TREE_COL_W;
       const dist = Math.abs(lane - mid);
       if (dist <= TREE_ROUTE_LANE_EPS) return 0;
       return dist * TREE_ROUTE_GUTTER_CENTER_COST;
@@ -41281,21 +41426,31 @@ initFortuneHub();
       return aFrom === bFrom || aFrom === bTo || aTo === bFrom || aTo === bTo;
     }
 
+    /** 2本の線が同じ接続点（ノードID＋辺）から出る／入るか */
+    function treeRouteSharesPort(aFromKey, aToKey, bFromKey, bToKey) {
+      if (!aFromKey && !aToKey) return false;
+      return (!!(aFromKey && bFromKey && aFromKey === bFromKey))
+        || (!!(aToKey && bToKey && aToKey === bToKey));
+    }
+
     /**
      * 線分（horiz/lane/lo..hi）と別の線の線分の関係。
      * 自分の接続点の助走端（a1/b1）での接触は避けようがないので数えない。
      * oTips: 相手の線分の端が線そのものの端か（1=oA 側, 2=oB 側）
      */
-    function treeRoutePairKind(horiz, lane, lo, hi, oHoriz, oLane, oA, oB, a1, b1, oTips, shareBus) {
+    function treeRoutePairKind(horiz, lane, lo, hi, oHoriz, oLane, oA, oB, a1, b1, oTips, shareBus, sharePort) {
       if (shareBus == null) shareBus = true;
       if (horiz === oHoriz) {
         const d = oLane > lane ? oLane - lane : lane - oLane;
         const ov = Math.min(hi, oB) - Math.max(lo, oA);
-        // 同じノードから分かれる束だけ、行間で1本に重ねる。
+        // 同じ接続点から出る／入る束は、接続点〜ガター間の共有区間も1本に重ねる
+        if (sharePort && d <= TREE_ROUTE_LANE_EPS && ov > -2) return TREE_PAIR_NONE;
+        // 同じノードから分かれる束だけ、行間／列間で1本に重ねる。
         // 端点を共有しない線はここを通さず、重なりを避けて迂回する。
-        if (shareBus && treeRouteSameRowGutter(horiz, lane, lo, hi, oLane, oA, oB)) {
+        if (shareBus && (treeRouteSameRowGutter(horiz, lane, lo, hi, oLane, oA, oB)
+          || treeRouteSameColGutter(horiz, lane, lo, hi, oLane, oA, oB))) {
           if (d <= TREE_ROUTE_LANE_EPS && ov > -2) return TREE_PAIR_NONE;
-          if (horiz && ov > 24) return TREE_PAIR_GUTTER_SPREAD;
+          if (ov > 24) return TREE_PAIR_GUTTER_SPREAD;
         }
         if (d >= TREE_ROUTE_GAP) return TREE_PAIR_NONE;
         if (d <= TREE_ROUTE_LANE_EPS) {
@@ -41320,10 +41475,11 @@ initFortuneHub();
         if (oLane < lo - 1 || oLane > hi + 1) return TREE_PAIR_NONE;
         const own = horiz ? treeRouteIsOwnEnd(oLane, lane, a1, b1) : treeRouteIsOwnEnd(lane, oLane, a1, b1);
         if (own) return TREE_PAIR_NONE;
-        // 行間の水平線に端が乗って分かれるだけなら、交差ではない
+        // 行間／列間の幹線に端が乗って分かれるだけなら、交差ではない
         const atEnd = Math.abs(oLane - lo) <= 1 || Math.abs(oLane - hi) <= 1;
         const junctionY = horiz ? lane : oLane;
-        if (atEnd && shareBus && treeRouteRowGutter(junctionY) >= 0) return TREE_PAIR_NONE;
+        const junctionX = horiz ? oLane : lane;
+        if (atEnd && (sharePort || (shareBus && (treeRouteRowGutter(junctionY) >= 0 || treeRouteColGutter(junctionX) >= 0)))) return TREE_PAIR_NONE;
         return atTip ? TREE_PAIR_HALF_TOUCH : TREE_PAIR_HALF_CROSS;
       }
       // 相手の線の端（角）がこの区間のそばにある
@@ -41332,9 +41488,10 @@ initFortuneHub();
       if (own) return TREE_PAIR_NONE;
       const along = oLane < lo ? lo - oLane : (oLane > hi ? oLane - hi : 0);
       const across = lane > end ? lane - end : end - lane;
-      // 行間の水平線から上下へ分かれる枝は、重ねた1本の分かれ目なので接触に数えない
+      // 行間／列間の幹線から上下・左右へ分かれる枝は、重ねた1本の分かれ目なので接触に数えない
       const junctionY = horiz ? lane : oLane;
-      if (along < 1 && across <= TREE_ROUTE_LANE_EPS && shareBus && treeRouteRowGutter(junctionY) >= 0) return TREE_PAIR_NONE;
+      const junctionX = horiz ? oLane : lane;
+      if (along < 1 && across <= TREE_ROUTE_LANE_EPS && (sharePort || (shareBus && (treeRouteRowGutter(junctionY) >= 0 || treeRouteColGutter(junctionX) >= 0)))) return TREE_PAIR_NONE;
       return Math.max(along, across) < TREE_ROUTE_TOUCH_GAP ? TREE_PAIR_TOUCH : TREE_PAIR_ROOM;
     }
 
@@ -41384,20 +41541,21 @@ initFortuneHub();
     }
 
     /** 他の線と交差・接触・並走・重なりのどれかがあるか */
-    function treeRouteHasConflict(segs, others, a1, b1, fromId, toId) {
+    function treeRouteHasConflict(segs, others, a1, b1, fromId, toId, fromKey, toKey) {
       for (let i = 0; i < segs.length; i++) {
         const s = segs[i];
         for (let j = 0; j < others.length; j++) {
           const o = others[j];
           const share = treeRouteSharesNode(fromId, toId, o.fromId, o.toId);
-          if (treeRoutePairKind(s.horiz, s.lane, s.a, s.b, o.horiz, o.lane, o.a, o.b, a1, b1, o.tips || 0, share)) return true;
+          const sharePort = treeRouteSharesPort(fromKey, toKey, o.fromKey, o.toKey);
+          if (treeRoutePairKind(s.horiz, s.lane, s.a, s.b, o.horiz, o.lane, o.a, o.b, a1, b1, o.tips || 0, share, sharePort)) return true;
         }
       }
       return false;
     }
 
     /** 引き直し前後の比較用: 長さ・曲がり・大回り・他の線との関係をまとめた悪さ */
-    function treeRouteScore(pts, others, a1, b1, fromId, toId) {
+    function treeRouteScore(pts, others, a1, b1, fromId, toId, fromKey, toKey) {
       let score = Math.max(0, pts.length - 2) * TREE_ROUTE_BEND_COST;
       const box = treeRouteDetourBox(a1, b1);
       const all = treeRouteSegments(pts, false);
@@ -41414,7 +41572,8 @@ initFortuneHub();
         for (let j = 0; j < others.length; j++) {
           const o = others[j];
           const share = treeRouteSharesNode(fromId, toId, o.fromId, o.toId);
-          score += TREE_PAIR_COSTS[treeRoutePairKind(s.horiz, s.lane, s.a, s.b, o.horiz, o.lane, o.a, o.b, a1, b1, o.tips || 0, share)];
+          const sharePort = treeRouteSharesPort(fromKey, toKey, o.fromKey, o.toKey);
+          score += TREE_PAIR_COSTS[treeRoutePairKind(s.horiz, s.lane, s.a, s.b, o.horiz, o.lane, o.a, o.b, a1, b1, o.tips || 0, share, sharePort)];
         }
       }
       return score;
@@ -41509,7 +41668,7 @@ initFortuneHub();
     }
 
     /** 格子上の最小コスト経路。dir: 0=水平, 1=垂直。a0/b0 は接続点（助走の根元） */
-    function treeRouteSolve(a1, b1, startDir, goalDir, occ, obstacles, a0, b0, fromId, toId) {
+    function treeRouteSolve(a1, b1, startDir, goalDir, occ, obstacles, a0, b0, fromId, toId, fromKey, toKey) {
       const grid = treeRouteGrid(a1, b1);
       const xs = grid.xs;
       const ys = grid.ys;
@@ -41577,14 +41736,16 @@ initFortuneHub();
         const b = new Float64Array(n);
         const tips = new Uint8Array(n);
         const bus = new Uint8Array(n);
+        const port = new Uint8Array(n);
         for (let i = 0; i < n; i++) {
           lane[i] = list[i].lane;
           a[i] = list[i].a;
           b[i] = list[i].b;
           tips[i] = list[i].tips || 0;
           bus[i] = treeRouteSharesNode(fromId, toId, list[i].fromId, list[i].toId) ? 1 : 0;
+          port[i] = treeRouteSharesPort(fromKey, toKey, list[i].fromKey, list[i].toKey) ? 1 : 0;
         }
-        return { n, lane, a, b, tips, bus };
+        return { n, lane, a, b, tips, bus, port };
       };
       const occHz = packOcc(true);
       const occVt = packOcc(false);
@@ -41612,16 +41773,18 @@ initFortuneHub();
         w += treeRouteOutsideGutterExtra(horiz, lane, hi - lo, a1, b1);
         w += treeRouteGutterCenterExtra(horiz, lane, a1, b1);
         const same = horiz ? occHz : occVt;
-        // 行間はレーン間隔が GAP より広い。水平だけ、行間の幅まで隣レーンを見る
-        const laneWindow = horiz ? Math.max(gap, TREE_ROW_H - TREE_NODE_H) : gap;
+        // 行間／列間はレーン間隔が GAP より広い。ガター幅まで隣レーンを見る
+        const laneWindow = horiz
+          ? Math.max(gap, TREE_ROW_H - TREE_NODE_H)
+          : Math.max(gap, TREE_COL_W - TREE_NODE_W);
         for (let i = firstLaneAtLeast(same, lane - laneWindow + 0.01); i < same.n && same.lane[i] < lane + laneWindow; i++) {
-          const kind = treeRoutePairKind(horiz, lane, lo, hi, horiz, same.lane[i], same.a[i], same.b[i], a1, b1, same.tips[i], same.bus[i] === 1);
+          const kind = treeRoutePairKind(horiz, lane, lo, hi, horiz, same.lane[i], same.a[i], same.b[i], a1, b1, same.tips[i], same.bus[i] === 1, same.port[i] === 1);
           if (kind) w += TREE_PAIR_COSTS[kind];
         }
         const across = horiz ? occVt : occHz;
         for (let i = firstLaneAtLeast(across, lo - tgap); i < across.n && across.lane[i] <= hi + tgap; i++) {
           if (lane < across.a[i] - tgap || lane > across.b[i] + tgap) continue;
-          const kind = treeRoutePairKind(horiz, lane, lo, hi, !horiz, across.lane[i], across.a[i], across.b[i], a1, b1, across.tips[i], across.bus[i] === 1);
+          const kind = treeRoutePairKind(horiz, lane, lo, hi, !horiz, across.lane[i], across.a[i], across.b[i], a1, b1, across.tips[i], across.bus[i] === 1, across.port[i] === 1);
           if (kind) w += TREE_PAIR_COSTS[kind];
         }
         return w;
@@ -41770,7 +41933,11 @@ initFortuneHub();
       const startDir = (fromSide === 'l' || fromSide === 'r') ? 0 : 1;
       const goalDir = (toSide === 'l' || toSide === 'r') ? 0 : 1;
 
-      const solved = treeRouteSolve(a1, b1, startDir, goalDir, occ || [], treeRouteObstacles(), a0, b0, fromNode && fromNode.id, toNode && toNode.id);
+      const fromId = fromNode && fromNode.id != null ? String(fromNode.id) : '';
+      const toId = toNode && toNode.id != null ? String(toNode.id) : '';
+      const fromKey = fromId ? (fromId + ':' + fromSide) : '';
+      const toKey = toId ? (toId + ':' + toSide) : '';
+      const solved = treeRouteSolve(a1, b1, startDir, goalDir, occ || [], treeRouteObstacles(), a0, b0, fromId, toId, fromKey, toKey);
       let mid;
       if (solved && solved.pts && solved.pts.length >= 2) {
         mid = solved.pts;
@@ -41990,9 +42157,13 @@ initFortuneHub();
         const segs = treeRouteOccSegments(pts);
         const fromId = p.from && p.from.id != null ? String(p.from.id) : '';
         const toId = p.to && p.to.id != null ? String(p.to.id) : '';
+        const fromKey = fromId ? (fromId + ':' + p.fromSide) : '';
+        const toKey = toId ? (toId + ':' + p.toSide) : '';
         segs.forEach((s) => {
           s.fromId = fromId;
           s.toId = toId;
+          s.fromKey = fromKey;
+          s.toKey = toKey;
           occ.push(s);
         });
         clock++;
@@ -42002,6 +42173,8 @@ initFortuneHub();
           to: p.to,
           fromSide: p.fromSide,
           toSide: p.toSide,
+          fromKey,
+          toKey,
           pts,
           segs,
           routedAt: clock,
@@ -42032,17 +42205,21 @@ initFortuneHub();
           const core = treeRouteTrimmedSegments(r.pts, TREE_ROUTE_STUB);
           const fromId = r.from && r.from.id != null ? String(r.from.id) : '';
           const toId = r.to && r.to.id != null ? String(r.to.id) : '';
-          if (!treeRouteHasConflict(core, unseen, a1, b1, fromId, toId)) continue;
+          const fromKey = r.fromKey || (fromId ? (fromId + ':' + r.fromSide) : '');
+          const toKey = r.toKey || (toId ? (toId + ':' + r.toSide) : '');
+          if (!treeRouteHasConflict(core, unseen, a1, b1, fromId, toId, fromKey, toKey)) continue;
           clock++;
           r.routedAt = clock;
           const pts = treeRouteEdgePoints(r.from, r.to, r.fromSide, r.toSide, others);
           if (treePointsToPath(pts) === treePointsToPath(r.pts)) continue;
-          if (treeRouteScore(pts, others, a1, b1, fromId, toId) >= treeRouteScore(r.pts, others, a1, b1, fromId, toId) - 1) continue;
+          if (treeRouteScore(pts, others, a1, b1, fromId, toId, fromKey, toKey) >= treeRouteScore(r.pts, others, a1, b1, fromId, toId, fromKey, toKey) - 1) continue;
           r.pts = pts;
           r.segs = treeRouteOccSegments(pts);
           r.segs.forEach((s) => {
             s.fromId = fromId;
             s.toId = toId;
+            s.fromKey = fromKey;
+            s.toKey = toKey;
           });
           r.changedAt = clock;
           changed = true;
@@ -42099,13 +42276,22 @@ initFortuneHub();
         });
         const ids = Array.from(byRoute.keys());
         if (ids.length < 2) return;
-        const overlaps = (a, b) => a.some((s) => b.some((o) => Math.min(s.hi, o.hi) - Math.max(s.lo, o.lo) > 8));
+        const shareSamePort = (idA, idB) => {
+          const ra = prepared[idA] && prepared[idA].r;
+          const rb = prepared[idB] && prepared[idB].r;
+          if (!ra || !rb) return false;
+          return treeRouteSharesPort(ra.fromKey, ra.toKey, rb.fromKey, rb.toKey);
+        };
+        const overlaps = (idA, idB, a, b) => {
+          if (shareSamePort(idA, idB)) return false;
+          return a.some((s) => b.some((o) => Math.min(s.hi, o.hi) - Math.max(s.lo, o.lo) > 8));
+        };
         const colors = new Map();
         const used = [];
         ids.forEach((id) => {
           const mine = byRoute.get(id);
           let color = 0;
-          while (used[color] && used[color].some((other) => overlaps(mine, byRoute.get(other)))) color++;
+          while (used[color] && used[color].some((other) => overlaps(id, other, mine, byRoute.get(other)))) color++;
           if (!used[color]) used[color] = [];
           used[color].push(id);
           colors.set(id, color);
@@ -42153,6 +42339,7 @@ initFortuneHub();
       }
       for (let i = 0; i < items.length; i++) {
         for (let j = i + 1; j < items.length; j++) {
+          if (treeRouteSharesPort(items[i].r.fromKey, items[i].r.toKey, items[j].r.fromKey, items[j].r.toKey)) continue;
           const over = items[i].when >= items[j].when ? items[i] : items[j];
           const under = over === items[i] ? items[j] : items[i];
           for (let s = 0; s < over.segs.length; s++) {
@@ -48063,21 +48250,37 @@ initFortuneHub();
 
       const hasImages = dumpComposeImages.length > 0;
       const imagesToUpload = hasImages ? dumpComposeImages.map((img) => ({ ...img })) : [];
-      if (hasImages) {
-        imagesToUpload.forEach((img) => {
-          localPendingImagesMap.set(img.id, img);
-        });
-        clearDumpComposeImages({ keepBlobs: true });
-      }
 
       const rawContent = hasImages
         ? appendDumpImagePlaceholders(stripDumpImageTokens(rawTyped), imagesToUpload)
         : rawTyped;
 
-      const chunks = splitDumpContent(rawContent);
+      let chunks = splitDumpContent(rawContent);
       if (chunks.length === 0) {
+        if (hasImages) {
+          imagesToUpload.forEach((img) => {
+            localPendingImagesMap.set(img.id, img);
+          });
+          clearDumpComposeImages({ keepBlobs: true });
+        }
         if (textarea) clearInboxInputAfterDump(textarea, rawContent, { focus: true });
         return;
+      }
+      if (chunks.length >= 2) {
+        const choice = await confirmBlankLineSplitModal(chunks);
+        if (choice === 'cancel') return;
+        if (choice === 'single') {
+          const merged = String(rawContent || '').trim();
+          chunks = merged ? [merged] : [];
+          if (chunks.length === 0) return;
+        }
+      }
+
+      if (hasImages) {
+        imagesToUpload.forEach((img) => {
+          localPendingImagesMap.set(img.id, img);
+        });
+        clearDumpComposeImages({ keepBlobs: true });
       }
 
       const preventDuplicates = localStorage.getItem('setting_prevent_duplicates') !== 'false';
@@ -50503,7 +50706,7 @@ initFortuneHub();
       return true;
     }
 
-    function saveCheckBlockExpand() {
+    async function saveCheckBlockExpand() {
       const state = checkBlocksExpandState;
       const editor = document.getElementById('check-blocks-editor');
       if (!state || !editor) return;
@@ -50514,7 +50717,14 @@ initFortuneHub();
       }
       try {
         if (state.mode === 'new') {
-          queueCheckBlockAsNewDump(content);
+          const splitChunks = typeof splitDumpContent === 'function' ? splitDumpContent(content) : [content];
+          let forceSingle = false;
+          if (splitChunks.length >= 2) {
+            const choice = await confirmBlankLineSplitModal(splitChunks);
+            if (choice === 'cancel') return;
+            if (choice === 'single') forceSingle = true;
+          }
+          queueCheckBlockAsNewDump(content, { forceSingle });
         } else {
           queueCheckBlockAsReplace(state.entry, content);
         }
@@ -50532,8 +50742,11 @@ initFortuneHub();
       }
     }
 
-    function queueCheckBlockAsNewDump(content) {
-      const chunks = typeof splitDumpContent === 'function' ? splitDumpContent(content) : [content];
+    function queueCheckBlockAsNewDump(content, opts) {
+      opts = opts || {};
+      const chunks = opts.forceSingle
+        ? [String(content || '').trim()]
+        : (typeof splitDumpContent === 'function' ? splitDumpContent(content) : [content]);
       const addedChunks = (chunks || []).filter((c) => c && String(c).trim());
       if (!addedChunks.length) throw new Error('empty');
       const laneDest = dumpLaneDest(checkBlocksLane);
@@ -53891,8 +54104,17 @@ initFortuneHub();
       const textarea = document.getElementById('review-add-content');
       const rawContent = textarea.value;
       if (!rawContent.trim()) return;
-      const chunks = splitDumpContent(rawContent);
+      let chunks = splitDumpContent(rawContent);
       if (chunks.length === 0) return;
+      if (chunks.length >= 2) {
+        const choice = await confirmBlankLineSplitModal(chunks);
+        if (choice === 'cancel') return;
+        if (choice === 'single') {
+          const merged = String(rawContent || '').trim();
+          chunks = merged ? [merged] : [];
+          if (chunks.length === 0) return;
+        }
+      }
       const preventDuplicates = localStorage.getItem('setting_prevent_duplicates') !== 'false';
       const existingKeys = new Set();
       if (preventDuplicates) {

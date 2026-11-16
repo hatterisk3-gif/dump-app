@@ -29,7 +29,7 @@
       will-change: opacity, transform;
       transform: translateZ(0);
       backface-visibility: hidden;
-      contain: layout style paint;
+      contain: strict;
     }
     #boot-splash.splash-out {
       opacity: 0 !important;
@@ -45,6 +45,13 @@
     .boot-logo {
       font-size: 26px; font-weight: 900; letter-spacing: 0.45em; padding-left: 0.45em;
       color: #67e8f9; font-family: ui-sans-serif, system-ui, sans-serif;
+    }
+    html:not(.boot-surface-ready) #space-background,
+    html:not(.boot-surface-ready) .tab-content,
+    html:not(.boot-surface-ready) #app-bottom-nav,
+    html:not(.boot-surface-ready) #memo-sub-nav {
+      visibility: hidden !important;
+      pointer-events: none !important;
     }
     html:not(.ui-ready) #space-background,
     html:not(.ui-ready) #space-background *,
@@ -2498,51 +2505,123 @@
     .fortune-home-profile-link:active {
       transform: scale(0.98);
     }
-    /* ミチシルベ：生年月日・出生時間スライダー */
+    /* ミチシルベ：生年月日・出生時間ドラムピッカー（ホイールピッカー） */
     .fortune-slider-card {
       position: relative;
       animation: fortune-home-rise 0.7s ease-out 0.28s both;
     }
-    .fortune-range-slider {
-      -webkit-appearance: none;
-      appearance: none;
-      width: 100%;
-      height: 10px;
-      border-radius: 9999px;
-      background: rgba(12, 74, 110, 0.45);
-      border: 1px solid rgba(56, 189, 248, 0.3);
-      outline: none;
+    .fortune-wheel-group {
+      position: relative;
+      border-radius: 14px;
+      background: rgba(2, 6, 23, 0.58);
+      border: 1px solid rgba(56, 189, 248, 0.24);
+      overflow: hidden;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    .fortune-wheel-highlight {
+      position: absolute;
+      top: 50%;
+      left: 8px;
+      right: 8px;
+      height: 36px;
+      transform: translateY(-50%);
+      border-radius: 10px;
+      background: rgba(56, 189, 248, 0.14);
+      border-top: 1px solid rgba(56, 189, 248, 0.45);
+      border-bottom: 1px solid rgba(56, 189, 248, 0.45);
+      pointer-events: none;
+      z-index: 1;
+    }
+    .fortune-wheel-cols {
+      position: relative;
+      z-index: 2;
+      display: grid;
+    }
+    .fortune-wheel-cols--date {
+      grid-template-columns: 1.25fr 0.9fr 0.9fr;
+    }
+    .fortune-wheel-cols--time {
+      grid-template-columns: 1fr 1fr;
+    }
+    .fortune-wheel-col {
+      height: 156px;
+      padding: 60px 0;
+      overflow-y: auto;
+      scroll-snap-type: y mandatory;
+      -webkit-overflow-scrolling: touch;
+      overscroll-behavior-y: contain;
+      scrollbar-width: none;
+      cursor: grab;
+      -webkit-mask-image: linear-gradient(to bottom, transparent 0%, rgba(0, 0, 0, 0.65) 22%, #000 38%, #000 62%, rgba(0, 0, 0, 0.65) 78%, transparent 100%);
+      mask-image: linear-gradient(to bottom, transparent 0%, rgba(0, 0, 0, 0.65) 22%, #000 38%, #000 62%, rgba(0, 0, 0, 0.65) 78%, transparent 100%);
+    }
+    .fortune-wheel-col:active,
+    .fortune-wheel-col.is-dragging {
+      cursor: grabbing;
+      scroll-snap-type: none;
+    }
+    .fortune-wheel-col::-webkit-scrollbar {
+      display: none;
+    }
+    .fortune-wheel-item {
+      height: 36px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      scroll-snap-align: center;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 15px;
+      font-weight: 700;
+      color: rgba(148, 163, 184, 0.72);
+      transform: scale(0.92);
+      transition: color 0.12s ease, transform 0.12s ease;
       cursor: pointer;
-      transition: all 0.15s ease;
     }
-    .fortune-range-slider:hover {
-      background: rgba(12, 74, 110, 0.65);
-      border-color: rgba(56, 189, 248, 0.5);
+    .fortune-wheel-item.is-selected {
+      color: #e0f2fe;
+      font-size: 17px;
+      font-weight: 800;
+      transform: scale(1.06);
     }
-    .fortune-range-slider::-webkit-slider-thumb {
-      -webkit-appearance: none;
-      appearance: none;
-      width: 24px;
-      height: 24px;
-      border-radius: 50%;
-      background: radial-gradient(circle at 35% 35%, #e0f2fe, #0284c7);
-      box-shadow: 0 0 10px rgba(56, 189, 248, 0.65), 0 2px 4px rgba(0, 0, 0, 0.4);
-      border: 2px solid #ffffff;
-      cursor: pointer;
-      transition: transform 0.1s ease, box-shadow 0.1s ease;
+    html.theme-light .fortune-wheel-group {
+      background: rgba(241, 245, 249, 0.92);
+      border-color: rgba(14, 116, 144, 0.25);
     }
-    .fortune-range-slider::-webkit-slider-thumb:active {
-      transform: scale(1.18);
-      box-shadow: 0 0 16px rgba(56, 189, 248, 0.95), 0 2px 6px rgba(0, 0, 0, 0.6);
+    html.theme-light .fortune-wheel-highlight {
+      background: rgba(14, 116, 144, 0.12);
+      border-color: rgba(14, 116, 144, 0.4);
     }
-    .fortune-range-slider::-moz-range-thumb {
-      width: 24px;
-      height: 24px;
-      border-radius: 50%;
-      background: radial-gradient(circle at 35% 35%, #e0f2fe, #0284c7);
-      box-shadow: 0 0 10px rgba(56, 189, 248, 0.65);
-      border: 2px solid #ffffff;
-      cursor: pointer;
+    html.theme-light .fortune-wheel-item {
+      color: rgba(71, 85, 105, 0.65);
+    }
+    html.theme-light .fortune-wheel-item.is-selected {
+      color: #0e7490;
+    }
+    html.theme-soft .fortune-wheel-group {
+      background: rgba(24, 20, 16, 0.75);
+      border-color: rgba(219, 177, 110, 0.3);
+    }
+    html.theme-soft .fortune-wheel-highlight {
+      background: rgba(219, 177, 110, 0.14);
+      border-color: rgba(219, 177, 110, 0.45);
+    }
+    html.theme-soft .fortune-wheel-item.is-selected {
+      color: #fef3c7;
+    }
+    html.theme-soft-light .fortune-wheel-group {
+      background: rgba(247, 243, 236, 0.92);
+      border-color: rgba(168, 132, 82, 0.3);
+    }
+    html.theme-soft-light .fortune-wheel-highlight {
+      background: rgba(168, 132, 82, 0.14);
+      border-color: rgba(168, 132, 82, 0.45);
+    }
+    html.theme-soft-light .fortune-wheel-item {
+      color: rgba(92, 77, 60, 0.6);
+    }
+    html.theme-soft-light .fortune-wheel-item.is-selected {
+      color: #784f1d;
     }
     .fortune-slider-btn {
       touch-action: manipulation;
@@ -4854,8 +4933,10 @@
         var q = afterSplashQueue.splice(0, afterSplashQueue.length);
         q.forEach(function (item, idx) {
           setTimeout(function () {
-            try { item(); } catch (_) {}
-          }, idx * 80);
+            requestAnimationFrame(function () {
+              try { item(); } catch (_) {}
+            });
+          }, idx * 110);
         });
       }
       window.__afterBootSplash = function (fn) {
@@ -4869,7 +4950,7 @@
 
       // 即時起動の場合は即座に非表示、それ以外は暗闇から演出を展開
       if (currentSplashStyle === 'instant') {
-        document.documentElement.classList.add('ui-ready');
+        document.documentElement.classList.add('boot-surface-ready', 'ui-ready');
         if (s0) {
           s0.style.display = 'none';
           hardRemoved = true;
@@ -4909,7 +4990,7 @@
         var s = document.getElementById('boot-splash');
         if (!s) {
           hardRemoved = true;
-          document.documentElement.classList.add('ui-ready');
+          document.documentElement.classList.add('boot-surface-ready', 'ui-ready');
           flushAfterBootSplash();
           return;
         }
@@ -4926,12 +5007,15 @@
             finish();
           }
         });
-        // フェードアウト開始（CSS transition 0.45s）。完了後に ui-ready を付与して衝突を防ぐ
+        // 先に背後UIを1フレーム描画させてから、次フレームでスプラッシュをフェードアウト（突っかかり防止）
+        document.documentElement.classList.add('boot-surface-ready');
         requestAnimationFrame(function () {
-          if (hardRemoved) return;
-          s.classList.add('splash-out');
+          requestAnimationFrame(function () {
+            if (hardRemoved) return;
+            s.classList.add('splash-out');
+          });
         });
-        setTimeout(finish, 500);
+        setTimeout(finish, 560);
       }
 
       function revealBootSurface() {
@@ -4973,6 +5057,7 @@
         }
         if (hardRemoved) return;
         hardRemoved = true;
+        document.documentElement.classList.add('boot-surface-ready');
         // スプラッシュ消去後、次フレームで背後UIのアニメーション・後続タスクを段階的に解放
         requestAnimationFrame(function () {
           document.documentElement.classList.add('ui-ready');
@@ -9123,7 +9208,7 @@
                 </button>
               </div>
 
-              <!-- 3. 生年月日と出生時間のスライダー -->
+              <!-- 3. 生年月日と出生時間のドラムピッカー -->
               <div id="fortune-home-slider-card" class="fortune-slider-card bg-slate-950/75 border border-sky-800/50 rounded-2xl p-4 shadow-[0_4px_24px_rgba(2,6,23,0.55)] space-y-3.5 backdrop-blur-md">
                 <!-- サマリープレビュー -->
                 <div class="flex items-center justify-between gap-2 pb-2.5 border-b border-sky-900/40">
@@ -9136,42 +9221,20 @@
                   </div>
                 </div>
 
-                <!-- 年スライダー -->
-                <div class="space-y-1">
-                  <div class="flex items-center justify-between text-xs">
-                    <span class="font-bold text-sky-300/80">年</span>
-                    <span id="fortune-slider-year-val" class="font-mono font-extrabold text-sky-100 text-sm">1995年</span>
+                <!-- 生年月日ドラムピッカー（年・月・日） -->
+                <div class="space-y-1.5">
+                  <div class="grid text-center text-[11px] font-bold text-sky-300/80" style="grid-template-columns: 1.25fr 0.9fr 0.9fr;">
+                    <span>年</span>
+                    <span>月</span>
+                    <span>日</span>
                   </div>
-                  <div class="flex items-center gap-2">
-                    <button type="button" onclick="adjustFortuneSlider('year', -1)" class="fortune-slider-btn w-9 h-8 rounded-lg bg-sky-950/80 hover:bg-sky-900 border border-sky-700/50 text-sky-200 font-black text-sm flex items-center justify-center shrink-0 active:scale-95" aria-label="1年減らす">−1</button>
-                    <input type="range" id="fortune-slider-year" min="1920" max="2035" value="1995" class="fortune-range-slider flex-1" oninput="onFortuneSliderInput('year')">
-                    <button type="button" onclick="adjustFortuneSlider('year', 1)" class="fortune-slider-btn w-9 h-8 rounded-lg bg-sky-950/80 hover:bg-sky-900 border border-sky-700/50 text-sky-200 font-black text-sm flex items-center justify-center shrink-0 active:scale-95" aria-label="1年増やす">＋1</button>
-                  </div>
-                </div>
-
-                <!-- 月スライダー -->
-                <div class="space-y-1">
-                  <div class="flex items-center justify-between text-xs">
-                    <span class="font-bold text-sky-300/80">月</span>
-                    <span id="fortune-slider-month-val" class="font-mono font-extrabold text-sky-100 text-sm">1月</span>
-                  </div>
-                  <div class="flex items-center gap-2">
-                    <button type="button" onclick="adjustFortuneSlider('month', -1)" class="fortune-slider-btn w-9 h-8 rounded-lg bg-sky-950/80 hover:bg-sky-900 border border-sky-700/50 text-sky-200 font-black text-sm flex items-center justify-center shrink-0 active:scale-95" aria-label="1月減らす">−1</button>
-                    <input type="range" id="fortune-slider-month" min="1" max="12" value="1" class="fortune-range-slider flex-1" oninput="onFortuneSliderInput('month')">
-                    <button type="button" onclick="adjustFortuneSlider('month', 1)" class="fortune-slider-btn w-9 h-8 rounded-lg bg-sky-950/80 hover:bg-sky-900 border border-sky-700/50 text-sky-200 font-black text-sm flex items-center justify-center shrink-0 active:scale-95" aria-label="1月増やす">＋1</button>
-                  </div>
-                </div>
-
-                <!-- 日スライダー -->
-                <div class="space-y-1">
-                  <div class="flex items-center justify-between text-xs">
-                    <span class="font-bold text-sky-300/80">日</span>
-                    <span id="fortune-slider-day-val" class="font-mono font-extrabold text-sky-100 text-sm">1日</span>
-                  </div>
-                  <div class="flex items-center gap-2">
-                    <button type="button" onclick="adjustFortuneSlider('day', -1)" class="fortune-slider-btn w-9 h-8 rounded-lg bg-sky-950/80 hover:bg-sky-900 border border-sky-700/50 text-sky-200 font-black text-sm flex items-center justify-center shrink-0 active:scale-95" aria-label="1日減らす">−1</button>
-                    <input type="range" id="fortune-slider-day" min="1" max="31" value="1" class="fortune-range-slider flex-1" oninput="onFortuneSliderInput('day')">
-                    <button type="button" onclick="adjustFortuneSlider('day', 1)" class="fortune-slider-btn w-9 h-8 rounded-lg bg-sky-950/80 hover:bg-sky-900 border border-sky-700/50 text-sky-200 font-black text-sm flex items-center justify-center shrink-0 active:scale-95" aria-label="1日増やす">＋1</button>
+                  <div class="fortune-wheel-group" role="group" aria-label="生年月日ドラムピッカー">
+                    <div class="fortune-wheel-highlight" aria-hidden="true"></div>
+                    <div class="fortune-wheel-cols fortune-wheel-cols--date">
+                      <div id="fortune-wheel-year" class="fortune-wheel-col" data-wheel-type="year" aria-label="年"></div>
+                      <div id="fortune-wheel-month" class="fortune-wheel-col" data-wheel-type="month" aria-label="月"></div>
+                      <div id="fortune-wheel-day" class="fortune-wheel-col" data-wheel-type="day" aria-label="日"></div>
+                    </div>
                   </div>
                 </div>
 
@@ -9185,30 +9248,16 @@
                     </label>
                   </div>
 
-                  <div id="fortune-slider-time-controls" class="space-y-2">
-                    <!-- 時スライダー -->
-                    <div class="space-y-1">
-                      <div class="flex items-center justify-between text-xs">
-                        <span class="text-slate-400 font-bold">時</span>
-                        <span id="fortune-slider-hour-val" class="font-mono font-extrabold text-sky-100 text-sm">12時</span>
-                      </div>
-                      <div class="flex items-center gap-2">
-                        <button type="button" onclick="adjustFortuneSlider('hour', -1)" class="fortune-slider-btn w-9 h-8 rounded-lg bg-sky-950/80 hover:bg-sky-900 border border-sky-700/50 text-sky-200 font-black text-sm flex items-center justify-center shrink-0 active:scale-95">−1</button>
-                        <input type="range" id="fortune-slider-hour" min="0" max="23" value="12" class="fortune-range-slider flex-1" oninput="onFortuneSliderInput('hour')">
-                        <button type="button" onclick="adjustFortuneSlider('hour', 1)" class="fortune-slider-btn w-9 h-8 rounded-lg bg-sky-950/80 hover:bg-sky-900 border border-sky-700/50 text-sky-200 font-black text-sm flex items-center justify-center shrink-0 active:scale-95">＋1</button>
-                      </div>
+                  <div id="fortune-slider-time-controls" class="space-y-1.5 transition-opacity">
+                    <div class="grid grid-cols-2 text-center text-[11px] font-bold text-slate-400">
+                      <span>時</span>
+                      <span>分</span>
                     </div>
-
-                    <!-- 分スライダー -->
-                    <div class="space-y-1">
-                      <div class="flex items-center justify-between text-xs">
-                        <span class="text-slate-400 font-bold">分</span>
-                        <span id="fortune-slider-minute-val" class="font-mono font-extrabold text-sky-100 text-sm">00分</span>
-                      </div>
-                      <div class="flex items-center gap-2">
-                        <button type="button" onclick="adjustFortuneSlider('minute', -5)" class="fortune-slider-btn w-9 h-8 rounded-lg bg-sky-950/80 hover:bg-sky-900 border border-sky-700/50 text-sky-200 font-black text-xs flex items-center justify-center shrink-0 active:scale-95">−5</button>
-                        <input type="range" id="fortune-slider-minute" min="0" max="55" step="5" value="0" class="fortune-range-slider flex-1" oninput="onFortuneSliderInput('minute')">
-                        <button type="button" onclick="adjustFortuneSlider('minute', 5)" class="fortune-slider-btn w-9 h-8 rounded-lg bg-sky-950/80 hover:bg-sky-900 border border-sky-700/50 text-sky-200 font-black text-xs flex items-center justify-center shrink-0 active:scale-95">＋5</button>
+                    <div class="fortune-wheel-group" role="group" aria-label="出生時間ドラムピッカー">
+                      <div class="fortune-wheel-highlight" aria-hidden="true"></div>
+                      <div class="fortune-wheel-cols fortune-wheel-cols--time">
+                        <div id="fortune-wheel-hour" class="fortune-wheel-col" data-wheel-type="hour" aria-label="時"></div>
+                        <div id="fortune-wheel-minute" class="fortune-wheel-col" data-wheel-type="minute" aria-label="分"></div>
                       </div>
                     </div>
                   </div>
@@ -9652,6 +9701,18 @@
               </div>
 
               <div class="flex-1 min-w-0 grid grid-cols-2 gap-2">
+                <!-- Web画像検索 -->
+                <button type="button" onclick="openSuppleJanGoogleImageSearch()" class="px-2.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-cyan-200 text-xs font-bold flex items-center justify-center gap-1.5 border border-cyan-900/40 transition-colors active:scale-95 shadow-2xs whitespace-nowrap" title="Google画像検索を別画面で開く">
+                  <span>🌐</span>
+                  <span>Web検索</span>
+                </button>
+
+                <!-- クリップボード貼付 -->
+                <button type="button" onclick="pasteSuppleImageFromClipboard()" class="px-2.5 py-2 rounded-xl bg-cyan-950/80 hover:bg-cyan-900 text-cyan-200 text-xs font-bold flex items-center justify-center gap-1.5 border border-cyan-700/60 transition-colors active:scale-95 shadow-2xs whitespace-nowrap" title="クリップボードから画像を貼り付ける">
+                  <span>📋</span>
+                  <span>貼付</span>
+                </button>
+
                 <!-- カメラ起動 -->
                 <label class="cursor-pointer px-2.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-cyan-200 text-xs font-bold flex items-center justify-center gap-1.5 border border-cyan-900/40 transition-colors active:scale-95 shadow-2xs whitespace-nowrap">
                   <span>📷</span>
@@ -9665,18 +9726,6 @@
                   <span>ギャラリー</span>
                   <input type="file" id="supple-master-file-gallery" accept="image/*" class="hidden" onchange="handleSupplePhotoUpload(event)" />
                 </label>
-
-                <!-- クリップボード貼付 -->
-                <button type="button" onclick="pasteSuppleImageFromClipboard()" class="px-2.5 py-2 rounded-xl bg-cyan-950/80 hover:bg-cyan-900 text-cyan-200 text-xs font-bold flex items-center justify-center gap-1.5 border border-cyan-700/60 transition-colors active:scale-95 shadow-2xs whitespace-nowrap" title="クリップボードから画像を貼り付ける">
-                  <span>📋</span>
-                  <span>貼付</span>
-                </button>
-
-                <!-- Web画像検索 -->
-                <button type="button" onclick="openSuppleJanGoogleImageSearch()" class="px-2.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-cyan-200 text-xs font-bold flex items-center justify-center gap-1.5 border border-cyan-900/40 transition-colors active:scale-95 shadow-2xs whitespace-nowrap" title="Google画像検索を別画面で開く">
-                  <span>🌐</span>
-                  <span>Web検索</span>
-                </button>
               </div>
             </div>
 
@@ -13797,10 +13846,9 @@
           } catch (_) {}
         };
         try {
-          initMainTabLayout();
           applyDumpDeepLinkFromUrl_();
         } catch (err) {
-          console.error('boot layout init failed', err);
+          console.error('boot deep-link init failed', err);
         }
         // スプラッシュ描画フレームに譲ってから初期タブ構築を実行
         requestAnimationFrame(function () {
@@ -13821,12 +13869,22 @@
           : function (fn) { setTimeout(fn, 1400); };
 
         schedulePostSplash(function () {
+          try { initMainTabLayout(); } catch (e) { console.error('post-splash layout init failed', e); }
+        });
+
+        schedulePostSplash(function () {
+          try { initAbstinenceHub(); } catch (e) { console.error('post-splash abstinence init failed', e); }
+        });
+
+        schedulePostSplash(function () {
+          try { initFortuneHub(); } catch (e) { console.error('post-splash fortune init failed', e); }
+        });
+
+        schedulePostSplash(function () {
           try {
-            initAbstinenceHub();
-            initFortuneHub();
             initBirthPartControls();
             initContextualInfo();
-          } catch (e) { console.error('post-splash ui init failed', e); }
+          } catch (e) { console.error('post-splash controls init failed', e); }
         });
 
         schedulePostSplash(function () {
@@ -21390,6 +21448,185 @@
       profileId: null
     };
 
+    const FORTUNE_WHEEL_ITEM_HEIGHT = 36;
+    const FORTUNE_WHEEL_MIN_YEAR = 1920;
+    const FORTUNE_WHEEL_MAX_YEAR = 2035;
+    const FORTUNE_WHEEL_MINUTE_STEP = 5;
+    let fortuneWheelsInitialized = false;
+    let fortuneWheelLastMaxDay = 0;
+    const fortuneWheelSyncLock = { year: false, month: false, day: false, hour: false, minute: false };
+    const fortuneWheelRaf = {};
+
+    function populateFortuneWheel(type, values, formatFn) {
+      const el = document.getElementById(`fortune-wheel-${type}`);
+      if (!el) return;
+      const frag = document.createDocumentFragment();
+      values.forEach((val, idx) => {
+        const item = document.createElement('div');
+        item.className = 'fortune-wheel-item';
+        item.dataset.val = String(val);
+        item.dataset.idx = String(idx);
+        item.textContent = formatFn(val);
+        frag.appendChild(item);
+      });
+      el.innerHTML = '';
+      el.appendChild(frag);
+    }
+
+    function updateFortuneWheelSelectedClass(el, activeIdx) {
+      if (!el) return;
+      const items = el.children;
+      for (let i = 0; i < items.length; i++) {
+        items[i].classList.toggle('is-selected', i === activeIdx);
+      }
+    }
+
+    function scrollFortuneWheelToIndex(type, idx, smooth) {
+      const el = document.getElementById(`fortune-wheel-${type}`);
+      if (!el || !el.children.length) return;
+      const clampedIdx = Math.max(0, Math.min(el.children.length - 1, idx));
+      const targetTop = clampedIdx * FORTUNE_WHEEL_ITEM_HEIGHT;
+      if (smooth) {
+        el.scrollTo({ top: targetTop, behavior: 'smooth' });
+      } else {
+        fortuneWheelSyncLock[type] = true;
+        el.scrollTop = targetTop;
+        updateFortuneWheelSelectedClass(el, clampedIdx);
+        requestAnimationFrame(() => {
+          fortuneWheelSyncLock[type] = false;
+        });
+      }
+    }
+
+    function scrollFortuneWheelToValue(type, value, smooth) {
+      const el = document.getElementById(`fortune-wheel-${type}`);
+      if (!el) return;
+      const targetStr = String(value);
+      const items = el.children;
+      let foundIdx = 0;
+      for (let i = 0; i < items.length; i++) {
+        if (items[i].dataset.val === targetStr) {
+          foundIdx = i;
+          break;
+        }
+      }
+      scrollFortuneWheelToIndex(type, foundIdx, smooth);
+    }
+
+    function rebuildFortuneDayWheelIfNeeded(maxDay) {
+      if (fortuneWheelLastMaxDay === maxDay) return;
+      fortuneWheelLastMaxDay = maxDay;
+      const days = [];
+      for (let d = 1; d <= maxDay; d++) days.push(d);
+      populateFortuneWheel('day', days, (d) => `${d}日`);
+    }
+
+    function attachFortuneWheelEvents(type) {
+      const el = document.getElementById(`fortune-wheel-${type}`);
+      if (!el || el.dataset.wheelBound === '1') return;
+      el.dataset.wheelBound = '1';
+
+      let isDragging = false;
+      let dragMoved = false;
+      let startY = 0;
+      let startScrollTop = 0;
+
+      el.addEventListener('click', (e) => {
+        if (dragMoved) {
+          dragMoved = false;
+          return;
+        }
+        const item = e.target && e.target.closest ? e.target.closest('.fortune-wheel-item') : null;
+        if (!item || item.parentElement !== el) return;
+        const idx = Number(item.dataset.idx);
+        if (!Number.isNaN(idx)) {
+          scrollFortuneWheelToIndex(type, idx, true);
+        }
+      });
+
+      el.addEventListener('mousedown', (e) => {
+        if (e.button !== 0) return;
+        isDragging = true;
+        dragMoved = false;
+        startY = e.clientY;
+        startScrollTop = el.scrollTop;
+        el.classList.add('is-dragging');
+      });
+
+      const stopDrag = () => {
+        if (!isDragging) return;
+        isDragging = false;
+        el.classList.remove('is-dragging');
+        const idx = Math.round(el.scrollTop / FORTUNE_WHEEL_ITEM_HEIGHT);
+        scrollFortuneWheelToIndex(type, idx, true);
+      };
+
+      window.addEventListener('mousemove', (e) => {
+        if (!isDragging) return;
+        const dy = e.clientY - startY;
+        if (Math.abs(dy) > 4) dragMoved = true;
+        el.scrollTop = startScrollTop - dy;
+      });
+      window.addEventListener('mouseup', stopDrag);
+
+      el.addEventListener('scroll', () => {
+        if (fortuneWheelRaf[type]) cancelAnimationFrame(fortuneWheelRaf[type]);
+        fortuneWheelRaf[type] = requestAnimationFrame(() => {
+          const items = el.children;
+          if (!items.length) return;
+          const idx = Math.max(0, Math.min(items.length - 1, Math.round(el.scrollTop / FORTUNE_WHEEL_ITEM_HEIGHT)));
+          updateFortuneWheelSelectedClass(el, idx);
+          if (fortuneWheelSyncLock[type]) return;
+          const val = Number(items[idx].dataset.val);
+          if (Number.isNaN(val)) return;
+          onFortuneWheelChanged(type, val);
+        });
+      }, { passive: true });
+    }
+
+    function initFortuneWheels() {
+      if (fortuneWheelsInitialized) return;
+      fortuneWheelsInitialized = true;
+
+      const years = [];
+      for (let y = FORTUNE_WHEEL_MIN_YEAR; y <= FORTUNE_WHEEL_MAX_YEAR; y++) years.push(y);
+      populateFortuneWheel('year', years, (y) => `${y}年`);
+
+      const months = [];
+      for (let m = 1; m <= 12; m++) months.push(m);
+      populateFortuneWheel('month', months, (m) => `${m}月`);
+
+      const maxDay = new Date(fortuneActiveInput.year, fortuneActiveInput.month, 0).getDate();
+      rebuildFortuneDayWheelIfNeeded(maxDay);
+
+      const hours = [];
+      for (let h = 0; h < 24; h++) hours.push(h);
+      populateFortuneWheel('hour', hours, (h) => `${h}時`);
+
+      const minutes = [];
+      for (let min = 0; min < 60; min += FORTUNE_WHEEL_MINUTE_STEP) minutes.push(min);
+      populateFortuneWheel('minute', minutes, (min) => `${String(min).padStart(2, '0')}分`);
+
+      ['year', 'month', 'day', 'hour', 'minute'].forEach(attachFortuneWheelEvents);
+    }
+
+    function onFortuneWheelChanged(type, val) {
+      if (fortuneActiveInput[type] === val) return;
+      fortuneActiveInput[type] = val;
+
+      if (type === 'year' || type === 'month') {
+        const maxDay = new Date(fortuneActiveInput.year, fortuneActiveInput.month, 0).getDate();
+        if (fortuneActiveInput.day > maxDay) {
+          fortuneActiveInput.day = maxDay;
+        }
+        rebuildFortuneDayWheelIfNeeded(maxDay);
+        scrollFortuneWheelToValue('day', fortuneActiveInput.day, false);
+      }
+
+      updateFortuneSliderSummary();
+      updateFortuneActiveBirthSync();
+    }
+
     function resetFortuneSliderToDefault() {
       fortuneActiveInput.name = '';
       fortuneActiveInput.year = 1995;
@@ -21405,25 +21642,20 @@
     }
 
     function syncFortuneSliderUI() {
-      const yEl = document.getElementById('fortune-slider-year');
-      const mEl = document.getElementById('fortune-slider-month');
-      const dEl = document.getElementById('fortune-slider-day');
-      const hEl = document.getElementById('fortune-slider-hour');
-      const minEl = document.getElementById('fortune-slider-minute');
+      initFortuneWheels();
       const uEl = document.getElementById('fortune-slider-unknown-time');
-      
-      if (yEl) yEl.value = fortuneActiveInput.year;
-      if (mEl) mEl.value = fortuneActiveInput.month;
-      
+
       const maxDay = new Date(fortuneActiveInput.year, fortuneActiveInput.month, 0).getDate();
-      if (dEl) {
-        dEl.max = maxDay;
-        if (fortuneActiveInput.day > maxDay) fortuneActiveInput.day = maxDay;
-        dEl.value = fortuneActiveInput.day;
-      }
-      
-      if (hEl) hEl.value = fortuneActiveInput.hour;
-      if (minEl) minEl.value = fortuneActiveInput.minute;
+      if (fortuneActiveInput.day > maxDay) fortuneActiveInput.day = maxDay;
+      rebuildFortuneDayWheelIfNeeded(maxDay);
+
+      const snappedMinute = Math.min(55, Math.max(0, Math.round((fortuneActiveInput.minute || 0) / FORTUNE_WHEEL_MINUTE_STEP) * FORTUNE_WHEEL_MINUTE_STEP));
+      scrollFortuneWheelToValue('year', fortuneActiveInput.year, false);
+      scrollFortuneWheelToValue('month', fortuneActiveInput.month, false);
+      scrollFortuneWheelToValue('day', fortuneActiveInput.day, false);
+      scrollFortuneWheelToValue('hour', fortuneActiveInput.hour, false);
+      scrollFortuneWheelToValue('minute', snappedMinute, false);
+
       if (uEl) uEl.checked = Boolean(fortuneActiveInput.unknownTime);
 
       updateFortuneSliderLabels();
@@ -21433,19 +21665,7 @@
     }
 
     function updateFortuneSliderLabels() {
-      const yVal = document.getElementById('fortune-slider-year-val');
-      const mVal = document.getElementById('fortune-slider-month-val');
-      const dVal = document.getElementById('fortune-slider-day-val');
-      const hVal = document.getElementById('fortune-slider-hour-val');
-      const minVal = document.getElementById('fortune-slider-minute-val');
       const timeControls = document.getElementById('fortune-slider-time-controls');
-
-      if (yVal) yVal.textContent = `${fortuneActiveInput.year}年`;
-      if (mVal) mVal.textContent = `${fortuneActiveInput.month}月`;
-      if (dVal) dVal.textContent = `${fortuneActiveInput.day}日`;
-      if (hVal) hVal.textContent = `${fortuneActiveInput.hour}時`;
-      if (minVal) minVal.textContent = `${String(fortuneActiveInput.minute).padStart(2, '0')}分`;
-      
       if (timeControls) {
         timeControls.classList.toggle('opacity-30', fortuneActiveInput.unknownTime);
         timeControls.classList.toggle('pointer-events-none', fortuneActiveInput.unknownTime);
@@ -21483,43 +21703,24 @@
     }
 
     function onFortuneSliderInput(type) {
-      const yEl = document.getElementById('fortune-slider-year');
-      const mEl = document.getElementById('fortune-slider-month');
-      const dEl = document.getElementById('fortune-slider-day');
-      const hEl = document.getElementById('fortune-slider-hour');
-      const minEl = document.getElementById('fortune-slider-minute');
-
-      if (type === 'year' && yEl) fortuneActiveInput.year = Number(yEl.value);
-      if (type === 'month' && mEl) {
-        fortuneActiveInput.month = Number(mEl.value);
-        const maxDay = new Date(fortuneActiveInput.year, fortuneActiveInput.month, 0).getDate();
-        if (dEl) {
-          dEl.max = maxDay;
-          if (fortuneActiveInput.day > maxDay) {
-            fortuneActiveInput.day = maxDay;
-            dEl.value = maxDay;
-          }
-        }
-      }
-      if (type === 'day' && dEl) fortuneActiveInput.day = Number(dEl.value);
-      if (type === 'hour' && hEl) fortuneActiveInput.hour = Number(hEl.value);
-      if (type === 'minute' && minEl) fortuneActiveInput.minute = Number(minEl.value);
-
       updateFortuneSliderLabels();
       updateFortuneSliderSummary();
       updateFortuneActiveBirthSync();
     }
 
     function adjustFortuneSlider(type, delta) {
-      const el = document.getElementById(`fortune-slider-${type}`);
-      if (!el) return;
-      let val = Number(el.value) + delta;
-      const min = Number(el.min);
-      const max = Number(el.max);
-      if (val < min) val = min;
-      if (val > max) val = max;
-      el.value = val;
-      onFortuneSliderInput(type);
+      const step = type === 'minute' ? FORTUNE_WHEEL_MINUTE_STEP : 1;
+      const current = Number(fortuneActiveInput[type] ?? 0);
+      let next = current + delta;
+      if (type === 'year') next = Math.max(FORTUNE_WHEEL_MIN_YEAR, Math.min(FORTUNE_WHEEL_MAX_YEAR, next));
+      else if (type === 'month') next = Math.max(1, Math.min(12, next));
+      else if (type === 'day') {
+        const maxDay = new Date(fortuneActiveInput.year, fortuneActiveInput.month, 0).getDate();
+        next = Math.max(1, Math.min(maxDay, next));
+      } else if (type === 'hour') next = Math.max(0, Math.min(23, next));
+      else if (type === 'minute') next = Math.max(0, Math.min(55, Math.round(next / step) * step));
+      onFortuneWheelChanged(type, next);
+      scrollFortuneWheelToValue(type, next, true);
     }
 
     function setFortuneSliderGender(gender, opts) {
@@ -34185,6 +34386,7 @@
       updateFortuneSliderSummary();
       updateFortuneSliderLabels();
       updateFortuneActiveBirthSync();
+      requestAnimationFrame(() => syncFortuneSliderUI());
     }
 
     function openFortuneProfileCard() {
@@ -44599,11 +44801,13 @@ initFortuneHub();
           loadSettings();
         }
         if (mainTab === 'abstinence-mode') {
+          if (typeof initMainTabLayout === 'function') initMainTabLayout();
           if (typeof initAbstinenceHub === 'function') initAbstinenceHub();
           const am = document.getElementById('abstinence-mode');
           if (am) am.scrollTop = 0;
         }
         if (mainTab === 'fortune-mode') {
+          if (typeof initMainTabLayout === 'function') initMainTabLayout();
           if (typeof initFortuneHub === 'function') initFortuneHub();
           const fm = document.getElementById('fortune-mode');
           if (fm) fm.scrollTop = 0;
@@ -46628,7 +46832,7 @@ initFortuneHub();
     }
 
     /** 編集置き換え後は「旧本文／新本文／旧ID／新ID」を1件に畳む（二重表示防止） */
-    function upsertLocalInputHistoryReplace({ fromId, toId, oldContent, newContent, folder, file, persistTombstone, skipPaint }) {
+    function upsertLocalInputHistoryReplace({ fromId, toId, oldContent, newContent, folder, file, persistTombstone, skipPaint, onlyIfExists }) {
       const content = String(newContent || '').trim();
       if (!isUsableInputHistoryContent(content)) return null;
       const oldKey = oldContent != null ? dumpContentKey(oldContent) : '';
@@ -46701,10 +46905,25 @@ initFortuneHub();
         if (typeof persistHistoryTombstones === 'function') persistHistoryTombstones();
       }
 
+      // 編集後は旧 dump 本文をキャッシュから落とし、重複バッジの誤表示を防ぐ
+      if (oldKey && typeof forgetDumpedItemsByContents === 'function') {
+        forgetDumpedItemsByContents([oldContent], { includeStored: true });
+      }
+      if (onlyIfExists && !keptMeta && !fromId) {
+        saveLocalInputHistory(local);
+        if (!skipPaint) {
+          if (typeof renderInputTabHistory === 'function') renderInputTabHistory();
+          if (typeof renderInputHistoryView === 'function' && currentSearchTabMode === 'input_history') {
+            renderInputHistoryView();
+          }
+        }
+        return null;
+      }
+
       const next = {
         ...(keptMeta || {}),
         id: preferId,
-        timestamp: new Date().toISOString(),
+        timestamp: (keptMeta && keptMeta.timestamp) || new Date().toISOString(),
         content,
         folder: folder || (keptMeta && keptMeta.folder) || 'INBOX',
         file: file || (keptMeta && keptMeta.file) || '未整理',
@@ -46713,10 +46932,6 @@ initFortuneHub();
       if (keptMeta && keptMeta.dumpId && !next.dumpId) next.dumpId = keptMeta.dumpId;
       if (keptMeta && keptMeta.dumpIsInbox != null && next.dumpIsInbox == null) {
         next.dumpIsInbox = keptMeta.dumpIsInbox;
-      }
-      // 編集後は旧 dump 本文をキャッシュから落とし、重複バッジの誤表示を防ぐ
-      if (oldKey && typeof forgetDumpedItemsByContents === 'function') {
-        forgetDumpedItemsByContents([oldContent], { includeStored: true });
       }
       // 同期完了前に閉じても、編集後本文が端末キャッシュに残るようにする
       if (typeof rememberDumpedItems === 'function' && next.dumpId && !isTempId(next.dumpId)) {
@@ -54014,7 +54229,22 @@ initFortuneHub();
         textarea.value = newContent;
         textarea.dataset.originalContent = newContent;
       }
-      forgetDumpedItemsByContents([oldContent]);
+      forgetDumpedItemsByContents([oldContent], { includeStored: true });
+      if (typeof patchStoredDumpById === 'function') {
+        const patchIds = Array.from(new Set([
+          writeIdHint,
+          priorId,
+          ...(Array.isArray(currentItem.ids) ? currentItem.ids : [])
+        ].filter(Boolean).map(String)));
+        const patchObj = {
+          content: newContent,
+          timestamp: stamp,
+          folder: fromInbox ? '📥 INBOX' : folder,
+          file: fromInbox ? '未整理' : file,
+          isInbox: fromInbox
+        };
+        patchIds.forEach((pid) => patchStoredDumpById(pid, patchObj));
+      }
       rememberDumpedItems([{
         ...reviewItems[idx],
         folder: fromInbox ? '📥 INBOX' : folder,
@@ -55644,7 +55874,8 @@ initFortuneHub();
         newContent,
         folder: nextFolder,
         file: nextFile,
-        persistTombstone: true
+        persistTombstone: true,
+        onlyIfExists: true
       });
       await replaceCloudInputHistoryEntry(historyId || null, oldContent, newContent, nextFolder, nextFile, {
         createIfMissing: false
@@ -58272,8 +58503,9 @@ initFortuneHub();
       const frag = document.createDocumentFragment();
       favorites.forEach((fav) => {
         const liveContent = liveDumpContentForFavorite(fav, liveById);
-        const shown = liveContent || fav.content || '';
-        if (liveContent && liveContent !== String(fav.content || '')) {
+        const recentlyEdited = fav && fav.editedAt && (Date.now() - favoriteTimeMs(fav.editedAt) < 30000);
+        const shown = (recentlyEdited && fav.content) ? fav.content : (liveContent || fav.content || '');
+        if (!recentlyEdited && liveContent && liveContent !== String(fav.content || '')) {
           liveUpdates.push({ fav, liveContent });
         }
         const card = document.createElement('div');
@@ -58296,20 +58528,49 @@ initFortuneHub();
         header.appendChild(badges);
         header.appendChild(time);
         const content = document.createElement('div');
-        content.className = 'whitespace-pre-wrap font-mono mt-1 bg-[#02040a]/60 px-1.5 py-1.5 sm:p-3 border border-amber-900/40 rounded-lg sm:rounded-xl shadow-inner text-base text-cyan-100 leading-relaxed cursor-pointer';
+        content.className = 'whitespace-pre-wrap font-mono mt-1 bg-[#02040a]/60 px-1.5 py-1.5 sm:p-3 border border-amber-900/40 hover:border-cyan-600/60 rounded-lg sm:rounded-xl shadow-inner text-base text-cyan-100 leading-relaxed cursor-pointer transition active:scale-[0.99]';
         if (typeof setDumpContentDisplay === 'function') setDumpContentDisplay(content, shown);
         else content.textContent = shown;
-        content.title = 'タップで折りたたみ / 全文表示';
-        content.onclick = () => {
-          content.classList.toggle('line-clamp-8');
+        content.title = 'タップして開く・編集';
+        let tapStartX = 0;
+        let tapStartY = 0;
+        let tapMoved = false;
+        let tapMovedAt = 0;
+        const markTapStart = (x, y) => {
+          tapStartX = x;
+          tapStartY = y;
+          tapMoved = false;
         };
-        const actions = document.createElement('div');
-        actions.className = 'grid grid-cols-3 gap-1.5 sm:gap-2 mt-2 sm:mt-3';
-        const openBtn = document.createElement('button');
-        openBtn.type = 'button';
-        openBtn.className = 'bg-cyan-900/40 text-cyan-200 border-2 border-cyan-700/50 hover:bg-cyan-800/60 font-extrabold h-11 rounded-xl transition active:scale-95 text-sm';
-        openBtn.textContent = '📂 開く';
-        openBtn.onclick = () => {
+        const markTapMove = (x, y) => {
+          if (Math.abs(x - tapStartX) > 10 || Math.abs(y - tapStartY) > 10) {
+            tapMoved = true;
+            tapMovedAt = Date.now();
+          }
+        };
+        content.addEventListener('touchstart', (e) => {
+          const t = e.touches && e.touches[0];
+          if (t) markTapStart(t.clientX, t.clientY);
+        }, { passive: true });
+        content.addEventListener('touchmove', (e) => {
+          const t = e.touches && e.touches[0];
+          if (t) markTapMove(t.clientX, t.clientY);
+        }, { passive: true });
+        content.addEventListener('pointerdown', (e) => {
+          if (e.pointerType === 'touch') return;
+          markTapStart(e.clientX, e.clientY);
+        }, { passive: true });
+        content.addEventListener('pointermove', (e) => {
+          if (e.pointerType === 'touch') return;
+          markTapMove(e.clientX, e.clientY);
+        }, { passive: true });
+        content.onclick = (e) => {
+          if (tapMoved || (Date.now() - tapMovedAt < 350)) {
+            tapMoved = false;
+            return;
+          }
+          if (e.target && e.target.closest && e.target.closest('a')) return;
+          const sel = window.getSelection ? String(window.getSelection()) : '';
+          if (sel) return;
           const realId = favoriteUsableDumpId(fav) || fav.id;
           openItemLocation({
             id: realId,
@@ -58321,6 +58582,8 @@ initFortuneHub();
             timestamp: fav.timestamp
           });
         };
+        const actions = document.createElement('div');
+        actions.className = 'grid grid-cols-2 gap-1.5 sm:gap-2 mt-2 sm:mt-3';
         const copyBtn = createCopyButton(() => shown || '');
         const unfavBtn = document.createElement('button');
         unfavBtn.type = 'button';
@@ -58336,7 +58599,6 @@ initFortuneHub();
             renderSearchResultsView();
           }
         };
-        actions.appendChild(openBtn);
         actions.appendChild(copyBtn);
         actions.appendChild(unfavBtn);
         card.appendChild(header);
@@ -60081,8 +60343,8 @@ initFortuneHub();
         ? window.__afterBootSplash
         : function (fn) { setTimeout(fn, 0); };
 
-      // 起動アニメーションの突っかかりを防ぐため、初期表示に不要なバインド・掃除は分割/遅延実行
-      setTimeout(() => {
+      // 起動アニメーションの突っかかりを防ぐため、初期表示に不要なバインド・掃除はスプラッシュ完了後に分割実行
+      afterSplash(() => {
         bindSimilarThresholdControls();
         renderAppBuildTag();
         updateSkipInputTopUI();
@@ -60090,7 +60352,7 @@ initFortuneHub();
         if (typeof bindAppBrowserBack === 'function') bindAppBrowserBack();
         if (typeof toggleDirectDestinationUI === 'function') toggleDirectDestinationUI();
         if (typeof ensureInputTopPreferenceApplied === 'function') ensureInputTopPreferenceApplied({ skipAutoFocus: true });
-      }, 0);
+      });
 
       afterSplash(() => {
         migrateDraftsToInboxOnBoot();
@@ -60762,7 +61024,7 @@ initFortuneHub();
 
       // サプリ一覧の下に「＋ 新しいサプリを登録」枠を配置
       const addWrap = document.createElement('div');
-      addWrap.className = 'pt-1.5 mt-1.5 border-t border-cyan-900/50 space-y-1.5';
+      addWrap.className = 'pt-1.5 mt-1.5 border-t border-cyan-900/50';
 
       const addBtn = document.createElement('button');
       addBtn.type = 'button';
@@ -60773,16 +61035,6 @@ initFortuneHub();
         openSuppleMasterModal();
       };
       addWrap.appendChild(addBtn);
-
-      const scanBtn = document.createElement('button');
-      scanBtn.type = 'button';
-      scanBtn.className = 'w-full px-3 py-2 rounded-xl bg-slate-800/70 hover:bg-slate-800 border border-cyan-800/50 text-cyan-300 text-[11px] font-bold flex items-center justify-center gap-1.5 transition-all active:scale-[0.99]';
-      scanBtn.innerHTML = '<span>📷</span><span>バーコードをかざして自動選択</span>';
-      scanBtn.onclick = () => {
-        closeSuppleDropdown();
-        openSuppleBarcodeScanner('intake');
-      };
-      addWrap.appendChild(scanBtn);
 
       menu.appendChild(addWrap);
     }

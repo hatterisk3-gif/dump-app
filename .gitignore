@@ -3,4 +3,7 @@
 node_modules/
 .ai_task_done.txt
 .watch.lock
+.pending_images.json
+line_image_*
+tmp_*
 watch.js

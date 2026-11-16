@@ -39327,7 +39327,6 @@ initFortuneHub();
     let treeLibraryStoreReady = false;
     let treeLibrarySyncing = false;
     let treeLibrarySyncPromise = null;
-    let treePublishPromise = null;
     let treeLibraryDirty = false;
     try { treeLibraryDirty = localStorage.getItem(TREE_LIBRARY_DIRTY_KEY) === '1'; } catch (e) {}
     let treeLocalEditGen = 0; // ローカル編集世代（同期の途中上書き防止）
@@ -39386,7 +39385,7 @@ initFortuneHub();
     function treeNormalizeZoom(z) {
       const n = Number(z);
       if (!Number.isFinite(n)) return 1;
-      return Math.max(TREE_ZOOM_MIN, Math.min(TREE_ZOOM_MAX, Math.round(n * 100000) / 100000));
+      return Math.max(TREE_ZOOM_MIN, Math.min(TREE_ZOOM_MAX, Math.round(n * 1000) / 1000));
     }
 
     function treeGetZoom() {
@@ -39548,18 +39547,18 @@ initFortuneHub();
       const zoom = treeNormalizeZoom(nextZoom);
       if (!wrap) {
         treeState.zoom = zoom;
-        treeApplyZoomTransform({ forceFull: true });
+        treeApplyZoomTransform();
         treeScheduleZoomSave();
         return;
       }
-      if (Math.abs(zoom - prevZoom) < 0.00001) return;
+      if (Math.abs(zoom - prevZoom) < 0.0005) return;
       const rect = wrap.getBoundingClientRect();
       const anchorX = (clientX == null ? rect.left + rect.width / 2 : clientX) - rect.left;
       const anchorY = (clientY == null ? rect.top + rect.height / 2 : clientY) - rect.top;
       const stageX = (wrap.scrollLeft + anchorX) / prevZoom;
       const stageY = (wrap.scrollTop + anchorY) / prevZoom;
       treeState.zoom = zoom;
-      treeApplyZoomTransform({ forceFull: true });
+      treeApplyZoomTransform();
       wrap.scrollLeft = Math.max(0, stageX * zoom - anchorX);
       wrap.scrollTop = Math.max(0, stageY * zoom - anchorY);
       treeScheduleGrowNearEdges();
@@ -39576,7 +39575,7 @@ initFortuneHub();
       }, 1200);
     }
 
-    /** ホイール／トラックパッドのスクロール・ピンチを全体の拡大縮小に割り当てる */
+    /** ホイール／トラックパッドのスクロールを全体の拡大縮小に割り当てる */
     function treeOnCanvasWheel(e) {
       if (!treeState) return;
       e.preventDefault();
@@ -39584,8 +39583,7 @@ initFortuneHub();
       if (e.deltaMode === 1) delta *= 16;
       else if (e.deltaMode === 2) delta *= 400;
       if (!delta) return;
-      const sens = e.ctrlKey ? 0.01 : 0.0018;
-      const factor = Math.exp(-Math.max(-160, Math.min(160, delta)) * sens);
+      const factor = Math.exp(-Math.max(-160, Math.min(160, delta)) * 0.0018);
       treeZoomTo(treeGetZoom() * factor, e.clientX, e.clientY);
     }
 
@@ -39855,73 +39853,53 @@ initFortuneHub();
     }
 
     async function publishTreeLibrary(prefetched) {
-      if (treePublishPromise) {
-        try { await treePublishPromise; } catch (_) {}
-        if (!treeLibraryDirty) return;
+      if (!treeLibrary) treeLibrary = loadTreeLibrary();
+      if (treeState) treeFlushActiveToLibrary();
+      await ensureTreeLibraryStore();
+      let localUpdatedAt = treeLibraryLocalUpdatedAtMs();
+      if (!localUpdatedAt) {
+        const nowIso = new Date().toISOString();
+        localStorage.setItem(TREE_LIBRARY_UPDATED_AT_KEY, nowIso);
+        localUpdatedAt = new Date(nowIso).getTime();
       }
-      const task = (async () => {
-        if (!treeLibrary) treeLibrary = loadTreeLibrary();
-        if (treeState) treeFlushActiveToLibrary();
-        await ensureTreeLibraryStore();
-        let localUpdatedAt = treeLibraryLocalUpdatedAtMs();
-        if (!localUpdatedAt) {
-          const nowIso = new Date().toISOString();
-          localStorage.setItem(TREE_LIBRARY_UPDATED_AT_KEY, nowIso);
-          localUpdatedAt = new Date(nowIso).getTime();
+      const existing = prefetched === undefined ? await fetchCloudTreeLibrarySnapshot() : prefetched;
+      // fetch 後にもう一度ローカルを確定（待ち時間中の編集を落とさない）
+      if (treeState) treeFlushActiveToLibrary();
+      localUpdatedAt = Math.max(localUpdatedAt, treeLibraryLocalUpdatedAtMs());
+      // 競合: クラウドの方が新しく、かつローカル保護が無いときだけ取り込む
+      if (existing && existing.updatedAt > localUpdatedAt && !treeShouldProtectLocalEdits()) {
+        if (applyTreeLibraryFromCloud(existing.library, existing.updatedAtIso)) {
+          treeRenderIfTreeTabActive();
         }
-        const existing = prefetched === undefined ? await fetchCloudTreeLibrarySnapshot() : prefetched;
-        // fetch 後にもう一度ローカルを確定（待ち時間中の編集を落とさない）
-        if (treeState) treeFlushActiveToLibrary();
-        localUpdatedAt = Math.max(localUpdatedAt, treeLibraryLocalUpdatedAtMs());
-        // 競合: クラウドの方が新しく、かつローカル保護が無いときだけ取り込む
-        if (existing && existing.updatedAt > localUpdatedAt && !treeShouldProtectLocalEdits()) {
-          if (applyTreeLibraryFromCloud(existing.library, existing.updatedAtIso)) {
-            treeRenderIfTreeTabActive();
-          }
-          return;
-        }
-        if (existing && existing.updatedAt > localUpdatedAt && treeShouldProtectLocalEdits()) {
-          // ローカル編集を守る。あとで取り込み
-          treeSyncPendingPull = true;
-        }
-        const sentGen = treeLocalEditGen;
-        const updatedAt = new Date(Math.max(localUpdatedAt, Date.now())).toISOString();
-        localStorage.setItem(TREE_LIBRARY_UPDATED_AT_KEY, updatedAt);
-        const payload = JSON.stringify({
-          v: 1,
-          updatedAt,
-          library: {
-            activeId: treeLibrary.activeId,
-            palettes: treeLibrary.palettes
-          }
-        });
-        const ops = [];
-        if (existing && existing.cloudId) {
-          ops.push({ action: 'deleteDataRecord', id: existing.cloudId });
-        }
-        ops.push({
-          action: 'addDataRecord',
-          folder: TREE_LIBRARY_FOLDER,
-          file: TREE_LIBRARY_FILE,
-          content: payload
-        });
-        const res = await callBatch(ops, { silent: true });
-        if (res && (res.error || res.success === false)) throw new Error('tree_library_sync');
-        // 送信待ち中に新しいローカル編集が入っていたら dirty を消さずに再送を予約する
-        if (treeLocalEditGen === sentGen && !treeSaveTimer) {
-          treeClearLibraryDirty();
-        } else {
-          treeLibraryDirty = true;
-          try { localStorage.setItem(TREE_LIBRARY_DIRTY_KEY, '1'); } catch (e) {}
-          queueTreeLibraryCloudSync();
-        }
-      })();
-      treePublishPromise = task;
-      try {
-        await task;
-      } finally {
-        if (treePublishPromise === task) treePublishPromise = null;
+        return;
       }
+      if (existing && existing.updatedAt > localUpdatedAt && treeShouldProtectLocalEdits()) {
+        // ローカル編集を守る。あとで取り込み
+        treeSyncPendingPull = true;
+      }
+      const updatedAt = new Date(Math.max(localUpdatedAt, Date.now())).toISOString();
+      localStorage.setItem(TREE_LIBRARY_UPDATED_AT_KEY, updatedAt);
+      const payload = JSON.stringify({
+        v: 1,
+        updatedAt,
+        library: {
+          activeId: treeLibrary.activeId,
+          palettes: treeLibrary.palettes
+        }
+      });
+      const ops = [];
+      if (existing && existing.cloudId) {
+        ops.push({ action: 'deleteDataRecord', id: existing.cloudId });
+      }
+      ops.push({
+        action: 'addDataRecord',
+        folder: TREE_LIBRARY_FOLDER,
+        file: TREE_LIBRARY_FILE,
+        content: payload
+      });
+      const res = await callBatch(ops, { silent: true });
+      if (res && (res.error || res.success === false)) throw new Error('tree_library_sync');
+      treeClearLibraryDirty();
     }
 
     function queueTreeLibraryCloudSync() {
@@ -39990,9 +39968,6 @@ initFortuneHub();
 
       treeLibrarySyncing = true;
       treeLibrarySyncPromise = (async () => {
-        if (treePublishPromise) {
-          try { await treePublishPromise; } catch (_) {}
-        }
         if (!treeLibrary) treeLibrary = loadTreeLibrary();
         if (treeState) treeFlushActiveToLibrary();
         const startGen = treeLocalEditGen;
@@ -40297,10 +40272,6 @@ initFortuneHub();
     }
 
     function saveTreeState() {
-      if (treeSaveTimer) {
-        clearTimeout(treeSaveTimer);
-        treeSaveTimer = null;
-      }
       if (!treeState) return;
       if (!treeLibrary) treeLibrary = loadTreeLibrary();
       treeNoteLocalEdit();
@@ -43618,16 +43589,10 @@ initFortuneHub();
     function treeCancelActiveGestures() {
       const wrap = document.getElementById('tree-canvas-wrap');
       if (treePan) {
-        const panPid = treePan.pointerId;
         treePan = null;
-        if (wrap) {
-          wrap.classList.remove('is-panning');
-          try { if (panPid != null) wrap.releasePointerCapture(panPid); } catch (_) {}
-        }
+        if (wrap) wrap.classList.remove('is-panning');
       }
       if (treeDrag) {
-        const dragPid = treeDrag.pointerId;
-        const dragEl = treeDrag.el;
         const members = treeDrag.members && treeDrag.members.length
           ? treeDrag.members
           : [{ id: treeDrag.id, el: treeDrag.el, originCol: treeDrag.originCol, originRow: treeDrag.originRow }];
@@ -43643,8 +43608,8 @@ initFortuneHub();
             if (node) treePlaceNodeEl(el, node);
           }
         });
-        try { if (dragEl && dragPid != null) dragEl.releasePointerCapture(dragPid); } catch (_) {}
         treeDrag = null;
+        treeLiveRouting = false;
         treeFinalizeEdgesIfDirty();
       }
       if (treePortLink) {
@@ -44288,6 +44253,7 @@ initFortuneHub();
       const hoverRow = treeDrag.hoverRow;
       const dragId = treeDrag.id;
       treeDrag = null;
+      treeLiveRouting = false;
 
       const n = treeFindNode(dragId);
       if (moved && n) {
@@ -44376,8 +44342,6 @@ initFortuneHub();
       wrap.addEventListener('pointermove', treeOnCanvasPointerMove);
       wrap.addEventListener('pointerup', treeOnCanvasPointerUp);
       wrap.addEventListener('pointercancel', treeOnCanvasPointerUp);
-      window.addEventListener('pointerup', treeOnCanvasPointerUpCapture, true);
-      window.addEventListener('pointercancel', treeOnCanvasPointerUpCapture, true);
       wrap.addEventListener('wheel', treeOnCanvasWheel, { passive: false });
       wrap.addEventListener('contextmenu', treeOnCanvasContextMenu);
       wrap.addEventListener('scroll', () => {

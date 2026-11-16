@@ -1837,6 +1837,10 @@
       cursor: pointer;
     }
 
+    html.review-detail-open #app-bottom-nav,
+    html.review-detail-open #memo-sub-nav {
+      display: none !important;
+    }
     .pause-animations *, .pause-animations::before, .pause-animations::after { animation-play-state: paused !important; }
     /* CAPTURE中: 背面装飾がオーバーレイ越しに見えるのを防ぐ（Android visualViewport 対策含む） */
     #capture-scrim {
@@ -8883,8 +8887,8 @@
         </div>
       </div>
     </div>
-    <div id="review-detail-overlay" class="hidden fixed inset-0 z-[60] bg-[#02040a]/95 backdrop-blur-xl flex flex-col p-4 pt-5">
-      <div class="flex justify-between items-center mb-3 w-full max-w-3xl mx-auto gap-3">
+    <div id="review-detail-overlay" class="hidden fixed inset-0 z-[95] bg-[#02040a]/95 backdrop-blur-xl flex flex-col p-4 pt-5" style="z-index: 95; height: 100dvh; max-height: 100dvh; padding-bottom: calc(1rem + env(safe-area-inset-bottom, 0px));">
+      <div class="flex justify-between items-center mb-3 w-full max-w-3xl mx-auto gap-3 shrink-0">
         <div class="min-w-0">
           <div id="review-detail-path" class="text-sm font-black text-cyan-300 truncate"></div>
           <div id="review-detail-time" class="text-xs text-cyan-500/80 font-mono font-bold mt-0.5"></div>
@@ -8892,9 +8896,9 @@
         </div>
         <button onclick="closeReviewDetail()" class="flex-shrink-0 w-12 h-12 rounded-full bg-slate-800/80 border border-slate-600 text-slate-200 font-bold text-lg hover:bg-slate-700 transition active:scale-95">✕</button>
       </div>
-      <div id="review-detail-view" class="flex-1 w-full max-w-3xl mx-auto min-h-0 overflow-y-auto flex flex-col">
-        <textarea id="review-edit-textarea" class="flex-1 w-full min-h-[50vh] p-5 bg-black/50 border-2 border-cyan-500/70 text-cyan-50 rounded-xl focus:outline-none focus:border-cyan-400 font-mono text-base sm:text-lg leading-relaxed resize-y shadow-[inset_0_0_10px_rgba(34,211,238,0.15)]" placeholder="内容を編集…"></textarea>
-        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-3 pb-1">
+      <div id="review-detail-view" class="flex-1 w-full max-w-3xl mx-auto min-h-0 flex flex-col">
+        <textarea id="review-edit-textarea" class="flex-1 w-full min-h-[180px] p-5 bg-black/50 border-2 border-cyan-500/70 text-cyan-50 rounded-xl focus:outline-none focus:border-cyan-400 font-mono text-base sm:text-lg leading-relaxed resize-y shadow-[inset_0_0_10px_rgba(34,211,238,0.15)]" placeholder="内容を編集…"></textarea>
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-3 pb-1 shrink-0">
           <button type="button" id="review-detail-fav-btn" onclick="toggleFavoriteFromReviewDetail(this)" class="bg-amber-950/40 text-amber-200 border-2 border-amber-700/50 hover:bg-amber-900/50 font-extrabold h-14 rounded-xl transition active:scale-95 text-base">☆ お気に入り</button>
           <button type="button" id="btn-save-edit" onclick="saveEditReviewItem()" class="bg-cyan-700 border-2 border-cyan-500 hover:bg-cyan-600 text-cyan-50 font-extrabold h-14 rounded-xl shadow-[0_0_15px_rgba(34,211,238,0.3)] transition active:scale-95 text-base">💾 保存</button>
           <button onclick="copyReviewDetailContent(this)" class="bg-slate-800/60 text-slate-200 border-2 border-slate-600/60 hover:bg-slate-700/70 font-extrabold h-14 rounded-xl transition active:scale-95 text-base">📋 コピー</button>
@@ -52920,6 +52924,7 @@ initFortuneHub();
         list.appendChild(card);
       });
       overlay.classList.remove('hidden');
+      document.documentElement.classList.add('review-detail-open');
       document.body.style.overflow = 'hidden';
     }
     function closeSplitOrganize() {
@@ -53832,6 +53837,7 @@ initFortuneHub();
       const moveSection = document.getElementById('review-move-section');
       if (moveSection) moveSection.classList.add('hidden');
       overlay.classList.remove('hidden');
+      document.documentElement.classList.add('review-detail-open');
       document.body.style.overflow = 'hidden';
       requestAnimationFrame(() => {
         if (textarea) {
@@ -53855,6 +53861,7 @@ initFortuneHub();
         }
       }
       document.getElementById('review-detail-overlay').classList.add('hidden');
+      document.documentElement.classList.remove('review-detail-open');
       const hint = document.getElementById('review-detail-hydrate-hint');
       if (hint) hint.classList.add('hidden');
       document.body.style.overflow = '';
@@ -54230,20 +54237,14 @@ initFortuneHub();
         textarea.dataset.originalContent = newContent;
       }
       forgetDumpedItemsByContents([oldContent], { includeStored: true });
-      if (typeof patchStoredDumpById === 'function') {
-        const patchIds = Array.from(new Set([
-          writeIdHint,
-          priorId,
-          ...(Array.isArray(currentItem.ids) ? currentItem.ids : [])
-        ].filter(Boolean).map(String)));
-        const patchObj = {
+      if (typeof patchStoredDumpById === 'function' && (writeIdHint || priorId)) {
+        patchStoredDumpById(writeIdHint || priorId, {
           content: newContent,
           timestamp: stamp,
           folder: fromInbox ? '📥 INBOX' : folder,
           file: fromInbox ? '未整理' : file,
           isInbox: fromInbox
-        };
-        patchIds.forEach((pid) => patchStoredDumpById(pid, patchObj));
+        });
       }
       rememberDumpedItems([{
         ...reviewItems[idx],
@@ -58503,9 +58504,8 @@ initFortuneHub();
       const frag = document.createDocumentFragment();
       favorites.forEach((fav) => {
         const liveContent = liveDumpContentForFavorite(fav, liveById);
-        const recentlyEdited = fav && fav.editedAt && (Date.now() - favoriteTimeMs(fav.editedAt) < 30000);
-        const shown = (recentlyEdited && fav.content) ? fav.content : (liveContent || fav.content || '');
-        if (!recentlyEdited && liveContent && liveContent !== String(fav.content || '')) {
+        const shown = liveContent || fav.content || '';
+        if (liveContent && liveContent !== String(fav.content || '')) {
           liveUpdates.push({ fav, liveContent });
         }
         const card = document.createElement('div');

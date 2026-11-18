@@ -1842,6 +1842,12 @@
       display: none !important;
     }
     .pause-animations *, .pause-animations::before, .pause-animations::after { animation-play-state: paused !important; }
+    .pause-animations #boot-splash-preview-overlay,
+    .pause-animations #boot-splash-preview-overlay *,
+    .pause-animations #boot-splash-preview-overlay *::before,
+    .pause-animations #boot-splash-preview-overlay *::after {
+      animation-play-state: running !important;
+    }
     /* CAPTURE中: 背面装飾がオーバーレイ越しに見えるのを防ぐ（Android visualViewport 対策含む） */
     #capture-scrim {
       display: none;
@@ -3056,7 +3062,10 @@
 
     body:has(#modal-supple-intake:not(.hidden)) #supple-fab-add,
     body:has(#modal-supple-master:not(.hidden)) #supple-fab-add,
-    body:has(#modal-supple-scanner:not(.hidden)) #supple-fab-add {
+    body:has(#modal-supple-scanner:not(.hidden)) #supple-fab-add,
+    body:has(#modal-supple-intake:not(.hidden)) #app-bottom-nav,
+    body:has(#modal-supple-master:not(.hidden)) #app-bottom-nav,
+    body:has(#modal-supple-scanner:not(.hidden)) #app-bottom-nav {
       display: none !important;
     }
 
@@ -3079,6 +3088,7 @@
       #modal-supple-intake,
       #modal-supple-master {
         height: 100% !important;
+        height: 100dvh !important;
         width: 100% !important;
       }
       #modal-supple-intake > div,
@@ -3088,7 +3098,18 @@
         min-height: 0 !important;
         width: 100% !important;
         border-radius: 0 !important;
+        display: flex !important;
+        flex-direction: column !important;
+        overflow: hidden !important;
       }
+    }
+    #supple-master-scroll-body {
+      flex: 1 1 0% !important;
+      min-height: 0 !important;
+      overflow-y: auto !important;
+      -webkit-overflow-scrolling: touch;
+      overscroll-behavior: contain;
+      touch-action: pan-y;
     }
 
     #supple-paste-zone:empty::before {
@@ -9554,9 +9575,18 @@
             />
           </div>
 
-          <!-- 2. サプリ選択（一覧の下に＋新規登録枠を配置） -->
+          <!-- 2. サプリ選択（右側に＋新規登録ボタン、一覧の下にも＋新規登録枠を配置） -->
           <div>
-            <label class="block text-xs font-bold text-cyan-200 mb-1.5">📦 摂取したサプリを選択</label>
+            <div class="flex items-center justify-between gap-2 mb-1.5">
+              <label class="block text-xs font-bold text-cyan-200">📦 摂取したサプリを選択</label>
+              <button
+                type="button"
+                onclick="closeSuppleDropdown(); openSuppleMasterModal();"
+                class="px-2.5 py-1 rounded-xl border border-emerald-500/50 bg-emerald-950/60 hover:bg-emerald-900/70 text-emerald-300 text-[11px] font-extrabold flex items-center gap-1 active:scale-95 transition-all shrink-0"
+              >
+                <span class="text-xs leading-none">＋</span><span>新規登録</span>
+              </button>
+            </div>
 
             <!-- カスタムセレクトボックス -->
             <div class="relative">
@@ -9653,7 +9683,7 @@
         </div>
 
         <!-- フォーム（スクロール領域: flex-1 min-h-0） -->
-        <div class="flex-1 min-h-0 p-5 space-y-4 overflow-y-auto">
+        <div id="supple-master-scroll-body" class="flex-1 min-h-0 p-5 space-y-4 overflow-y-auto overscroll-contain touch-pan-y">
 
           <!-- バーコード登録 & JAN検索 -->
           <div class="bg-black/30 p-3.5 rounded-2xl border border-cyan-900/40 space-y-2">
@@ -9767,25 +9797,25 @@
             />
           </div>
 
-          <!-- 登録・戻るボタン（目安量・メモの下） -->
-          <div class="pt-2 pb-[calc(2rem+env(safe-area-inset-bottom,0px))] flex items-center gap-2.5">
-            <button
-              type="button"
-              onclick="closeSuppleMasterModal()"
-              class="flex-1 py-3 px-4 rounded-xl bg-slate-800 border border-slate-700 text-slate-300 text-xs font-bold hover:bg-slate-700 transition-colors"
-            >
-              戻る
-            </button>
-            <button
-              type="button"
-              onclick="submitSuppleMaster()"
-              style="flex: 2;"
-              class="py-3 px-4 rounded-xl bg-gradient-to-r from-teal-500 to-emerald-500 text-white text-sm font-extrabold shadow-lg shadow-teal-500/25 active:scale-[0.99] transition-all flex items-center justify-center gap-1.5"
-            >
-              💾 サプリを登録
-            </button>
-          </div>
+        </div>
 
+        <!-- フッター（戻る & 登録ボタンを常に下部固定） -->
+        <div class="px-5 pt-3.5 pb-[calc(1.5rem+env(safe-area-inset-bottom,0px))] border-t border-cyan-900/40 bg-[#070a14]/95 flex items-center gap-2.5 shrink-0">
+          <button
+            type="button"
+            onclick="closeSuppleMasterModal()"
+            class="flex-1 py-3 px-4 rounded-xl bg-slate-800 border border-slate-700 text-slate-300 text-xs font-bold hover:bg-slate-700 transition-colors"
+          >
+            戻る
+          </button>
+          <button
+            type="button"
+            onclick="submitSuppleMaster()"
+            style="flex: 2;"
+            class="py-3 px-4 rounded-xl bg-gradient-to-r from-teal-500 to-emerald-500 text-white text-sm font-extrabold shadow-lg shadow-teal-500/25 active:scale-[0.99] transition-all flex items-center justify-center gap-1.5"
+          >
+            💾 サプリを登録
+          </button>
         </div>
 
       </div>
@@ -48849,7 +48879,7 @@ initFortuneHub();
     function closeCaptureOverlay(opts) {
       opts = opts || {};
       const inputMode = document.getElementById('input-mode');
-      if (inputMode && inputMode.classList.contains('active')) {
+      if (!opts.force && inputMode && inputMode.classList.contains('active')) {
         updateSkipInputTopUI(true);
         return;
       }
@@ -61096,6 +61126,8 @@ initFortuneHub();
 
       if (suppleMasters.length > 0) {
         selectSuppleForIntake(suppleMasters[0].id);
+      } else {
+        resetSuppleIntakeSelection();
       }
       closeSuppleDropdown();
       const modal = document.getElementById('modal-supple-intake');
@@ -61214,37 +61246,124 @@ initFortuneHub();
       renderSuppleAll();
     }
 
+    function resetSuppleIntakeSelection() {
+      const idInput = document.getElementById('supple-selected-id');
+      const display = document.getElementById('supple-dropdown-selected');
+      if (idInput) idInput.value = '';
+      if (display) {
+        display.innerHTML = '<span class="text-sm text-slate-400 font-medium">サプリを選択してください</span>';
+      }
+    }
+
+    function deleteSuppleMaster(suppleId, ev) {
+      if (ev) ev.stopPropagation();
+      const target = suppleMasters.find(m => m.id === suppleId);
+      if (!target) return;
+      if (!confirm('「' + target.name + '」をサプリマスタから削除しますか？\n（登録済みの摂取記録は残ります）')) return;
+
+      suppleMasters = suppleMasters.filter(m => m.id !== suppleId);
+      saveSuppleMasters(suppleMasters);
+
+      const idInput = document.getElementById('supple-selected-id');
+      if (idInput && idInput.value === suppleId) {
+        if (suppleMasters.length > 0) {
+          selectSuppleForIntake(suppleMasters[0].id);
+        } else {
+          resetSuppleIntakeSelection();
+        }
+      }
+
+      renderSuppleAll();
+      if (typeof showToast === 'function') {
+        showToast('「' + target.name + '」を削除しました');
+      }
+    }
+
     function renderSuppleDropdownList() {
       const menu = document.getElementById('supple-dropdown-menu');
       if (!menu) return;
       menu.innerHTML = '';
 
+      if (suppleMasters.length === 0) {
+        const emptyEl = document.createElement('div');
+        emptyEl.className = 'px-3 py-3 text-center text-xs text-slate-400 font-semibold';
+        emptyEl.textContent = '登録されているサプリがありません';
+        menu.appendChild(emptyEl);
+      }
+
+      const selectedId = (document.getElementById('supple-selected-id') || {}).value || '';
+
+      // ジャンル（SUPPLE_CATEGORIES）ごとにグループ分けして表示
+      const fallbackCat = SUPPLE_CATEGORIES[SUPPLE_CATEGORIES.length - 1];
+      const grouped = new Map();
+      SUPPLE_CATEGORIES.forEach(cat => grouped.set(cat.name, { cat, items: [] }));
+
       suppleMasters.forEach(s => {
-        const item = document.createElement('button');
-        item.type = 'button';
-        item.className = 'w-full px-3 py-2 rounded-xl text-left flex items-center justify-between hover:bg-slate-800 transition-colors group';
-        item.onclick = () => {
-          selectSuppleForIntake(s.id);
-          closeSuppleDropdown();
-        };
+        const matchedCat = SUPPLE_CATEGORIES.find(c => c.name === s.category) || fallbackCat;
+        grouped.get(matchedCat.name).items.push(s);
+      });
 
-        const thumb = getSupplePhotoThumbHtml(s.photo, 28);
-        const cat = SUPPLE_CATEGORIES.find(c => c.name === s.category) || SUPPLE_CATEGORIES[5];
+      grouped.forEach(({ cat, items }) => {
+        if (!items || items.length === 0) return;
 
-        item.innerHTML = `
-          <div class="flex items-center gap-2.5">
-            ${thumb}
-            <div>
-              <p class="text-xs font-bold text-slate-100 group-hover:text-cyan-300">${escapeHtml(s.name)}</p>
-              <div class="flex items-center gap-1.5 mt-0.5">
-                <span class="text-[9px] font-semibold px-1.5 py-0.2 rounded-md ${cat.color}">${escapeHtml(s.category)}</span>
-                ${s.barcode ? `<span class="text-[9px] text-slate-500 font-mono">#${escapeHtml(s.barcode)}</span>` : ''}
+        const groupWrap = document.createElement('div');
+        groupWrap.className = 'space-y-1 pt-1.5 first:pt-0';
+        groupWrap.dataset.suppleCategoryGroup = cat.name;
+
+        const header = document.createElement('div');
+        header.className = 'px-2.5 py-1 flex items-center justify-between text-[10px] font-extrabold tracking-wide text-cyan-200/80 border-b border-cyan-900/40';
+        header.innerHTML = `
+          <span class="flex items-center gap-1.5">
+            <span class="w-2 h-2 rounded-full shrink-0" style="background-color:${cat.dot}"></span>
+            <span>${escapeHtml(cat.name)}</span>
+          </span>
+          <span class="text-[10px] font-bold text-slate-400">${items.length}件</span>
+        `;
+        groupWrap.appendChild(header);
+
+        items.forEach(s => {
+          const row = document.createElement('div');
+          row.className = 'w-full px-2.5 py-1.5 rounded-xl flex items-center justify-between gap-2 hover:bg-slate-800/80 transition-colors group';
+
+          const selectBtn = document.createElement('button');
+          selectBtn.type = 'button';
+          selectBtn.className = 'flex-1 min-w-0 py-0.5 text-left flex items-center justify-between gap-2';
+          selectBtn.onclick = () => {
+            selectSuppleForIntake(s.id);
+            closeSuppleDropdown();
+          };
+
+          const thumb = getSupplePhotoThumbHtml(s.photo, 28);
+          const isSelected = s.id === selectedId;
+
+          selectBtn.innerHTML = `
+            <div class="flex items-center gap-2.5 min-w-0">
+              ${thumb}
+              <div class="min-w-0">
+                <p class="text-xs font-bold text-slate-100 group-hover:text-cyan-300 truncate">${escapeHtml(s.name)}</p>
+                <div class="flex items-center gap-1.5 mt-0.5">
+                  <span class="text-[9px] font-semibold px-1.5 py-0.2 rounded-md ${cat.color}">${escapeHtml(s.category || cat.name)}</span>
+                  ${s.barcode ? `<span class="text-[9px] text-slate-500 font-mono">#${escapeHtml(s.barcode)}</span>` : ''}
+                </div>
               </div>
             </div>
-          </div>
-          <span class="text-emerald-400 opacity-0 group-hover:opacity-100 text-xs">✓</span>
-        `;
-        menu.appendChild(item);
+            <span class="text-emerald-400 ${isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'} text-xs shrink-0">✓</span>
+          `;
+
+          const delBtn = document.createElement('button');
+          delBtn.type = 'button';
+          delBtn.className = 'px-2 py-1.5 rounded-lg bg-rose-950/60 hover:bg-rose-900/80 border border-rose-700/50 text-rose-300 hover:text-rose-100 text-[11px] font-bold shrink-0 active:scale-95 transition-all';
+          delBtn.title = 'このサプリマスタを削除';
+          delBtn.setAttribute('aria-label', s.name + 'を削除');
+          delBtn.textContent = '🗑️';
+          delBtn.onclick = (ev) => deleteSuppleMaster(s.id, ev);
+
+          row.appendChild(selectBtn);
+          row.appendChild(delBtn);
+          groupWrap.appendChild(row);
+        });
+
+        menu.appendChild(groupWrap);
       });
 
       // サプリ一覧の下に「＋ 新しいサプリを登録」枠を配置
@@ -61512,6 +61631,8 @@ initFortuneHub();
         modal.classList.add('flex');
         modal.style.setProperty('display', 'flex', 'important');
       }
+      const scrollBody = document.getElementById('supple-master-scroll-body');
+      if (scrollBody) scrollBody.scrollTop = 0;
       syncSuppleFabVisibility();
     }
 

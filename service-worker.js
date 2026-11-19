@@ -1,4 +1,4 @@
-const CACHE_NAME = 'dump-app-v445';
+const CACHE_NAME = 'dump-app-v448';
 const PENDING_WRITES_CACHE = 'dump-pending-writes-v1';
 const PENDING_WRITES_CACHE_URL = './__pending_inbox_writes.json';
 /** activate 時に残す直前ビルド数（更新直後のネット失敗でも旧 index で開ける） */

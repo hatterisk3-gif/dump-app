@@ -60,7 +60,7 @@
     }
   </style>
   <script>
-    window.__DUMP_BUILD__ = 'v446';
+    window.__DUMP_BUILD__ = 'v448';
     // かつてここで「既知の最新ビルドより古い＝巻き戻り」と判定し、キャッシュ全消し＋SW登録解除を
     // していたが、その直後はオフライン用の控えが無く、ネットワークが不調だと起動不能になった。
     // 判定値(dump_known_good_build)は下がらない一方通行のため、一度ずれると毎回自己破壊を繰り返す。
@@ -2519,6 +2519,9 @@
     .fortune-slider-card {
       position: relative;
       animation: fortune-home-rise 0.7s ease-out 0.28s both;
+    }
+    #fortune-profile-modal .fortune-slider-card {
+      animation: none;
     }
     .fortune-wheel-group {
       position: relative;
@@ -9225,6 +9228,7 @@
                     <div class="min-w-0">
                       <div class="text-[10px] text-sky-400/80 font-extrabold tracking-wider">対象プロファイル</div>
                       <div id="fortune-home-name-text" class="text-sm sm:text-base font-extrabold text-white truncate">（未設定 - タップして登録・履歴選択）</div>
+                      <div id="fortune-home-birth-text" class="hidden text-[11px] font-mono font-bold text-sky-300/90 truncate mt-0.5"></div>
                     </div>
                   </div>
                   <span class="text-xs px-2.5 py-1 rounded-lg bg-sky-900/60 group-hover:bg-sky-800/80 text-sky-200 border border-sky-500/40 font-bold shrink-0 transition">
@@ -9233,72 +9237,7 @@
                 </button>
               </div>
 
-              <!-- 3. 生年月日と出生時間のドラムピッカー -->
-              <div id="fortune-home-slider-card" class="fortune-slider-card bg-slate-950/75 border border-sky-800/50 rounded-2xl p-4 shadow-[0_4px_24px_rgba(2,6,23,0.55)] space-y-3.5 backdrop-blur-md">
-                <!-- サマリープレビュー -->
-                <div class="flex items-center justify-between gap-2 pb-2.5 border-b border-sky-900/40">
-                  <div class="flex items-center gap-2">
-                    <span class="text-base text-sky-400">📅</span>
-                    <span class="text-xs font-black text-sky-200 tracking-wider">生年月日・時間</span>
-                  </div>
-                  <div id="fortune-slider-preview-badge" class="px-2.5 py-1 rounded-full bg-sky-900/70 border border-sky-500/40 text-[11px] font-mono font-bold text-sky-200">
-                    1995-01-01 12:00
-                  </div>
-                </div>
-
-                <!-- 生年月日ドラムピッカー（年・月・日） -->
-                <div class="space-y-1.5">
-                  <div class="grid text-center text-[11px] font-bold text-sky-300/80" style="grid-template-columns: 1.25fr 0.9fr 0.9fr;">
-                    <span>年</span>
-                    <span>月</span>
-                    <span>日</span>
-                  </div>
-                  <div class="fortune-wheel-group" role="group" aria-label="生年月日ドラムピッカー">
-                    <div class="fortune-wheel-highlight" aria-hidden="true"></div>
-                    <div class="fortune-wheel-cols fortune-wheel-cols--date">
-                      <div id="fortune-wheel-year" class="fortune-wheel-col" data-wheel-type="year" aria-label="年"></div>
-                      <div id="fortune-wheel-month" class="fortune-wheel-col" data-wheel-type="month" aria-label="月"></div>
-                      <div id="fortune-wheel-day" class="fortune-wheel-col" data-wheel-type="day" aria-label="日"></div>
-                    </div>
-                  </div>
-                </div>
-
-                <!-- 出生時間 & 時間不明トグル -->
-                <div class="pt-2.5 border-t border-sky-900/40 space-y-2">
-                  <div class="flex items-center justify-between">
-                    <div class="text-xs font-bold text-sky-300/80">出生時間</div>
-                    <label class="inline-flex items-center gap-1.5 cursor-pointer text-xs text-sky-300 font-bold">
-                      <input type="checkbox" id="fortune-slider-unknown-time" class="accent-sky-500 rounded" onchange="onFortuneUnknownTimeChange()">
-                      <span>時間不明（正午扱い）</span>
-                    </label>
-                  </div>
-
-                  <div id="fortune-slider-time-controls" class="space-y-1.5 transition-opacity">
-                    <div class="grid grid-cols-2 text-center text-[11px] font-bold text-slate-400">
-                      <span>時</span>
-                      <span>分</span>
-                    </div>
-                    <div class="fortune-wheel-group" role="group" aria-label="出生時間ドラムピッカー">
-                      <div class="fortune-wheel-highlight" aria-hidden="true"></div>
-                      <div class="fortune-wheel-cols fortune-wheel-cols--time">
-                        <div id="fortune-wheel-hour" class="fortune-wheel-col" data-wheel-type="hour" aria-label="時"></div>
-                        <div id="fortune-wheel-minute" class="fortune-wheel-col" data-wheel-type="minute" aria-label="分"></div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <!-- 性別スイッチ -->
-                <div class="pt-2.5 border-t border-sky-900/40 flex items-center justify-between">
-                  <span class="text-xs font-bold text-sky-300">性別（大運・命盤用）</span>
-                  <div class="inline-flex rounded-lg border border-sky-700/50 p-0.5 bg-black/60">
-                    <button type="button" id="fortune-gender-male-btn" onclick="setFortuneSliderGender('male')" class="px-3 py-1 text-xs font-bold rounded-md transition bg-sky-600 text-white">♂ 男性</button>
-                    <button type="button" id="fortune-gender-female-btn" onclick="setFortuneSliderGender('female')" class="px-3 py-1 text-xs font-bold rounded-md transition text-slate-400 hover:text-white">♀ 女性</button>
-                  </div>
-                </div>
-              </div>
-
-              <!-- 4. 各占い項目 -->
+              <!-- 3. 各占い項目 -->
               <div class="fortune-home-cta" role="navigation" aria-label="鑑定メニュー">
                 <button type="button" class="fortune-hub-btn fortune-hub-unified" data-fortune-key="unified" aria-pressed="false" onclick="openFortuneFeature('unified')">
                   <span class="fortune-hub-title">総合鑑定</span>
@@ -9335,11 +9274,66 @@
             <button type="button" onclick="closeFortuneProfileModal()" class="w-8 h-8 rounded-full bg-slate-900 border border-slate-700 text-slate-300 hover:text-white flex items-center justify-center text-sm font-bold" aria-label="閉じる">✕</button>
           </div>
 
-          <!-- セクション1: 現在のスライダー設定で名前を登録 -->
+          <!-- セクション1: ドラムで生年月日を合わせて登録 -->
+          <div id="fortune-home-slider-card" class="fortune-slider-card bg-slate-950/75 border border-sky-800/50 rounded-2xl p-4 shadow-[0_4px_24px_rgba(2,6,23,0.55)] space-y-3.5">
+            <div class="flex items-center justify-between gap-2 pb-2.5 border-b border-sky-900/40">
+              <div class="flex items-center gap-2">
+                <span class="text-base text-sky-400">📅</span>
+                <span class="text-xs font-black text-sky-200 tracking-wider">生年月日・時間</span>
+              </div>
+              <div id="fortune-slider-preview-badge" class="px-2.5 py-1 rounded-full bg-sky-900/70 border border-sky-500/40 text-[11px] font-mono font-bold text-sky-200">
+                1995-01-01 12:00
+              </div>
+            </div>
+            <div class="space-y-1.5">
+              <div class="grid text-center text-[11px] font-bold text-sky-300/80" style="grid-template-columns: 1.25fr 0.9fr 0.9fr;">
+                <span>年</span>
+                <span>月</span>
+                <span>日</span>
+              </div>
+              <div class="fortune-wheel-group" role="group" aria-label="生年月日ドラムピッカー">
+                <div class="fortune-wheel-highlight" aria-hidden="true"></div>
+                <div class="fortune-wheel-cols fortune-wheel-cols--date">
+                  <div id="fortune-wheel-year" class="fortune-wheel-col" data-wheel-type="year" aria-label="年"></div>
+                  <div id="fortune-wheel-month" class="fortune-wheel-col" data-wheel-type="month" aria-label="月"></div>
+                  <div id="fortune-wheel-day" class="fortune-wheel-col" data-wheel-type="day" aria-label="日"></div>
+                </div>
+              </div>
+            </div>
+            <div class="pt-2.5 border-t border-sky-900/40 space-y-2">
+              <div class="flex items-center justify-between">
+                <div class="text-xs font-bold text-sky-300/80">出生時間</div>
+                <label class="inline-flex items-center gap-1.5 cursor-pointer text-xs text-sky-300 font-bold">
+                  <input type="checkbox" id="fortune-slider-unknown-time" class="accent-sky-500 rounded" onchange="onFortuneUnknownTimeChange()">
+                  <span>時間不明（正午扱い）</span>
+                </label>
+              </div>
+              <div id="fortune-slider-time-controls" class="space-y-1.5 transition-opacity">
+                <div class="grid grid-cols-2 text-center text-[11px] font-bold text-slate-400">
+                  <span>時</span>
+                  <span>分</span>
+                </div>
+                <div class="fortune-wheel-group" role="group" aria-label="出生時間ドラムピッカー">
+                  <div class="fortune-wheel-highlight" aria-hidden="true"></div>
+                  <div class="fortune-wheel-cols fortune-wheel-cols--time">
+                    <div id="fortune-wheel-hour" class="fortune-wheel-col" data-wheel-type="hour" aria-label="時"></div>
+                    <div id="fortune-wheel-minute" class="fortune-wheel-col" data-wheel-type="minute" aria-label="分"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="pt-2.5 border-t border-sky-900/40 flex items-center justify-between">
+              <span class="text-xs font-bold text-sky-300">性別（大運・命盤用）</span>
+              <div class="inline-flex rounded-lg border border-sky-700/50 p-0.5 bg-black/60">
+                <button type="button" id="fortune-gender-male-btn" onclick="setFortuneSliderGender('male')" class="px-3 py-1 text-xs font-bold rounded-md transition bg-sky-600 text-white">♂ 男性</button>
+                <button type="button" id="fortune-gender-female-btn" onclick="setFortuneSliderGender('female')" class="px-3 py-1 text-xs font-bold rounded-md transition text-slate-400 hover:text-white">♀ 女性</button>
+              </div>
+            </div>
+          </div>
           <div class="bg-black/50 border border-sky-700/40 rounded-xl p-3.5 space-y-2.5">
             <div class="text-xs font-black text-sky-300 flex items-center gap-1.5">
               <span>✨</span>
-              <span>現在のスライダー設定で登録</span>
+              <span>この生年月日で名前を登録</span>
             </div>
             <div id="fortune-modal-current-target-summary" class="text-xs font-mono font-bold text-sky-200/90 bg-sky-950/60 border border-sky-800/40 px-2.5 py-1.5 rounded-lg">
               1995年 1月 1日 12:00（男性）
@@ -11167,7 +11161,7 @@
                   </p>
                   <div id="unified-panel" class="mt-2 space-y-3">
                     <div id="unified-source-chips" class="flex flex-wrap gap-1.5 text-[11px] font-bold"></div>
-                    <div>
+                    <div class="hidden">
                       <label class="block text-xs font-extrabold text-amber-400 mb-1.5">対象プロファイル</label>
                       <select id="unified-profile-select" onchange="onUnifiedProfileSelectChange()" class="w-full p-3 border-2 border-amber-800/50 rounded-xl bg-black/40 text-sm font-bold text-amber-50 focus:outline-none focus:border-amber-400 h-12"></select>
                     </div>
@@ -11295,7 +11289,7 @@
                     <input type="hidden" id="sanmei-birth-date" value="">
                     <input type="hidden" id="sanmei-birth-time" value="">
                     <input type="hidden" id="sanmei-birth-gender" value="male">
-                    <div>
+                    <div class="hidden">
                       <label class="block text-xs font-extrabold text-cyan-400 mb-1.5">対象プロファイル</label>
                       <select id="sanmei-profile-select" onchange="onSanmeiProfileSelectChange()" class="w-full p-3 border-2 border-cyan-800/50 rounded-xl bg-black/40 text-sm font-bold text-cyan-50 focus:outline-none focus:border-cyan-400 h-12"></select>
                     </div>
@@ -11473,7 +11467,7 @@
                           <div id="sanmei-daiun-list" class="space-y-1.5 text-xs font-bold"></div>
                         </div>
                         <div id="sanmei-daiun-detail" class="hidden mt-2 p-4 rounded-xl bg-gradient-to-br from-violet-950/50 via-black/45 to-cyan-950/40 border border-violet-700/50 space-y-3"></div>
-                        <p class="text-[10px] text-slate-500 font-bold leading-relaxed">※ 立運（起運）年齢は生まれ日から節入りまでの日数÷3による近似です（流派・端数処理により1歳前後ずれる場合があります）。順逆は年干の陰陽と性別（陽男陰女＝順行、陰男陽女＝逆行）で判定します。</p>
+                        <p class="text-[10px] text-slate-500 font-bold leading-relaxed">※ 順逆は年柱の陰陽と性別（陽男・陰女は順行、陰男・陽女は逆行）。順行は次の節入り、逆行は直前の節入りまでの時間を、3日=1年・1日=4ヶ月・2時間=10日で歳・月・日に換算します。節入りは太陽黄経の実時刻（日本時間）です。年齢の右端は、次の大運が始まるときです。</p>
                       </div>
                     </div>
 
@@ -12339,7 +12333,7 @@
                     <input type="hidden" id="ziwei-birth-date" value="">
                     <input type="hidden" id="ziwei-birth-time" value="">
                     <input type="hidden" id="ziwei-birth-gender" value="male">
-                    <div>
+                    <div class="hidden">
                       <label class="block text-xs font-extrabold text-fuchsia-400 mb-1.5">対象プロファイル</label>
                       <select id="ziwei-profile-select" onchange="onZiweiProfileSelectChange()" class="w-full p-3 border-2 border-fuchsia-800/50 rounded-xl bg-black/40 text-sm font-bold text-fuchsia-50 focus:outline-none focus:border-fuchsia-400 h-12"></select>
                     </div>
@@ -12588,7 +12582,7 @@
                     <input type="hidden" id="bazi-birth-date" value="">
                     <input type="hidden" id="bazi-birth-time" value="">
                     <input type="hidden" id="bazi-birth-gender" value="male">
-                    <div>
+                    <div class="hidden">
                       <label class="block text-xs font-extrabold text-emerald-400 mb-1.5">対象プロファイル</label>
                       <select id="bazi-profile-select" onchange="onBaziProfileSelectChange()" class="w-full p-3 border-2 border-emerald-800/50 rounded-xl bg-black/40 text-sm font-bold text-emerald-50 focus:outline-none focus:border-emerald-400 h-12"></select>
                     </div>
@@ -12615,7 +12609,7 @@
                         <p id="bazi-solar-note" class="text-[10px] text-amber-300/80 font-bold leading-relaxed"></p>
                       </div>
                     </div>
-                    <p class="text-[11px] text-slate-400 font-bold leading-relaxed">※ 簡易判定・流派差あり。目安であり断定ではありません。節入り・蔵干・大運は算命学パネルと同じ近似です。</p>
+                    <p class="text-[11px] text-slate-400 font-bold leading-relaxed">※ 簡易判定・流派差あり。目安であり断定ではありません。大運は算命学と同じく、節入り実時刻から3日=1年・1日=4ヶ月・2時間=10日で換算します。</p>
                     <button type="button" onclick="executeBaziReading()" class="w-full text-sm text-emerald-50 font-bold bg-gradient-to-r from-emerald-700 to-teal-700 hover:from-emerald-600 hover:to-teal-600 px-4 py-3 rounded-xl border border-emerald-500/30 shadow-[0_0_15px_rgba(16,185,129,0.2)] transition active:scale-95">四柱推命の命式を鑑定</button>
         
                     <div id="bazi-result" class="hidden mt-2 pt-4 border-t border-emerald-900/60 space-y-3">
@@ -16961,32 +16955,22 @@
     }
 
     function sanmeiGetMonthBranchIndex(y, month, day, hour, minute) {
-      // 返すのは地支 index（寅=2 ... 丑=1）
-      const key = sanmeiDateTimeKey(month, day, hour, minute);
-      const lichun = SANMEI_JIE[0];
-      const xiaohan = SANMEI_JIE[11];
-      // 立春前: 小寒以降なら丑、それ以前（年始）は子
-      if (key < sanmeiJieKey(lichun)) {
-        if (key >= sanmeiJieKey(xiaohan) || month === 1) {
-          // 1/1〜小寒前は子、小寒〜立春前は丑
-          if (month === 1 && key < sanmeiJieKey(xiaohan)) return 0;
-          return 1;
-        }
-        return 0;
+      // 直前に迎えた節（月の区切り）の地支。寅=2 ... 丑=1
+      const birth = new Date(y, month - 1, day, hour || 0, minute || 0, 0, 0);
+      const cands = sanmeiJieCandidatesAround(y);
+      let last = null;
+      for (const c of cands) {
+        if (c.getTime() <= birth.getTime()) last = c;
       }
-      let branch = 2;
-      for (let i = 0; i < SANMEI_JIE.length; i++) {
-        const jie = SANMEI_JIE[i];
-        if (jie.m === 1) continue; // 小寒は年始側で処理済み
-        if (key >= sanmeiJieKey(jie)) branch = jie.branch;
-      }
-      return branch;
+      if (last && last.branch != null) return last.branch;
+      return 0;
     }
 
     function sanmeiGetYearForPillar(y, month, day, hour, minute) {
-      // 立春の近似時刻前は前年
-      const key = sanmeiDateTimeKey(month, day, hour, minute);
-      if (key < sanmeiJieKey(SANMEI_JIE[0])) return y - 1;
+      // その年の立春より前は前年
+      const birth = new Date(y, month - 1, day, hour || 0, minute || 0, 0, 0);
+      const lichun = sanmeiPreciseJieDate(y, SANMEI_JIE_SOLAR[1]);
+      if (birth.getTime() < lichun.getTime()) return y - 1;
       return y;
     }
 
@@ -21500,6 +21484,48 @@
       gender: 'male',
       profileId: null
     };
+    let fortuneAppliedSnapshot = null;
+
+    function rememberAppliedFortuneInput() {
+      fortuneAppliedSnapshot = {
+        name: fortuneActiveInput.name || '',
+        year: fortuneActiveInput.year,
+        month: fortuneActiveInput.month,
+        day: fortuneActiveInput.day,
+        hour: fortuneActiveInput.hour,
+        minute: fortuneActiveInput.minute,
+        unknownTime: Boolean(fortuneActiveInput.unknownTime),
+        gender: fortuneActiveInput.gender === 'female' ? 'female' : 'male',
+        profileId: fortuneActiveInput.profileId || null
+      };
+    }
+
+    function fortuneWheelEditingOpen() {
+      const modal = document.getElementById('fortune-profile-modal');
+      return Boolean(modal && !modal.classList.contains('hidden'));
+    }
+
+    function restoreAppliedFortuneInput() {
+      const saved = fortuneAppliedSnapshot;
+      if (!saved) return;
+      fortuneActiveInput.name = saved.name;
+      fortuneActiveInput.year = saved.year;
+      fortuneActiveInput.month = saved.month;
+      fortuneActiveInput.day = saved.day;
+      fortuneActiveInput.hour = saved.hour;
+      fortuneActiveInput.minute = saved.minute;
+      fortuneActiveInput.unknownTime = saved.unknownTime;
+      fortuneActiveInput.gender = saved.gender;
+      fortuneActiveInput.profileId = saved.profileId;
+      updateFortuneSliderLabels();
+      updateFortuneSliderSummary();
+      updateFortuneNameDisplay();
+      updateFortuneActiveBirthSync();
+    }
+
+    function fortuneProfileIsApplied() {
+      return Boolean(fortuneActiveInput.profileId);
+    }
 
     const FORTUNE_WHEEL_ITEM_HEIGHT = 36;
     const FORTUNE_WHEEL_MIN_YEAR = 1920;
@@ -21623,8 +21649,10 @@
       window.addEventListener('mouseup', stopDrag);
 
       el.addEventListener('scroll', () => {
+        if (!fortuneWheelEditingOpen()) return;
         if (fortuneWheelRaf[type]) cancelAnimationFrame(fortuneWheelRaf[type]);
         fortuneWheelRaf[type] = requestAnimationFrame(() => {
+          if (!fortuneWheelEditingOpen()) return;
           const items = el.children;
           if (!items.length) return;
           const idx = Math.max(0, Math.min(items.length - 1, Math.round(el.scrollTop / FORTUNE_WHEEL_ITEM_HEIGHT)));
@@ -21664,6 +21692,7 @@
     }
 
     function onFortuneWheelChanged(type, val) {
+      if (!fortuneWheelEditingOpen()) return;
       if (fortuneActiveInput[type] === val) return;
       fortuneActiveInput[type] = val;
 
@@ -21753,6 +21782,21 @@
       if (headerName) {
         headerName.textContent = currentName || '未設定';
       }
+      const birthEl = document.getElementById('fortune-home-birth-text');
+      if (birthEl) {
+        if (fortuneActiveInput.profileId) {
+          const timeText = fortuneActiveInput.unknownTime
+            ? '時間不明'
+            : `${String(fortuneActiveInput.hour).padStart(2, '0')}:${String(fortuneActiveInput.minute).padStart(2, '0')}`;
+          const genderText = fortuneActiveInput.gender === 'female' ? '女性' : '男性';
+          const dateText = `${fortuneActiveInput.year}-${String(fortuneActiveInput.month).padStart(2, '0')}-${String(fortuneActiveInput.day).padStart(2, '0')}`;
+          birthEl.textContent = `${dateText} ${timeText}・${genderText}`;
+          birthEl.classList.remove('hidden');
+        } else {
+          birthEl.textContent = '';
+          birthEl.classList.add('hidden');
+        }
+      }
     }
 
     function onFortuneSliderInput(type) {
@@ -21832,16 +21876,23 @@
       if (!modal) return;
       updateFortuneSliderSummary();
       const input = document.getElementById('fortune-modal-name-input');
-      if (input) {
-        input.value = fortuneActiveInput.name || '';
-        setTimeout(() => input.focus(), 80);
-      }
+      if (input) input.value = fortuneActiveInput.name || '';
       renderFortuneProfileHistoryList();
       modal.classList.remove('hidden');
+      const alignWheels = () => {
+        if (modal.classList.contains('hidden')) return;
+        syncFortuneSliderUI();
+      };
+      requestAnimationFrame(() => {
+        alignWheels();
+        requestAnimationFrame(alignWheels);
+      });
+      setTimeout(alignWheels, 80);
     }
 
     function closeFortuneProfileModal() {
       const modal = document.getElementById('fortune-profile-modal');
+      restoreAppliedFortuneInput();
       if (modal) modal.classList.add('hidden');
     }
 
@@ -21877,6 +21928,7 @@
       saveProfileBirthList(nextList, targetId);
       fortuneActiveInput.name = name;
       fortuneActiveInput.profileId = targetId;
+      rememberAppliedFortuneInput();
       updateFortuneNameDisplay();
       updateFortuneActiveBirthSync();
       closeFortuneProfileModal();
@@ -21888,6 +21940,7 @@
     function clearFortuneActiveName() {
       fortuneActiveInput.name = '';
       fortuneActiveInput.profileId = null;
+      rememberAppliedFortuneInput();
       updateFortuneNameDisplay();
       updateFortuneActiveBirthSync();
       closeFortuneProfileModal();
@@ -21965,7 +22018,9 @@
         fortuneActiveInput.minute = 0;
         fortuneActiveInput.unknownTime = true;
       }
-      
+
+      if (typeof setActiveProfileBirthId === 'function') setActiveProfileBirthId(p.id);
+      rememberAppliedFortuneInput();
       syncFortuneSliderUI();
       updateFortuneActiveBirthSync();
       closeFortuneProfileModal();
@@ -21987,6 +22042,7 @@
       if (fortuneActiveInput.profileId === id) {
         fortuneActiveInput.profileId = null;
         fortuneActiveInput.name = '';
+        rememberAppliedFortuneInput();
         updateFortuneNameDisplay();
         updateFortuneActiveBirthSync();
       }
@@ -22841,15 +22897,152 @@
       return new Date(ys, ms - 1, ds, hour || 0, minute || 0, 0);
     }
 
+    // 月を区切る12節（中気は使わない）。黄経は太陽の視黄経
+    const SANMEI_JIE_SOLAR = [
+      { lon: 285, branch: 1, m: 1, d: 6 },  // 小寒 → 丑
+      { lon: 315, branch: 2, m: 2, d: 4 },  // 立春 → 寅
+      { lon: 345, branch: 3, m: 3, d: 6 },  // 驚蟄 → 卯
+      { lon: 15, branch: 4, m: 4, d: 5 },   // 清明 → 辰
+      { lon: 45, branch: 5, m: 5, d: 6 },   // 立夏 → 巳
+      { lon: 75, branch: 6, m: 6, d: 6 },   // 芒種 → 午
+      { lon: 105, branch: 7, m: 7, d: 7 },  // 小暑 → 未
+      { lon: 135, branch: 8, m: 8, d: 8 },  // 立秋 → 申
+      { lon: 165, branch: 9, m: 9, d: 8 },  // 白露 → 酉
+      { lon: 195, branch: 10, m: 10, d: 8 }, // 寒露 → 戌
+      { lon: 225, branch: 11, m: 11, d: 7 }, // 立冬 → 亥
+      { lon: 255, branch: 0, m: 12, d: 7 }  // 大雪 → 子
+    ];
+    const sanmeiPreciseJieCache = Object.create(null);
+
+    function sanmeiSunLongitudeDeg(utcMs) {
+      const jd = utcMs / 86400000 + 2440587.5;
+      const T = (jd - 2451545.0) / 36525;
+      const L0 = 280.46646 + 36000.76983 * T + 0.0003032 * T * T;
+      const M = 357.52911 + 35999.05029 * T - 0.0001537 * T * T;
+      const Mr = M * Math.PI / 180;
+      const C = (1.914602 - 0.004817 * T - 0.000014 * T * T) * Math.sin(Mr)
+        + (0.019993 - 0.000101 * T) * Math.sin(2 * Mr)
+        + 0.000289 * Math.sin(3 * Mr);
+      const omega = 125.04 - 1934.136 * T;
+      let lon = L0 + C - 0.00569 - 0.00478 * Math.sin(omega * Math.PI / 180);
+      lon %= 360;
+      if (lon < 0) lon += 360;
+      return lon;
+    }
+
+    function sanmeiLonDelta(utcMs, target) {
+      let d = sanmeiSunLongitudeDeg(utcMs) - target;
+      d = ((d % 360) + 360) % 360;
+      if (d > 180) d -= 360;
+      return d;
+    }
+
+    function sanmeiPreciseJieDate(year, term) {
+      const key = year + ':' + term.lon;
+      if (sanmeiPreciseJieCache[key]) return sanmeiPreciseJieCache[key];
+      const center = Date.UTC(year, term.m - 1, term.d, 3, 0, 0);
+      let lo = center - 40 * 86400000;
+      let hi = center + 40 * 86400000;
+      if (!(sanmeiLonDelta(lo, term.lon) < 0 && sanmeiLonDelta(hi, term.lon) >= 0)) {
+        lo = center - 80 * 86400000;
+        hi = center + 80 * 86400000;
+      }
+      for (let i = 0; i < 56; i++) {
+        const mid = (lo + hi) / 2;
+        if (sanmeiLonDelta(mid, term.lon) < 0) lo = mid;
+        else hi = mid;
+      }
+      const ms = (lo + hi) / 2;
+      const jst = new Date(ms + 9 * 3600000);
+      const dt = new Date(
+        jst.getUTCFullYear(),
+        jst.getUTCMonth(),
+        jst.getUTCDate(),
+        jst.getUTCHours(),
+        jst.getUTCMinutes(),
+        jst.getUTCSeconds()
+      );
+      dt.branch = term.branch;
+      sanmeiPreciseJieCache[key] = dt;
+      return dt;
+    }
+
     function sanmeiJieCandidatesAround(year) {
       const list = [];
-      for (let yy = year - 1; yy <= year + 1; yy++) {
-        for (const jie of SANMEI_JIE) {
-          list.push(new Date(yy, jie.m - 1, jie.d, jie.h || 12, 0, 0));
+      try {
+        for (let yy = year - 1; yy <= year + 1; yy++) {
+          SANMEI_JIE_SOLAR.forEach((term) => list.push(sanmeiPreciseJieDate(yy, term)));
+        }
+      } catch (e) {
+        list.length = 0;
+        for (let yy = year - 1; yy <= year + 1; yy++) {
+          SANMEI_JIE.forEach((jie) => {
+            const dt = new Date(yy, jie.m - 1, jie.d, jie.h || 12, 0, 0);
+            dt.branch = jie.branch;
+            list.push(dt);
+          });
         }
       }
       list.sort((a, b) => a.getTime() - b.getTime());
       return list;
+    }
+
+    function sanmeiAgePointLabel(years, months, days) {
+      let text = `${years}歳`;
+      if (months) text += `${months}ヶ月`;
+      if (days) text += `${days}日`;
+      return text;
+    }
+
+    function sanmeiDaiunPeriodLabel(q, step) {
+      const start = sanmeiAgePointLabel(q.years + step * 10, q.months, q.days);
+      const next = sanmeiAgePointLabel(q.years + (step + 1) * 10, q.months, q.days);
+      return `${start}〜${next}`;
+    }
+
+    function sanmeiDaiunRangeText(item) {
+      if (!item) return '';
+      if (item.periodLabel) return item.periodLabel;
+      return `${item.periodStart}〜${item.periodEnd}歳`;
+    }
+
+    function sanmeiDaiunStartText(info) {
+      if (!info) return '';
+      if (info.startAgeLabel) return info.startAgeLabel;
+      return `${info.startAge}歳`;
+    }
+
+    // 3日=1年、1日=4ヶ月、1時辰（2時間）=10日
+    function sanmeiSplitQiyun(diffMs) {
+      const minutes = Math.max(0, Math.abs(diffMs) / 60000);
+      const yearMin = 3 * 24 * 60;
+      const monthMin = yearMin / 12;
+      const dayMin = 12;
+      let years = Math.floor(minutes / yearMin);
+      let rem = minutes - years * yearMin;
+      let months = Math.floor(rem / monthMin + 1e-9);
+      rem -= months * monthMin;
+      let days = Math.floor(rem / dayMin + 1e-9);
+      if (months >= 12) {
+        years += Math.floor(months / 12);
+        months %= 12;
+      }
+      return { years, months, days };
+    }
+
+    function sanmeiAddCalendar(base, years, months, days) {
+      const monthIndex = base.getMonth() + months;
+      const y = base.getFullYear() + years + Math.floor(monthIndex / 12);
+      const m = ((monthIndex % 12) + 12) % 12;
+      const dim = new Date(y, m + 1, 0).getDate();
+      const dt = new Date(y, m, Math.min(base.getDate(), dim), base.getHours(), base.getMinutes(), 0, 0);
+      if (days) dt.setDate(dt.getDate() + days);
+      return dt;
+    }
+
+    function sanmeiFormatClock(dt) {
+      const p = (n) => String(n).padStart(2, '0');
+      return `${dt.getFullYear()}-${p(dt.getMonth() + 1)}-${p(dt.getDate())} ${p(dt.getHours())}:${p(dt.getMinutes())}`;
     }
 
     function sanmeiDaiunForward(yearStem, gender) {
@@ -22876,45 +23069,49 @@
         }
       }
       if (!target) return null;
-      const days = Math.abs(Math.round((target.getTime() - t) / 86400000));
-      const startAge = Math.max(0, Math.round(days / 3));
+      const q = sanmeiSplitQiyun(target.getTime() - t);
+      const qiyun = sanmeiAddCalendar(birth, q.years, q.months, q.days);
       const monthJiazi = sanmeiJiaziIndex(natalChart.month.stem, natalChart.month.branch);
       const firstJiazi = (monthJiazi + (forward ? 1 : -1) + 60) % 60;
 
-      // 満年齢（簡易）
       let age = asOf.getFullYear() - birth.getFullYear();
       const mdAsOf = (asOf.getMonth() + 1) * 100 + asOf.getDate();
       const mdBirth = (birth.getMonth() + 1) * 100 + birth.getDate();
       if (mdAsOf < mdBirth) age -= 1;
       age = Math.max(0, age);
 
+      const beforeStart = asOf.getTime() < qiyun.getTime();
       let step = 0;
-      let periodStart = startAge;
-      let periodEnd = startAge + 9;
-      let currentJiazi = firstJiazi;
-      if (age >= startAge) {
-        step = Math.floor((age - startAge) / 10);
-        currentJiazi = (firstJiazi + (forward ? step : -step) + 600) % 60;
-        periodStart = startAge + step * 10;
-        periodEnd = periodStart + 9;
-      } else {
-        // 起運前は「前運」として月柱を参考表示せず、最初の大運を予告
-        currentJiazi = firstJiazi;
-        periodStart = startAge;
-        periodEnd = startAge + 9;
+      if (!beforeStart) {
+        for (let i = 0; i < 16; i++) {
+          const start = sanmeiAddCalendar(qiyun, i * 10, 0, 0);
+          const next = sanmeiAddCalendar(qiyun, (i + 1) * 10, 0, 0);
+          if (asOf.getTime() >= start.getTime() && asOf.getTime() < next.getTime()) {
+            step = i;
+            break;
+          }
+          if (asOf.getTime() >= next.getTime()) step = i + 1;
+        }
       }
-
+      const shownStep = beforeStart ? 0 : step;
+      const currentJiazi = (firstJiazi + (forward ? shownStep : -shownStep) + 600) % 60;
       const stem = currentJiazi % 10;
       const branch = currentJiazi % 12;
       const juusei = sanmeiFollowerStar(natalChart.day.stem, branch);
+      const startAgeLabel = sanmeiAgePointLabel(q.years, q.months, q.days);
       return {
         forward,
-        startAge,
+        startAge: q.years,
+        startMonths: q.months,
+        startDays: q.days,
+        startAgeLabel,
         age,
-        step,
-        beforeStart: age < startAge,
-        periodStart,
-        periodEnd,
+        step: shownStep,
+        beforeStart,
+        periodStart: q.years + shownStep * 10,
+        periodEnd: q.years + (shownStep + 1) * 10,
+        periodLabel: sanmeiDaiunPeriodLabel(q, shownStep),
+        basisText: `${forward ? '次の節入り' : '直前の節入り'} ${sanmeiFormatClock(target)} までを ${startAgeLabel} に換算（3日=1年・1日=4ヶ月・2時間=10日）`,
         stem,
         branch,
         ganzi: SANMEI_STEMS[stem] + SANMEI_BRANCHES[branch],
@@ -22930,7 +23127,11 @@
       const base = sanmeiCalcDaiun(natalChart, birthDateStr, birthTimeStr || '12:00', gender, asOf);
       if (!base) return null;
       const forward = base.forward;
-      const startAge = base.startAge;
+      const qiyunAge = {
+        years: base.startAge,
+        months: base.startMonths || 0,
+        days: base.startDays || 0
+      };
       const monthJiazi = sanmeiJiaziIndex(natalChart.month.stem, natalChart.month.branch);
       const firstJiazi = (monthJiazi + (forward ? 1 : -1) + 60) % 60;
       const tenchuKey = sanmeiTenchusatsuKey(natalChart.day.stem, natalChart.day.branch);
@@ -22956,8 +23157,9 @@
         const branch = jiazi % 12;
         const stemChar = SANMEI_STEMS[stem];
         const branchChar = SANMEI_BRANCHES[branch];
-        const periodStart = startAge + step * 10;
-        const periodEnd = periodStart + 9;
+        const periodStart = qiyunAge.years + step * 10;
+        const periodEnd = periodStart + 10;
+        const periodLabel = sanmeiDaiunPeriodLabel(qiyunAge, step);
         const star = sanmeiMainStar(natalChart.day.stem, stem);
         const juusei = sanmeiFollowerStar(natalChart.day.stem, branch);
         const juuseiScore = SANMEI_JUUSEI_SCORE[juusei] ?? 0;
@@ -22987,6 +23189,7 @@
           junLabel: SANMEI_DAIUN_JUN_LABELS[step] || `${step + 1}旬`,
           periodStart,
           periodEnd,
+          periodLabel,
           stem,
           branch,
           stemChar,
@@ -23004,12 +23207,14 @@
 
       const tenchuSteps = list.filter((x) => x.isDaiunTenchu);
       const tenchuRangeText = tenchuSteps.length
-        ? `${tenchuSteps[0].periodStart}〜${tenchuSteps[tenchuSteps.length - 1].periodEnd}歳（${tenchuSteps.map((x) => x.ganzi).join('・')}）`
+        ? `${sanmeiAgePointLabel(qiyunAge.years + tenchuSteps[0].step * 10, qiyunAge.months, qiyunAge.days)}〜${sanmeiAgePointLabel(qiyunAge.years + (tenchuSteps[tenchuSteps.length - 1].step + 1) * 10, qiyunAge.months, qiyunAge.days)}（${tenchuSteps.map((x) => x.ganzi).join('・')}）`
         : '—';
 
       return {
         forward,
-        startAge,
+        startAge: base.startAge,
+        startAgeLabel: base.startAgeLabel,
+        basisText: base.basisText,
         age: base.age,
         beforeStart: base.beforeStart,
         currentStep: base.step,
@@ -23064,7 +23269,7 @@
       detailEl.innerHTML = `
         <div class="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-violet-800/40">
           <div>
-            <div class="text-[10px] font-extrabold text-violet-300">${item.junLabel}（${item.periodStart}〜${item.periodEnd}歳）${item.current ? '・いま歩いている大運' : ''}</div>
+            <div class="text-[10px] font-extrabold text-violet-300">${item.junLabel}（${sanmeiDaiunRangeText(item)}）${item.current ? '・いま歩いている大運' : ''}</div>
             <div class="text-base font-black text-cyan-50 mt-0.5">大運 <span class="font-mono text-amber-200">${item.ganzi}</span> ／ 主星: <span class="text-cyan-300">${item.star}</span> ／ 従星: <span class="text-amber-300">${item.juusei}（${item.juuseiScore}点）</span></div>
           </div>
           <div class="flex flex-wrap gap-1.5">${shugoHtml}</div>
@@ -23116,7 +23321,7 @@
 
       if (badgeEl && curItem) {
         badgeEl.textContent = pack.beforeStart
-          ? `起運${pack.startAge}歳〜（初旬:${curItem.ganzi}）`
+          ? `起運${sanmeiDaiunStartText(pack)}〜（初旬:${curItem.ganzi}）`
           : `いま: ${curItem.ganzi}・${curItem.star}（${curItem.juuseiScore}点）`;
       }
       if (tenchuBadgeEl) {
@@ -23132,7 +23337,7 @@
         <div class="flex flex-wrap items-center justify-between gap-2">
           <div>
             <div class="text-[10px] font-extrabold text-violet-300 tracking-wide">
-              ${pack.beforeStart ? `現在は起運前（満${pack.age}歳・立運 約${pack.startAge}歳〜）` : `いま歩いている大運（満${pack.age}歳・${curItem.junLabel} ${curItem.periodStart}〜${curItem.periodEnd}歳）`}
+              ${pack.beforeStart ? `現在は起運前（満${pack.age}歳・立運 ${sanmeiDaiunStartText(pack)}〜）` : `いま歩いている大運（満${pack.age}歳・${curItem.junLabel} ${sanmeiDaiunRangeText(curItem)}）`}
             </div>
             <div class="flex flex-wrap items-baseline gap-2 mt-1">
               <span class="text-2xl font-black text-amber-100 font-mono">${curItem.ganzi}</span>
@@ -23142,13 +23347,14 @@
             </div>
           </div>
           <div class="text-right text-[11px] font-bold text-slate-300 space-y-0.5">
-            <div><span class="text-violet-300 font-extrabold">${dirLabel}</span>（${genderLabel}）・立運 約<span class="text-amber-200 font-extrabold">${pack.startAge}歳</span></div>
+            <div><span class="text-violet-300 font-extrabold">${dirLabel}</span>（${genderLabel}）・立運 <span class="text-amber-200 font-extrabold">${sanmeiDaiunStartText(pack)}</span></div>
             <div class="text-[10px] text-rose-300/90">大運天中殺: ${pack.tenchuRangeText}</div>
           </div>
         </div>
         <div class="text-xs text-cyan-100/90 font-bold leading-relaxed pt-1.5 border-t border-violet-800/40">
           <div><span class="text-violet-300 font-extrabold">10年の基調:</span> ${curStarGuide.meaning || ''}${curStarGuide.mindset ? `（指針: ${curStarGuide.mindset}）` : ''}</div>
           <div class="text-[11px] text-indigo-200/90 mt-1"><span class="text-indigo-300 font-extrabold">命式との作用:</span> ${curIsouSummary}</div>
+          <div class="text-[10px] text-slate-400 mt-1">${pack.basisText || ''}</div>
         </div>
       `;
 
@@ -23179,7 +23385,7 @@
         row.innerHTML = `
           <div class="flex flex-wrap items-center gap-x-2.5 gap-y-1">
             <span class="text-[11px] font-extrabold text-violet-300 min-w-[2.2rem]">${item.junLabel}</span>
-            <span class="font-extrabold text-amber-100 min-w-[5.2rem]">${item.periodStart}〜${item.periodEnd}歳</span>
+            <span class="font-extrabold text-amber-100">${sanmeiDaiunRangeText(item)}</span>
             <span class="inline-flex items-center gap-0.5 font-mono text-sm font-black">
               <span class="px-1.5 py-0.5 rounded border sanmei-wx ${stemWx}">${item.stemChar}</span>
               <span class="px-1.5 py-0.5 rounded border sanmei-wx ${branchWx}">${item.branchChar}</span>
@@ -23246,9 +23452,9 @@
           const dir = daiun.forward ? '順行' : '逆行';
           const genderLabel = gender === 'female' ? '女性' : '男性';
           if (daiun.beforeStart) {
-            summaryEl.textContent = `大運: 起運 ${daiun.startAge}歳〜（${dir}・${genderLabel}）。いまは起運前。最初の大運は ${daiun.ganzi}（主星: ${daiun.star}）。`;
+            summaryEl.textContent = `大運: 起運 ${sanmeiDaiunStartText(daiun)}〜（${dir}・${genderLabel}）。いまは起運前。最初の大運は ${daiun.ganzi}（主星: ${daiun.star}）。`;
           } else {
-            summaryEl.textContent = `大運: ${daiun.ganzi}（${daiun.periodStart}〜${daiun.periodEnd}歳・${dir}・${genderLabel}）／主星: ${daiun.star} ※起運年齢は節入り近似のため目安です。`;
+            summaryEl.textContent = `大運: ${daiun.ganzi}（${sanmeiDaiunRangeText(daiun)}・${dir}・${genderLabel}）／主星: ${daiun.star}`;
           }
         } else {
           summaryEl.textContent = '大運を算出できませんでした。';
@@ -26544,7 +26750,11 @@
       const base = sanmeiCalcDaiun(natalChart, birthDateStr, birthTimeStr || '12:00', gender, new Date());
       if (!base) return [];
       const forward = base.forward;
-      const startAge = base.startAge;
+      const qiyunAge = {
+        years: base.startAge,
+        months: base.startMonths || 0,
+        days: base.startDays || 0
+      };
       const monthJiazi = sanmeiJiaziIndex(natalChart.month.stem, natalChart.month.branch);
       const firstJiazi = (monthJiazi + (forward ? 1 : -1) + 60) % 60;
       const list = [];
@@ -26552,12 +26762,12 @@
         const jiazi = (firstJiazi + (forward ? step : -step) + 600) % 60;
         const stem = jiazi % 10;
         const branch = jiazi % 12;
-        const periodStart = startAge + step * 10;
-        const periodEnd = periodStart + 9;
+        const periodStart = qiyunAge.years + step * 10;
         list.push({
           step,
           periodStart,
-          periodEnd,
+          periodEnd: periodStart + 10,
+          periodLabel: sanmeiDaiunPeriodLabel(qiyunAge, step),
           stem,
           branch,
           ganzi: SANMEI_STEMS[stem] + SANMEI_BRANCHES[branch],
@@ -26565,7 +26775,15 @@
           current: !base.beforeStart && base.step === step
         });
       }
-      return { startAge, forward, beforeStart: base.beforeStart, currentStep: base.step, list };
+      return {
+        startAge: base.startAge,
+        startAgeLabel: base.startAgeLabel,
+        basisText: base.basisText,
+        forward,
+        beforeStart: base.beforeStart,
+        currentStep: base.step,
+        list
+      };
     }
 
     const BAZI_GROUP_CONCRETE = {
@@ -27753,7 +27971,7 @@
         const dTag = baziFortuneYongTag(analysis, curDaiun.tengod);
         daiunOverlay = `いまの大運 ${curDaiun.ganzi}（${curDaiun.tengod}・${dTag.label}）に、流年→流時と重ねて読むと安定します。`;
       } else if (daiunInfo && daiunInfo.beforeStart) {
-        daiunOverlay = `起運前（約${daiunInfo.startAge}歳〜）。流年・流日の影響が相対的に大きく出やすい目安です。`;
+        daiunOverlay = `起運前（${sanmeiDaiunStartText(daiunInfo)}〜）。流年・流日の影響が相対的に大きく出やすい目安です。`;
       }
       return {
         asOf: dateStr,
@@ -29173,12 +29391,12 @@
         const curTag = baziFortuneYongTag(analysis, cur.tengod);
         sections.push({
           title: 'いまの10年の流れで意識すること',
-          text: `${cur.periodStart}〜${cur.periodEnd}歳は${cur.ganzi}・${cur.tengod}の時期です（${curTag.label}）。${curGuide.meaning || 'この役割のテーマが表れやすくなります。'}${curGuide.mindset ? ` 具体策: ${curGuide.mindset}` : ''} ${curTag.text}`
+          text: `${sanmeiDaiunRangeText(cur)}は${cur.ganzi}・${cur.tengod}の時期です（${curTag.label}）。${curGuide.meaning || 'この役割のテーマが表れやすくなります。'}${curGuide.mindset ? ` 具体策: ${curGuide.mindset}` : ''} ${curTag.text}`
         });
       } else if (daiunInfo && daiunInfo.beforeStart) {
         sections.push({
           title: '10年の流れ',
-          text: `大きな運の区切りはおよそ${daiunInfo.startAge}歳から。それまでは命式本体の役割バランスを軸に読む段階です。`
+          text: `大きな運の区切りは${sanmeiDaiunStartText(daiunInfo)}から。それまでは命式本体の役割バランスを軸に読む段階です。`
         });
       }
       const ln = liunianOpt || window.__baziLiunian;
@@ -29553,7 +29771,7 @@
           if (daiunInfo.beforeStart) {
             const tip = document.createElement('div');
             tip.className = 'text-[11px] text-teal-300/90 font-bold mb-1';
-            tip.textContent = `起運 約${daiunInfo.startAge}歳（${daiunInfo.forward ? '順行' : '逆行'}）・いまは起運前`;
+            tip.textContent = `起運 ${sanmeiDaiunStartText(daiunInfo)}（${daiunInfo.forward ? '順行' : '逆行'}）・いまは起運前`;
             listEl.appendChild(tip);
           }
           daiunInfo.list.forEach((item) => {
@@ -29564,7 +29782,7 @@
             row.className = item.current
               ? 'w-full text-left px-3 py-2 rounded-xl bg-emerald-900/50 border border-emerald-500/60 text-emerald-50'
               : 'w-full text-left px-3 py-2 rounded-xl bg-black/40 border border-emerald-900/50 text-emerald-100/90 hover:border-emerald-600/50 transition';
-            row.innerHTML = `<span class="font-extrabold">${item.periodStart}〜${item.periodEnd}歳</span>
+            row.innerHTML = `<span class="font-extrabold">${sanmeiDaiunRangeText(item)}</span>
               <span class="ml-2 font-mono">${item.ganzi}</span>
               <span class="ml-2 text-teal-300">${item.tengod}</span>
               <span class="ml-2 text-[10px] font-extrabold ${tagCls}">${dTag.label}</span>
@@ -29647,7 +29865,7 @@
         yongText: analysis.yongText || '',
         nature: (unifiedFindSection(sogo.sections, ['日主の気質', '日主から見る基本性格']) || {}).text || '',
         tens: (unifiedFindSection(sogo.sections, ['十神']) || {}).text || '',
-        daiun: cur ? `${cur.periodStart}〜${cur.periodEnd}歳・${cur.ganzi}（${cur.tengod}）` : '',
+        daiun: cur ? `${sanmeiDaiunRangeText(cur)}・${cur.ganzi}（${cur.tengod}）` : '',
         daiunTg: cur ? cur.tengod : '',
         daiunTag: cur ? baziFortuneYongTag(analysis, cur.tengod).label : '',
         liunianYear: ln && ln.year ? `${ln.year.ganzi}（${ln.year.tengod}・${ln.year.tag.label}）` : '',
@@ -30689,7 +30907,7 @@
         score -= 1;
         waitBits.push(plain
           ? '大きな運の区切りの前段階なので、土台のスキルと人脈を厚くしてから動くと安定しやすいです。'
-          : (`起運前（約${daiunInfo.startAge}歳〜）。土台づくりを優先し、大きな転職は準備完了後が無難です。`));
+          : (`起運前（${sanmeiDaiunStartText(daiunInfo)}〜）。土台づくりを優先し、大きな転職は準備完了後が無難です。`));
       }
 
       if (baziAnalysis && liunian && liunian.year && typeof baziFortuneYongTag === 'function') {
@@ -30737,7 +30955,7 @@
             if (starPlain) {
               goBits.push(plain
                 ? (`いまの十年前後の波は「${starPlain}」。このテーマに合う転職なら納得感が続きやすいです。`)
-                : (`算命の大運主星 ${daiun.star}（${daiun.periodStart}〜${daiun.periodEnd}歳）: ${starPlain}`));
+                : (`算命の大運主星 ${daiun.star}（${sanmeiDaiunRangeText(daiun)}）: ${starPlain}`));
             }
             if (starGuide.mindset) {
               waitBits.push(plain
@@ -31176,13 +31394,13 @@
           const daiun = sanmeiCalcDaiun(chart, birth.date, birth.time || '12:00', gender, new Date());
           if (daiun) {
             if (daiun.beforeStart) {
-              bits.push(`大運の本格スタートはおよそ${daiun.startAge}歳。いまは命式そのものの持ち味を土台にする時期。`);
+              bits.push(`大運の本格スタートは${sanmeiDaiunStartText(daiun)}。いまは命式そのものの持ち味を土台にする時期。`);
             } else {
               const starGuide = daiun.star && SANMEI_STAR_GUIDE[daiun.star] ? SANMEI_STAR_GUIDE[daiun.star] : null;
               const starPlain = starGuide && starGuide.meaning
                 ? String(starGuide.meaning).replace(/星/g, '傾向').replace(/・/g, '、')
                 : '';
-              bits.push(`${daiun.periodStart}〜${daiun.periodEnd}歳ごろの波。${starPlain || 'この時期らしいテーマが表に出やすい。'}`);
+              bits.push(`${sanmeiDaiunRangeText(daiun)}の波。${starPlain || 'この時期らしいテーマが表に出やすい。'}`);
             }
           }
         }
@@ -34483,10 +34701,13 @@
 
     function openFortuneFeature(key) {
       if (!FORTUNE_FEATURE_KEYS.includes(key)) return;
+      if (!fortuneProfileIsApplied()) {
+        openFortuneProfileModal();
+        return;
+      }
       const profile = typeof getProfileBirth === 'function' ? getProfileBirth() : null;
       if (!profile || !profile.date) {
-        alert('先にプロフィールで生年月日を登録してください');
-        openFortuneProfileCard();
+        openFortuneProfileModal();
         return;
       }
       ALL_FORTUNE_CARD_KEYS.forEach((k) => {
@@ -34500,17 +34721,19 @@
       });
       if (typeof refreshProfileBirthSelects === 'function') refreshProfileBirthSelects();
       if (typeof updateFortuneProfileSources === 'function') updateFortuneProfileSources();
+      applyBirthToPanel(key === 'unified' ? 'sanmei' : key, profile, { recalc: false });
       if (key === 'unified') {
         if (typeof refreshUnifiedSourceChips === 'function') refreshUnifiedSourceChips();
+        if (typeof calculateUnifiedReading === 'function') calculateUnifiedReading();
+      } else if (key === 'sanmei') {
+        executeSanmeiReading();
+      } else if (key === 'ziwei') {
+        executeZiweiReading();
       } else if (key === 'bazi') {
         if (typeof loadBaziBirthInput === 'function') loadBaziBirthInput();
-        applyBirthToPanel('bazi', profile, { recalc: false });
-      } else {
-        applyBirthToPanel(key, profile, { recalc: false });
-      }
-      const card = document.getElementById('fortune-card-' + key);
-      if (card) {
-        requestAnimationFrame(() => card.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+        else executeBaziReading();
+        const resultEl = document.getElementById('bazi-result');
+        if (resultEl) requestAnimationFrame(() => resultEl.scrollIntoView({ behavior: 'smooth', block: 'start' }));
       }
     }
 
@@ -57283,7 +57506,7 @@ initFortuneHub();
         if (dp && dp.list && dp.list.length) {
           const cur = dp.list.find((x) => x.current) || dp.list[0];
           if (cur) {
-            bits.push(`大運${cur.ganzi}(${cur.periodStart}〜${cur.periodEnd}歳・${cur.star}・${cur.juusei}${cur.isDaiunTenchu ? '・大運天中殺' : ''})`);
+            bits.push(`大運${cur.ganzi}(${sanmeiDaiunRangeText(cur)}・${cur.star}・${cur.juusei}${cur.isDaiunTenchu ? '・大運天中殺' : ''})`);
           }
         }
       } catch (e) {}

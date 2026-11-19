@@ -10859,6 +10859,7 @@
                       <div class="text-[10px] text-sky-400/80 font-extrabold tracking-wider">対象プロファイル</div>
                       <div id="fortune-home-name-text" class="text-sm sm:text-base font-extrabold text-white truncate">
                         （未設定 - タップして登録・履歴選択）</div>
+                      <div id="fortune-home-birth-text" class="hidden text-[11px] font-mono font-bold text-sky-300/90 truncate mt-0.5"></div>
                     </div>
                   </div>
                   <span
@@ -10868,83 +10869,7 @@
                 </button>
               </div>
 
-              <!-- 3. 生年月日と出生時間のドラムピッカー -->
-              <div id="fortune-home-slider-card"
-                class="fortune-slider-card bg-slate-950/75 border border-sky-800/50 rounded-2xl p-4 shadow-[0_4px_24px_rgba(2,6,23,0.55)] space-y-3.5 backdrop-blur-md">
-                <!-- サマリープレビュー -->
-                <div class="flex items-center justify-between gap-2 pb-2.5 border-b border-sky-900/40">
-                  <div class="flex items-center gap-2">
-                    <span class="text-base text-sky-400">📅</span>
-                    <span class="text-xs font-black text-sky-200 tracking-wider">生年月日・時間</span>
-                  </div>
-                  <div id="fortune-slider-preview-badge"
-                    class="px-2.5 py-1 rounded-full bg-sky-900/70 border border-sky-500/40 text-[11px] font-mono font-bold text-sky-200">
-                    1995-01-01 12:00
-                  </div>
-                </div>
-
-                <!-- 生年月日ドラムピッカー（年・月・日） -->
-                <div class="space-y-1.5">
-                  <div class="grid text-center text-[11px] font-bold text-sky-300/80"
-                    style="grid-template-columns: 1.25fr 0.9fr 0.9fr;">
-                    <span>年</span>
-                    <span>月</span>
-                    <span>日</span>
-                  </div>
-                  <div class="fortune-wheel-group" role="group" aria-label="生年月日ドラムピッカー">
-                    <div class="fortune-wheel-highlight" aria-hidden="true"></div>
-                    <div class="fortune-wheel-cols fortune-wheel-cols--date">
-                      <div id="fortune-wheel-year" class="fortune-wheel-col" data-wheel-type="year" aria-label="年">
-                      </div>
-                      <div id="fortune-wheel-month" class="fortune-wheel-col" data-wheel-type="month" aria-label="月">
-                      </div>
-                      <div id="fortune-wheel-day" class="fortune-wheel-col" data-wheel-type="day" aria-label="日"></div>
-                    </div>
-                  </div>
-                </div>
-
-                <!-- 出生時間 & 時間不明トグル -->
-                <div class="pt-2.5 border-t border-sky-900/40 space-y-2">
-                  <div class="flex items-center justify-between">
-                    <div class="text-xs font-bold text-sky-300/80">出生時間</div>
-                    <label class="inline-flex items-center gap-1.5 cursor-pointer text-xs text-sky-300 font-bold">
-                      <input type="checkbox" id="fortune-slider-unknown-time" class="accent-sky-500 rounded"
-                        onchange="onFortuneUnknownTimeChange()">
-                      <span>時間不明（正午扱い）</span>
-                    </label>
-                  </div>
-
-                  <div id="fortune-slider-time-controls" class="space-y-1.5 transition-opacity">
-                    <div class="grid grid-cols-2 text-center text-[11px] font-bold text-slate-400">
-                      <span>時</span>
-                      <span>分</span>
-                    </div>
-                    <div class="fortune-wheel-group" role="group" aria-label="出生時間ドラムピッカー">
-                      <div class="fortune-wheel-highlight" aria-hidden="true"></div>
-                      <div class="fortune-wheel-cols fortune-wheel-cols--time">
-                        <div id="fortune-wheel-hour" class="fortune-wheel-col" data-wheel-type="hour" aria-label="時">
-                        </div>
-                        <div id="fortune-wheel-minute" class="fortune-wheel-col" data-wheel-type="minute"
-                          aria-label="分"></div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <!-- 性別スイッチ -->
-                <div class="pt-2.5 border-t border-sky-900/40 flex items-center justify-between">
-                  <span class="text-xs font-bold text-sky-300">性別（大運・命盤用）</span>
-                  <div class="inline-flex rounded-lg border border-sky-700/50 p-0.5 bg-black/60">
-                    <button type="button" id="fortune-gender-male-btn" onclick="setFortuneSliderGender('male')"
-                      class="px-3 py-1 text-xs font-bold rounded-md transition bg-sky-600 text-white">♂ 男性</button>
-                    <button type="button" id="fortune-gender-female-btn" onclick="setFortuneSliderGender('female')"
-                      class="px-3 py-1 text-xs font-bold rounded-md transition text-slate-400 hover:text-white">♀
-                      女性</button>
-                  </div>
-                </div>
-              </div>
-
-              <!-- 4. 各占い項目 -->
+              <!-- 3. 各占い項目 -->
               <div class="fortune-home-cta" role="navigation" aria-label="鑑定メニュー">
                 <button type="button" class="fortune-hub-btn fortune-hub-unified" data-fortune-key="unified"
                   aria-pressed="false" onclick="openFortuneFeature('unified')">
@@ -10990,47 +10915,135 @@
               aria-label="閉じる">✕</button>
           </div>
 
-          <!-- セクション1: 現在のスライダー設定で名前を登録 -->
-          <div class="bg-black/50 border border-sky-700/40 rounded-xl p-3.5 space-y-2.5">
-            <div class="text-xs font-black text-sky-300 flex items-center gap-1.5">
-              <span>✨</span>
-              <span>現在のスライダー設定で登録</span>
+          <!-- 画面1: 登録済みの履歴から選択（右上に新規作成ボタン） -->
+          <div id="fortune-modal-history-view" class="space-y-3">
+            <div class="flex items-center justify-between gap-2">
+              <div class="flex items-center gap-1.5 text-xs font-black text-sky-300">
+                <span>📜</span>
+                <span>登録済みの履歴から選択</span>
+                <span id="fortune-modal-history-count" class="text-[10px] font-bold text-slate-400 ml-1"></span>
+              </div>
+              <button type="button" id="fortune-modal-new-btn" onclick="showFortuneProfileRegisterView()"
+                class="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-gradient-to-r from-sky-600 to-indigo-600 hover:from-sky-500 hover:to-indigo-500 text-white text-xs font-extrabold border border-sky-400/40 shadow-md transition active:scale-[0.97] shrink-0">
+                <span class="text-sm leading-none">＋</span><span>新規作成</span>
+              </button>
             </div>
-            <div id="fortune-modal-current-target-summary"
-              class="text-xs font-mono font-bold text-sky-200/90 bg-sky-950/60 border border-sky-800/40 px-2.5 py-1.5 rounded-lg">
-              1995年 1月 1日 12:00（男性）
+            <div id="fortune-modal-history-list" class="space-y-2 max-h-[55vh] overflow-y-auto pr-1">
+              <!-- JSで動的レンダリング -->
             </div>
-            <div>
-              <label class="block text-[11px] font-bold text-slate-400 mb-1">名前</label>
+            <!-- 名前クリア（未設定に戻す）ボタン -->
+            <div class="flex justify-end pt-1">
+              <button type="button" onclick="clearFortuneActiveName()"
+                class="text-[11px] font-bold text-slate-400 hover:text-slate-200 underline">
+                名前を未設定（空白）に戻す
+              </button>
+            </div>
+          </div>
+
+          <!-- 画面2: 新規作成（名前・ドラムピッカー・登録ボタン） -->
+          <div id="fortune-modal-register-view" class="hidden space-y-3.5">
+            <div class="flex items-center justify-between gap-2">
+              <button type="button" id="fortune-modal-back-history-btn" onclick="showFortuneProfileHistoryView()"
+                class="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-700 text-slate-300 hover:text-white text-xs font-bold transition active:scale-[0.97]">
+                ← 登録済み履歴に戻る
+              </button>
+              <span class="text-xs font-black text-sky-200">✨ 新規作成</span>
+            </div>
+
+            <!-- 1. 名前入力 -->
+            <div class="bg-black/50 border border-sky-700/40 rounded-xl p-3.5 space-y-2">
+              <label for="fortune-modal-name-input" class="block text-xs font-black text-sky-300">👤 名前</label>
               <input type="text" id="fortune-modal-name-input" maxlength="20" placeholder="例: 自分 / パートナー / 田中さん"
                 class="w-full h-10 px-3 rounded-lg bg-black/60 border border-sky-700/60 text-sky-50 text-sm font-bold focus:outline-none focus:border-sky-400"
                 onkeydown="if(event.key==='Enter')registerCurrentFortuneSliderProfile()">
             </div>
-            <button type="button" onclick="registerCurrentFortuneSliderProfile()"
-              class="w-full py-2.5 rounded-lg bg-gradient-to-r from-sky-600 to-indigo-600 hover:from-sky-500 hover:to-indigo-500 text-white font-extrabold text-xs shadow-md transition active:scale-[0.98]">
-              この設定で名前を登録して適用
-            </button>
-          </div>
 
-          <!-- 名前クリア（未設定に戻す）ボタン -->
-          <div class="flex justify-end">
-            <button type="button" onclick="clearFortuneActiveName()"
-              class="text-[11px] font-bold text-slate-400 hover:text-slate-200 underline">
-              名前を未設定（空白）に戻す
-            </button>
-          </div>
+            <!-- 2. 生年月日と出生時間のドラムピッカー -->
+            <div id="fortune-home-slider-card"
+              class="fortune-slider-card bg-slate-950/75 border border-sky-800/50 rounded-2xl p-4 shadow-[0_4px_24px_rgba(2,6,23,0.55)] space-y-3.5 backdrop-blur-md">
+              <!-- サマリープレビュー -->
+              <div class="flex items-center justify-between gap-2 pb-2.5 border-b border-sky-900/40">
+                <div class="flex items-center gap-2">
+                  <span class="text-base text-sky-400">📅</span>
+                  <span class="text-xs font-black text-sky-200 tracking-wider">生年月日・時間</span>
+                </div>
+                <div id="fortune-slider-preview-badge"
+                  class="px-2.5 py-1 rounded-full bg-sky-900/70 border border-sky-500/40 text-[11px] font-mono font-bold text-sky-200">
+                  1995-01-01 12:00
+                </div>
+              </div>
 
-          <!-- セクション2: 登録履歴から呼び出す -->
-          <div class="space-y-2 pt-2 border-t border-sky-900/40">
-            <div class="flex items-center justify-between text-xs font-black text-sky-300">
-              <span class="flex items-center gap-1.5">
-                <span>📜</span>
-                <span>登録済みの履歴から選択</span>
-              </span>
-              <span id="fortune-modal-history-count" class="text-[10px] font-normal text-slate-400"></span>
+              <!-- 生年月日ドラムピッカー（年・月・日） -->
+              <div class="space-y-1.5">
+                <div class="grid text-center text-[11px] font-bold text-sky-300/80"
+                  style="grid-template-columns: 1.25fr 0.9fr 0.9fr;">
+                  <span>年</span>
+                  <span>月</span>
+                  <span>日</span>
+                </div>
+                <div class="fortune-wheel-group" role="group" aria-label="生年月日ドラムピッカー">
+                  <div class="fortune-wheel-highlight" aria-hidden="true"></div>
+                  <div class="fortune-wheel-cols fortune-wheel-cols--date">
+                    <div id="fortune-wheel-year" class="fortune-wheel-col" data-wheel-type="year" aria-label="年">
+                    </div>
+                    <div id="fortune-wheel-month" class="fortune-wheel-col" data-wheel-type="month" aria-label="月">
+                    </div>
+                    <div id="fortune-wheel-day" class="fortune-wheel-col" data-wheel-type="day" aria-label="日"></div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 出生時間 & 時間不明トグル -->
+              <div class="pt-2.5 border-t border-sky-900/40 space-y-2">
+                <div class="flex items-center justify-between">
+                  <div class="text-xs font-bold text-sky-300/80">出生時間</div>
+                  <label class="inline-flex items-center gap-1.5 cursor-pointer text-xs text-sky-300 font-bold">
+                    <input type="checkbox" id="fortune-slider-unknown-time" class="accent-sky-500 rounded"
+                      onchange="onFortuneUnknownTimeChange()">
+                    <span>時間不明（正午扱い）</span>
+                  </label>
+                </div>
+
+                <div id="fortune-slider-time-controls" class="space-y-1.5 transition-opacity">
+                  <div class="grid grid-cols-2 text-center text-[11px] font-bold text-slate-400">
+                    <span>時</span>
+                    <span>分</span>
+                  </div>
+                  <div class="fortune-wheel-group" role="group" aria-label="出生時間ドラムピッカー">
+                    <div class="fortune-wheel-highlight" aria-hidden="true"></div>
+                    <div class="fortune-wheel-cols fortune-wheel-cols--time">
+                      <div id="fortune-wheel-hour" class="fortune-wheel-col" data-wheel-type="hour" aria-label="時">
+                      </div>
+                      <div id="fortune-wheel-minute" class="fortune-wheel-col" data-wheel-type="minute"
+                        aria-label="分"></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 性別スイッチ -->
+              <div class="pt-2.5 border-t border-sky-900/40 flex items-center justify-between">
+                <span class="text-xs font-bold text-sky-300">性別（大運・命盤用）</span>
+                <div class="inline-flex rounded-lg border border-sky-700/50 p-0.5 bg-black/60">
+                  <button type="button" id="fortune-gender-male-btn" onclick="setFortuneSliderGender('male')"
+                    class="px-3 py-1 text-xs font-bold rounded-md transition bg-sky-600 text-white">♂ 男性</button>
+                  <button type="button" id="fortune-gender-female-btn" onclick="setFortuneSliderGender('female')"
+                    class="px-3 py-1 text-xs font-bold rounded-md transition text-slate-400 hover:text-white">♀
+                    女性</button>
+                </div>
+              </div>
             </div>
-            <div id="fortune-modal-history-list" class="space-y-2 max-h-56 overflow-y-auto pr-1">
-              <!-- JSで動的レンダリング -->
+
+            <!-- 3. 設定確認 & 登録ボタン -->
+            <div class="bg-black/50 border border-sky-700/40 rounded-xl p-3.5 space-y-2.5">
+              <div id="fortune-modal-current-target-summary"
+                class="text-xs font-mono font-bold text-sky-200/90 bg-sky-950/60 border border-sky-800/40 px-2.5 py-1.5 rounded-lg">
+                1995年 1月 1日 12:00（男性）
+              </div>
+              <button type="button" id="fortune-modal-register-submit-btn" onclick="registerCurrentFortuneSliderProfile()"
+                class="w-full py-2.5 rounded-lg bg-gradient-to-r from-sky-600 to-indigo-600 hover:from-sky-500 hover:to-indigo-500 text-white font-extrabold text-xs shadow-md transition active:scale-[0.98]">
+                登録する
+              </button>
             </div>
           </div>
         </div>
@@ -24700,8 +24713,43 @@
       if (modalSummary) modalSummary.textContent = `${fortuneActiveInput.year}年${fortuneActiveInput.month}月${fortuneActiveInput.day}日 ${timeText}（${genderText}）`;
     }
 
+    let fortuneAppliedSnapshot = null;
+
+    function rememberAppliedFortuneInput() {
+      fortuneAppliedSnapshot = {
+        name: fortuneActiveInput.name || '',
+        year: fortuneActiveInput.year,
+        month: fortuneActiveInput.month,
+        day: fortuneActiveInput.day,
+        hour: fortuneActiveInput.hour,
+        minute: fortuneActiveInput.minute,
+        unknownTime: Boolean(fortuneActiveInput.unknownTime),
+        gender: fortuneActiveInput.gender === 'female' ? 'female' : 'male',
+        profileId: fortuneActiveInput.profileId || null
+      };
+    }
+
+    function restoreAppliedFortuneInput() {
+      const saved = fortuneAppliedSnapshot;
+      if (!saved) return;
+      fortuneActiveInput.name = saved.name;
+      fortuneActiveInput.year = saved.year;
+      fortuneActiveInput.month = saved.month;
+      fortuneActiveInput.day = saved.day;
+      fortuneActiveInput.hour = saved.hour;
+      fortuneActiveInput.minute = saved.minute;
+      fortuneActiveInput.unknownTime = saved.unknownTime;
+      fortuneActiveInput.gender = saved.gender;
+      fortuneActiveInput.profileId = saved.profileId;
+      updateFortuneSliderLabels();
+      updateFortuneSliderSummary();
+      updateFortuneNameDisplay();
+      updateFortuneActiveBirthSync();
+    }
+
     function updateFortuneNameDisplay() {
       const nameEl = document.getElementById('fortune-home-name-text');
+      const birthEl = document.getElementById('fortune-home-birth-text');
       const headerName = document.getElementById('fortune-header-profile-name');
       const currentName = (fortuneActiveInput.name || '').trim();
 
@@ -24712,6 +24760,20 @@
         } else {
           nameEl.textContent = '（名前未設定 - タップして登録・履歴選択）';
           nameEl.className = 'text-xs sm:text-sm font-bold text-slate-400 truncate';
+        }
+      }
+      if (birthEl) {
+        if (currentName || fortuneActiveInput.profileId) {
+          const dateText = `${fortuneActiveInput.year}-${String(fortuneActiveInput.month).padStart(2, '0')}-${String(fortuneActiveInput.day).padStart(2, '0')}`;
+          const timeText = fortuneActiveInput.unknownTime
+            ? '時間不明'
+            : `${String(fortuneActiveInput.hour).padStart(2, '0')}:${String(fortuneActiveInput.minute).padStart(2, '0')}`;
+          const genderText = fortuneActiveInput.gender === 'female' ? '女性' : '男性';
+          birthEl.textContent = `📅 ${dateText} ${timeText}・${genderText}`;
+          birthEl.classList.remove('hidden');
+        } else {
+          birthEl.textContent = '';
+          birthEl.classList.add('hidden');
         }
       }
       if (headerName) {
@@ -24791,21 +24853,54 @@
       };
     }
 
+    function setFortuneProfileModalView(view) {
+      const historyView = document.getElementById('fortune-modal-history-view');
+      const registerView = document.getElementById('fortune-modal-register-view');
+      const isRegister = view === 'register';
+      if (historyView) historyView.classList.toggle('hidden', isRegister);
+      if (registerView) registerView.classList.toggle('hidden', !isRegister);
+    }
+
     function openFortuneProfileModal() {
       const modal = document.getElementById('fortune-profile-modal');
       if (!modal) return;
+      rememberAppliedFortuneInput();
       updateFortuneSliderSummary();
-      const input = document.getElementById('fortune-modal-name-input');
-      if (input) {
-        input.value = fortuneActiveInput.name || '';
-        setTimeout(() => input.focus(), 80);
-      }
       renderFortuneProfileHistoryList();
+      setFortuneProfileModalView('history');
       modal.classList.remove('hidden');
+    }
+
+    function showFortuneProfileRegisterView() {
+      const modal = document.getElementById('fortune-profile-modal');
+      rememberAppliedFortuneInput();
+      const input = document.getElementById('fortune-modal-name-input');
+      if (input) input.value = '';
+      setFortuneProfileModalView('register');
+      updateFortuneSliderSummary();
+      const alignWheels = () => {
+        if (!modal || modal.classList.contains('hidden')) return;
+        syncFortuneSliderUI();
+      };
+      requestAnimationFrame(() => {
+        alignWheels();
+        requestAnimationFrame(alignWheels);
+      });
+      setTimeout(alignWheels, 80);
+    }
+
+    function showFortuneProfileHistoryView() {
+      restoreAppliedFortuneInput();
+      renderFortuneProfileHistoryList();
+      setFortuneProfileModalView('history');
     }
 
     function closeFortuneProfileModal() {
       const modal = document.getElementById('fortune-profile-modal');
+      const registerView = document.getElementById('fortune-modal-register-view');
+      if (registerView && !registerView.classList.contains('hidden')) {
+        restoreAppliedFortuneInput();
+      }
       if (modal) modal.classList.add('hidden');
     }
 
@@ -24841,17 +24936,21 @@
       saveProfileBirthList(nextList, targetId);
       fortuneActiveInput.name = name;
       fortuneActiveInput.profileId = targetId;
+      rememberAppliedFortuneInput();
       updateFortuneNameDisplay();
       updateFortuneActiveBirthSync();
-      closeFortuneProfileModal();
+      // 登録完了後はモーダルを閉じず、前の「登録済みの履歴から選択」画面に戻る
+      renderFortuneProfileHistoryList();
+      setFortuneProfileModalView('history');
       if (typeof notifyProfileSaved === 'function') {
-        notifyProfileSaved(name, '登録・適用完了');
+        notifyProfileSaved(name, '登録完了');
       }
     }
 
     function clearFortuneActiveName() {
       fortuneActiveInput.name = '';
       fortuneActiveInput.profileId = null;
+      rememberAppliedFortuneInput();
       updateFortuneNameDisplay();
       updateFortuneActiveBirthSync();
       closeFortuneProfileModal();
@@ -24869,7 +24968,7 @@
       if (countEl) countEl.textContent = `${list.length}件`;
 
       if (!list.length) {
-        container.innerHTML = '<div class="text-xs text-slate-500 py-3 text-center">登録された履歴はまだありません</div>';
+        container.innerHTML = '<div class="text-xs text-slate-500 py-3 text-center">登録された履歴はまだありません<br>右上の「＋ 新規作成」から登録してください</div>';
         return;
       }
 
@@ -24930,6 +25029,7 @@
         fortuneActiveInput.unknownTime = true;
       }
 
+      rememberAppliedFortuneInput();
       syncFortuneSliderUI();
       updateFortuneActiveBirthSync();
       closeFortuneProfileModal();
@@ -24959,6 +25059,9 @@
 
     window.openFortuneProfileModal = openFortuneProfileModal;
     window.closeFortuneProfileModal = closeFortuneProfileModal;
+    window.showFortuneProfileRegisterView = showFortuneProfileRegisterView;
+    window.showFortuneProfileHistoryView = showFortuneProfileHistoryView;
+    window.setFortuneProfileModalView = setFortuneProfileModalView;
     window.adjustFortuneSlider = adjustFortuneSlider;
     window.onFortuneSliderInput = onFortuneSliderInput;
     window.setFortuneSliderGender = setFortuneSliderGender;
@@ -25236,8 +25339,8 @@
           }
         }, 2200);
       }
-      if (typeof showFortuneAiToast === 'function' && name) {
-        showFortuneAiToast(`「${name}」のプロファイルを${action === '切替完了' ? '選択しました' : '保存しました'}（全鑑定に反映）`);
+      if (typeof hideFortuneAiToast === 'function') {
+        hideFortuneAiToast();
       }
     }
 

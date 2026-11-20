@@ -473,6 +473,7 @@
 
     html.theme-soft-light [class*="bg-black/"],
     html.theme-soft-light [class*="bg-[#0b1021]"],
+    html.theme-soft-light [class*="bg-[#0b1329]"],
     html.theme-soft-light [class*="bg-[#070a14]"],
     html.theme-soft-light [class*="bg-[#030509]"],
     html.theme-soft-light [class*="bg-[#02040a]"],
@@ -643,6 +644,7 @@
     /* 暗い面・カードを明るい面へ */
     html.theme-light [class*="bg-black/"],
     html.theme-light [class*="bg-[#0b1021]"],
+    html.theme-light [class*="bg-[#0b1329]"],
     html.theme-light [class*="bg-[#070a14]"],
     html.theme-light [class*="bg-[#030509]"],
     html.theme-light [class*="bg-[#02040a]"],
@@ -868,6 +870,383 @@
       background: #fffcf7;
       color: #5c4e3f;
       border-color: rgba(168, 132, 82, 0.35);
+    }
+
+    /* ライト / 目にやさしい: 明るい面の上でもボタンと文字が判別できる色 */
+    html.theme-light [class*="text-sky-"],
+    html.theme-light [class*="text-blue-"] {
+      color: #075985 !important;
+    }
+
+    html.theme-light [class*="text-amber-"],
+    html.theme-light [class*="text-yellow-"],
+    html.theme-light [class*="text-orange-"] {
+      color: #9a3412 !important;
+    }
+
+    html.theme-light [class*="text-rose-"],
+    html.theme-light [class*="text-red-"],
+    html.theme-light [class*="text-pink-"] {
+      color: #9f1239 !important;
+    }
+
+    html.theme-light [class*="text-emerald-"],
+    html.theme-light [class*="text-green-"],
+    html.theme-light [class*="text-teal-"] {
+      color: #047857 !important;
+    }
+
+    html.theme-light [class*="text-violet-"],
+    html.theme-light [class*="text-purple-"],
+    html.theme-light [class*="text-fuchsia-"] {
+      color: #6d28d9 !important;
+    }
+
+    html.theme-soft-light [class*="text-amber-"],
+    html.theme-soft-light [class*="text-yellow-"],
+    html.theme-soft-light [class*="text-orange-"] {
+      color: #9a3412 !important;
+    }
+
+    html.theme-soft-light [class*="text-rose-"],
+    html.theme-soft-light [class*="text-red-"],
+    html.theme-soft-light [class*="text-pink-"] {
+      color: #9f1239 !important;
+    }
+
+    html.theme-soft-light [class*="text-emerald-"],
+    html.theme-soft-light [class*="text-green-"],
+    html.theme-soft-light [class*="text-teal-"] {
+      color: #047857 !important;
+    }
+
+    html.theme-soft-light [class*="text-fuchsia-"] {
+      color: #9d174d !important;
+    }
+
+    html.theme-light button[class*="bg-sky-600"],
+    html.theme-light button[class*="bg-sky-700"],
+    html.theme-light button[class*="bg-cyan-500"],
+    html.theme-light button[class*="bg-cyan-600"],
+    html.theme-light button[class*="bg-cyan-700"],
+    html.theme-light button[class*="bg-indigo-600"],
+    html.theme-light button[class*="bg-indigo-700"],
+    html.theme-light button[class*="bg-rose-600"],
+    html.theme-light button[class*="bg-rose-700"],
+    html.theme-light button[class*="bg-emerald-500"],
+    html.theme-light button[class*="bg-emerald-600"],
+    html.theme-light button[class*="bg-emerald-700"],
+    html.theme-light button[class*="bg-amber-500"],
+    html.theme-light button[class*="bg-amber-600"],
+    html.theme-light button[class*="from-sky-600"],
+    html.theme-light button[class*="from-sky-500"],
+    html.theme-light button[class*="from-cyan-600"],
+    html.theme-light button[class*="from-cyan-700"],
+    html.theme-light button[class*="from-indigo-600"],
+    html.theme-light button[class*="from-indigo-500"],
+    html.theme-light button[class*="from-rose-600"],
+    html.theme-light button[class*="from-rose-500"],
+    html.theme-light button[class*="from-emerald-600"],
+    html.theme-light button[class*="from-emerald-500"],
+    html.theme-light button[class*="from-amber-600"],
+    html.theme-light button[class*="from-amber-500"],
+    html.theme-light button[class*="from-violet-600"],
+    html.theme-light button[class*="from-fuchsia-600"],
+    html.theme-light button[class*="from-fuchsia-700"],
+    html.theme-light button[class*="from-teal-500"],
+    html.theme-light button[class*="from-teal-600"],
+    html.theme-soft-light button[class*="bg-sky-600"],
+    html.theme-soft-light button[class*="bg-sky-700"],
+    html.theme-soft-light button[class*="bg-cyan-500"],
+    html.theme-soft-light button[class*="bg-cyan-600"],
+    html.theme-soft-light button[class*="bg-cyan-700"],
+    html.theme-soft-light button[class*="bg-indigo-600"],
+    html.theme-soft-light button[class*="bg-indigo-700"],
+    html.theme-soft-light button[class*="bg-rose-600"],
+    html.theme-soft-light button[class*="bg-rose-700"],
+    html.theme-soft-light button[class*="bg-emerald-500"],
+    html.theme-soft-light button[class*="bg-emerald-600"],
+    html.theme-soft-light button[class*="bg-emerald-700"],
+    html.theme-soft-light button[class*="bg-amber-500"],
+    html.theme-soft-light button[class*="bg-amber-600"],
+    html.theme-soft-light button[class*="from-sky-600"],
+    html.theme-soft-light button[class*="from-sky-500"],
+    html.theme-soft-light button[class*="from-cyan-600"],
+    html.theme-soft-light button[class*="from-cyan-700"],
+    html.theme-soft-light button[class*="from-indigo-600"],
+    html.theme-soft-light button[class*="from-indigo-500"],
+    html.theme-soft-light button[class*="from-rose-600"],
+    html.theme-soft-light button[class*="from-rose-500"],
+    html.theme-soft-light button[class*="from-emerald-600"],
+    html.theme-soft-light button[class*="from-emerald-500"],
+    html.theme-soft-light button[class*="from-amber-600"],
+    html.theme-soft-light button[class*="from-amber-500"],
+    html.theme-soft-light button[class*="from-violet-600"],
+    html.theme-soft-light button[class*="from-fuchsia-600"],
+    html.theme-soft-light button[class*="from-fuchsia-700"],
+    html.theme-soft-light button[class*="from-teal-500"],
+    html.theme-soft-light button[class*="from-teal-600"] {
+      color: #ffffff !important;
+    }
+
+    html.theme-light button[class*="bg-sky-600"] [class*="text-"],
+    html.theme-light button[class*="bg-sky-700"] [class*="text-"],
+    html.theme-light button[class*="bg-cyan-600"] [class*="text-"],
+    html.theme-light button[class*="bg-indigo-600"] [class*="text-"],
+    html.theme-light button[class*="bg-rose-600"] [class*="text-"],
+    html.theme-light button[class*="bg-rose-700"] [class*="text-"],
+    html.theme-light button[class*="bg-emerald-600"] [class*="text-"],
+    html.theme-light button[class*="bg-amber-600"] [class*="text-"],
+    html.theme-light button[class*="from-sky-600"] [class*="text-"],
+    html.theme-light button[class*="from-sky-500"] [class*="text-"],
+    html.theme-light button[class*="from-cyan-600"] [class*="text-"],
+    html.theme-light button[class*="from-indigo-600"] [class*="text-"],
+    html.theme-light button[class*="from-rose-600"] [class*="text-"],
+    html.theme-light button[class*="from-emerald-600"] [class*="text-"],
+    html.theme-light button[class*="from-amber-500"] [class*="text-"],
+    html.theme-light button[class*="from-amber-600"] [class*="text-"],
+    html.theme-light button[class*="from-violet-600"] [class*="text-"],
+    html.theme-light button[class*="from-fuchsia-600"] [class*="text-"],
+    html.theme-soft-light button[class*="bg-sky-600"] [class*="text-"],
+    html.theme-soft-light button[class*="bg-sky-700"] [class*="text-"],
+    html.theme-soft-light button[class*="bg-cyan-600"] [class*="text-"],
+    html.theme-soft-light button[class*="bg-indigo-600"] [class*="text-"],
+    html.theme-soft-light button[class*="bg-rose-600"] [class*="text-"],
+    html.theme-soft-light button[class*="bg-rose-700"] [class*="text-"],
+    html.theme-soft-light button[class*="bg-emerald-600"] [class*="text-"],
+    html.theme-soft-light button[class*="bg-amber-600"] [class*="text-"],
+    html.theme-soft-light button[class*="from-sky-600"] [class*="text-"],
+    html.theme-soft-light button[class*="from-sky-500"] [class*="text-"],
+    html.theme-soft-light button[class*="from-cyan-600"] [class*="text-"],
+    html.theme-soft-light button[class*="from-indigo-600"] [class*="text-"],
+    html.theme-soft-light button[class*="from-rose-600"] [class*="text-"],
+    html.theme-soft-light button[class*="from-emerald-600"] [class*="text-"],
+    html.theme-soft-light button[class*="from-amber-500"] [class*="text-"],
+    html.theme-soft-light button[class*="from-amber-600"] [class*="text-"],
+    html.theme-soft-light button[class*="from-violet-600"] [class*="text-"],
+    html.theme-soft-light button[class*="from-fuchsia-600"] [class*="text-"] {
+      color: #ffffff !important;
+    }
+
+    html.theme-light button[class*="bg-amber-500"],
+    html.theme-light button[class*="bg-amber-600"],
+    html.theme-light button[class*="from-amber-500"],
+    html.theme-light button[class*="from-amber-600"],
+    html.theme-light button[class*="bg-amber-500"] [class*="text-"],
+    html.theme-light button[class*="bg-amber-600"] [class*="text-"],
+    html.theme-light button[class*="from-amber-500"] [class*="text-"],
+    html.theme-light button[class*="from-amber-600"] [class*="text-"],
+    html.theme-soft-light button[class*="bg-amber-500"],
+    html.theme-soft-light button[class*="bg-amber-600"],
+    html.theme-soft-light button[class*="from-amber-500"],
+    html.theme-soft-light button[class*="from-amber-600"],
+    html.theme-soft-light button[class*="bg-amber-500"] [class*="text-"],
+    html.theme-soft-light button[class*="bg-amber-600"] [class*="text-"],
+    html.theme-soft-light button[class*="from-amber-500"] [class*="text-"],
+    html.theme-soft-light button[class*="from-amber-600"] [class*="text-"] {
+      color: #7c2d12 !important;
+    }
+
+    html.theme-light button[class*="bg-sky-800"],
+    html.theme-light button[class*="bg-sky-900"],
+    html.theme-light button[class*="bg-cyan-800"],
+    html.theme-light button[class*="bg-cyan-900"],
+    html.theme-light button[class*="bg-indigo-800"],
+    html.theme-light button[class*="bg-indigo-900"],
+    html.theme-light button[class*="bg-slate-800"],
+    html.theme-light button[class*="bg-slate-900"],
+    html.theme-soft-light button[class*="bg-sky-800"],
+    html.theme-soft-light button[class*="bg-sky-900"],
+    html.theme-soft-light button[class*="bg-cyan-800"],
+    html.theme-soft-light button[class*="bg-cyan-900"],
+    html.theme-soft-light button[class*="bg-indigo-800"],
+    html.theme-soft-light button[class*="bg-indigo-900"],
+    html.theme-soft-light button[class*="bg-slate-800"],
+    html.theme-soft-light button[class*="bg-slate-900"] {
+      background-color: #f0f9ff !important;
+      color: #0c4a6e !important;
+      border-color: #0284c7 !important;
+    }
+
+    html.theme-soft-light button[class*="bg-sky-800"],
+    html.theme-soft-light button[class*="bg-sky-900"],
+    html.theme-soft-light button[class*="bg-cyan-800"],
+    html.theme-soft-light button[class*="bg-cyan-900"],
+    html.theme-soft-light button[class*="bg-indigo-800"],
+    html.theme-soft-light button[class*="bg-indigo-900"],
+    html.theme-soft-light button[class*="bg-slate-800"],
+    html.theme-soft-light button[class*="bg-slate-900"] {
+      background-color: #fff8ee !important;
+      color: #7c3a12 !important;
+      border-color: #c2410c !important;
+    }
+
+    html.theme-light button[class*="bg-sky-800"] [class*="text-"],
+    html.theme-light button[class*="bg-sky-900"] [class*="text-"],
+    html.theme-light button[class*="bg-cyan-800"] [class*="text-"],
+    html.theme-light button[class*="bg-cyan-900"] [class*="text-"],
+    html.theme-light button[class*="bg-indigo-800"] [class*="text-"],
+    html.theme-light button[class*="bg-indigo-900"] [class*="text-"],
+    html.theme-light button[class*="bg-slate-800"] [class*="text-"],
+    html.theme-light button[class*="bg-slate-900"] [class*="text-"] {
+      color: #0c4a6e !important;
+    }
+
+    html.theme-soft-light button[class*="bg-sky-800"] [class*="text-"],
+    html.theme-soft-light button[class*="bg-sky-900"] [class*="text-"],
+    html.theme-soft-light button[class*="bg-cyan-800"] [class*="text-"],
+    html.theme-soft-light button[class*="bg-cyan-900"] [class*="text-"],
+    html.theme-soft-light button[class*="bg-indigo-800"] [class*="text-"],
+    html.theme-soft-light button[class*="bg-indigo-900"] [class*="text-"],
+    html.theme-soft-light button[class*="bg-slate-800"] [class*="text-"],
+    html.theme-soft-light button[class*="bg-slate-900"] [class*="text-"] {
+      color: #7c3a12 !important;
+    }
+
+    html.theme-light .fortune-hub-unified,
+    html.theme-soft-light .fortune-hub-unified {
+      background: #fff7ed !important;
+      color: #9a3412 !important;
+      border-color: #ea580c !important;
+    }
+
+    html.theme-light .fortune-hub-sanmei,
+    html.theme-soft-light .fortune-hub-sanmei {
+      background: #ecfeff !important;
+      color: #0f766e !important;
+      border-color: #0f766e !important;
+    }
+
+    html.theme-light .fortune-hub-ziwei,
+    html.theme-soft-light .fortune-hub-ziwei {
+      background: #fdf2f8 !important;
+      color: #9d174d !important;
+      border-color: #db2777 !important;
+    }
+
+    html.theme-light .fortune-hub-bazi,
+    html.theme-soft-light .fortune-hub-bazi {
+      background: #ecfdf5 !important;
+      color: #047857 !important;
+      border-color: #059669 !important;
+    }
+
+    html.theme-light .fortune-quick-open,
+    html.theme-soft-light .fortune-quick-open {
+      background: linear-gradient(135deg, #fff7ed, #ecfeff) !important;
+      color: #9a3412 !important;
+      border-color: #d97706 !important;
+    }
+
+    html.theme-soft .fortune-hub-unified {
+      background: linear-gradient(145deg, #7c4a16, #2a2118) !important;
+      color: #fff6e4 !important;
+      border-color: #e8b86d !important;
+    }
+
+    html.theme-soft .fortune-hub-sanmei {
+      background: linear-gradient(145deg, #3f5c4e, #241c16) !important;
+      color: #e7f6ee !important;
+      border-color: #8fbfa8 !important;
+    }
+
+    html.theme-soft .fortune-hub-ziwei {
+      background: linear-gradient(145deg, #6b3d52, #241c16) !important;
+      color: #ffe4ee !important;
+      border-color: #e7a3b8 !important;
+    }
+
+    html.theme-soft .fortune-hub-bazi {
+      background: linear-gradient(145deg, #3d5344, #241c16) !important;
+      color: #e5f5ea !important;
+      border-color: #9dccae !important;
+    }
+
+    html.theme-soft .fortune-quick-open {
+      background: linear-gradient(135deg, #7c4a16, #3f5c4e) !important;
+      color: #fff6e4 !important;
+      border-color: #e8b86d !important;
+    }
+
+    html.theme-soft button[class*="bg-sky-600"],
+    html.theme-soft button[class*="bg-sky-700"],
+    html.theme-soft button[class*="bg-cyan-600"],
+    html.theme-soft button[class*="bg-indigo-600"],
+    html.theme-soft button[class*="bg-rose-600"],
+    html.theme-soft button[class*="bg-emerald-600"],
+    html.theme-soft button[class*="from-sky-600"],
+    html.theme-soft button[class*="from-indigo-600"],
+    html.theme-soft button[class*="from-rose-600"],
+    html.theme-soft button[class*="from-emerald-600"],
+    html.theme-soft button[class*="from-amber-500"],
+    html.theme-soft button[class*="from-amber-600"] {
+      color: #fff8ee !important;
+      border-color: rgba(244, 201, 127, 0.55) !important;
+    }
+
+    html.theme-soft button[class*="bg-sky-600"] [class*="text-"],
+    html.theme-soft button[class*="bg-sky-700"] [class*="text-"],
+    html.theme-soft button[class*="from-sky-600"] [class*="text-"],
+    html.theme-soft button[class*="from-indigo-600"] [class*="text-"],
+    html.theme-soft button[class*="from-rose-600"] [class*="text-"],
+    html.theme-soft button[class*="from-emerald-600"] [class*="text-"],
+    html.theme-soft button[class*="from-amber-500"] [class*="text-"],
+    html.theme-soft button[class*="from-amber-600"] [class*="text-"] {
+      color: #fff8ee !important;
+    }
+
+    html.theme-soft button[class*="bg-sky-900"],
+    html.theme-soft button[class*="bg-cyan-900"],
+    html.theme-soft button[class*="bg-slate-900"],
+    html.theme-soft button[class*="bg-slate-800"] {
+      color: #fff6e4 !important;
+      border-color: rgba(244, 201, 127, 0.5) !important;
+    }
+
+    html.theme-soft button[class*="bg-sky-900"] [class*="text-"],
+    html.theme-soft button[class*="bg-cyan-900"] [class*="text-"],
+    html.theme-soft button[class*="bg-slate-900"] [class*="text-"],
+    html.theme-soft button[class*="bg-slate-800"] [class*="text-"] {
+      color: #fff6e4 !important;
+    }
+
+    html.theme-light #app-bottom-nav button,
+    html.theme-light #memo-sub-nav button {
+      color: #475569 !important;
+    }
+
+    html.theme-light #app-bottom-nav button.text-cyan-300,
+    html.theme-light #memo-sub-nav button.text-cyan-300,
+    html.theme-light #tab-memo-mode {
+      color: #0f766e !important;
+      background: rgba(15, 118, 110, 0.12);
+      border-radius: 0.85rem;
+    }
+
+    html.theme-soft #app-bottom-nav button,
+    html.theme-soft #memo-sub-nav button {
+      color: #cbb89a !important;
+    }
+
+    html.theme-soft #app-bottom-nav button.text-cyan-300,
+    html.theme-soft #memo-sub-nav button.text-cyan-300,
+    html.theme-soft #tab-memo-mode {
+      color: #fff8ee !important;
+      background: rgba(244, 201, 127, 0.18);
+      border-radius: 0.85rem;
+    }
+
+    html.theme-soft-light #app-bottom-nav button,
+    html.theme-soft-light #memo-sub-nav button {
+      color: #6b5d4d !important;
+    }
+
+    html.theme-soft-light #app-bottom-nav button.text-cyan-300,
+    html.theme-soft-light #memo-sub-nav button.text-cyan-300,
+    html.theme-soft-light #tab-memo-mode {
+      color: #7c3a12 !important;
+      background: rgba(154, 107, 47, 0.18);
+      border-radius: 0.85rem;
     }
 
     /* スマホフォーカス時のズームを完全に防止し、文字をクッキリさせる */
@@ -3196,6 +3575,26 @@
       gap: 0.65rem;
       margin-top: 0.35rem;
       animation: fortune-home-rise 0.7s ease-out 0.32s both;
+    }
+
+    .fortune-quick-open {
+      grid-column: 1 / -1;
+      border-color: rgba(251, 191, 36, 0.45);
+      background: linear-gradient(135deg, rgba(120, 53, 15, 0.55), rgba(8, 47, 73, 0.62));
+      color: #fde68a;
+    }
+
+    .fortune-quick-screen {
+      padding: 0.85rem 1rem 2rem;
+    }
+
+    .fortune-quick-inner {
+      width: 100%;
+      max-width: 720px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 0.85rem;
     }
 
     .fortune-home-profile-link {
@@ -10891,11 +11290,58 @@
                   <span class="fortune-hub-title">四柱推命</span>
                   <span class="fortune-hub-desc">役割の星・今の流れ・相性</span>
                 </button>
+                <button type="button" class="fortune-hub-btn fortune-quick-open" onclick="openFortuneQuickSearch()">
+                  <span class="fortune-hub-title">クイック検索</span>
+                  <span class="fortune-hub-desc">生年月日で陰占・陽占・天中殺</span>
+                </button>
               </div>
             </div>
           </section>
         </div>
       </div>
+
+      <section id="fortune-quick-screen" class="hidden fortune-quick-screen" aria-label="クイック検索">
+        <div class="fortune-quick-inner">
+          <div class="flex items-center justify-between gap-2">
+            <button type="button" onclick="closeFortuneQuickSearch()"
+              class="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-700 text-slate-300 hover:text-white text-xs font-bold transition active:scale-[0.97]">
+              ← トップへ
+            </button>
+            <span class="text-xs font-black text-amber-200">クイック検索</span>
+          </div>
+
+          <div class="fortune-slider-card bg-slate-950/75 border border-amber-800/40 rounded-2xl p-4 space-y-3">
+            <div class="flex items-center justify-between gap-2 pb-2 border-b border-amber-900/40">
+              <div class="flex items-center gap-2">
+                <span class="text-base">📅</span>
+                <span class="text-xs font-black text-amber-100 tracking-wider">生年月日</span>
+              </div>
+              <div id="fortune-quick-date-badge"
+                class="px-2.5 py-1 rounded-full bg-amber-950/80 border border-amber-500/40 text-[11px] font-mono font-bold text-amber-100">
+                1995-01-01
+              </div>
+            </div>
+            <div class="grid text-center text-[11px] font-bold text-amber-300/80"
+              style="grid-template-columns: 1.25fr 0.9fr 0.9fr;">
+              <span>年</span>
+              <span>月</span>
+              <span>日</span>
+            </div>
+            <div class="fortune-wheel-group" role="group" aria-label="クイック検索の生年月日">
+              <div class="fortune-wheel-highlight" aria-hidden="true"></div>
+              <div class="fortune-wheel-cols fortune-wheel-cols--date">
+                <div id="fortune-quick-wheel-year" class="fortune-wheel-col" aria-label="年"></div>
+                <div id="fortune-quick-wheel-month" class="fortune-wheel-col" aria-label="月"></div>
+                <div id="fortune-quick-wheel-day" class="fortune-wheel-col" aria-label="日"></div>
+              </div>
+            </div>
+            <p class="text-[10px] text-slate-500 font-bold leading-relaxed">年・月・日の3柱だけを見ます。出生時間は使わず、節入り当日の蔵干は正午扱いで出します。</p>
+          </div>
+
+          <div id="fortune-quick-result" class="space-y-3"></div>
+        </div>
+      </section>
+
       <div id="fortune-panel-root" class="fortune-panel-root settings-acc-list space-y-2"></div>
 
       <!-- プロファイル・名前管理 専用ポップアップモーダル -->
@@ -10947,7 +11393,7 @@
                 class="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-700 text-slate-300 hover:text-white text-xs font-bold transition active:scale-[0.97]">
                 ← 登録済み履歴に戻る
               </button>
-              <span class="text-xs font-black text-sky-200">✨ 新規作成</span>
+              <span id="fortune-modal-register-title" class="text-xs font-black text-sky-200">✨ 新規作成</span>
             </div>
 
             <!-- 1. 名前入力 -->
@@ -11272,26 +11718,18 @@
               class="w-full px-4 py-2.5 rounded-2xl bg-black/40 border border-cyan-800/60 text-white text-sm font-semibold focus:outline-hidden focus:border-cyan-400 transition-all" />
           </div>
 
-          <!-- 2. サプリ選択（一覧の下に＋新規登録枠を配置） -->
+          <!-- 2. サプリ選択（複数・個数・削除） -->
           <div>
-            <label class="block text-xs font-bold text-cyan-200 mb-1.5">📦 摂取したサプリを選択</label>
-
-            <!-- カスタムセレクトボックス -->
-            <div class="relative">
-              <button type="button" id="supple-dropdown-trigger" onclick="toggleSuppleDropdown()"
-                class="w-full px-3.5 py-2.5 rounded-2xl bg-black/40 border border-cyan-800/60 text-left flex items-center justify-between hover:border-cyan-400 transition-all focus:outline-hidden">
-                <div id="supple-dropdown-selected" class="flex items-center gap-3">
-                  <span class="text-sm text-slate-400 font-medium">サプリを選択してください</span>
-                </div>
-                <span id="supple-dropdown-arrow"
-                  class="text-slate-400 text-xs transition-transform duration-200">▼</span>
+            <div class="flex items-center justify-between gap-2 mb-1.5">
+              <label class="min-w-0 text-xs font-bold text-cyan-200 leading-tight">📦 摂取したサプリを選択</label>
+              <button type="button" onclick="openSuppleMasterModal()"
+                class="shrink-0 whitespace-nowrap inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl border border-dashed border-emerald-500/60 bg-emerald-950/30 hover:bg-emerald-900/40 text-emerald-300 text-[11px] font-extrabold transition active:scale-[0.98]">
+                <span class="text-sm leading-none">＋</span><span>新規登録</span>
               </button>
-
-              <!-- ドロップダウンメニュー -->
-              <div id="supple-dropdown-menu"
-                class="hidden absolute left-0 right-0 top-full mt-2 z-50 bg-[#0b1021] rounded-2xl shadow-2xl border border-cyan-700/60 max-h-72 overflow-y-auto p-1.5 space-y-1">
-              </div>
             </div>
+            <div id="supple-pick-list"
+              class="max-h-64 overflow-y-auto space-y-1 rounded-2xl border border-cyan-800/60 bg-black/30 p-1.5"></div>
+            <p id="supple-pick-summary" class="text-[11px] text-slate-400 font-bold mt-1.5"></p>
             <input type="hidden" id="supple-selected-id" value="" />
           </div>
 
@@ -11307,10 +11745,15 @@
                 <option value="運動前後">運動前後</option>
                 <option value="随時">随時</option>
               </select>
-              <input type="text" id="supple-input-note" placeholder="例: 1錠、多めの水で"
+              <input type="text" id="supple-input-note" placeholder="例: 食後、多めの水で"
                 class="flex-1 px-3.5 py-2 rounded-xl bg-black/40 border border-cyan-800/60 text-xs text-white placeholder-slate-500 focus:outline-hidden focus:border-cyan-400" />
             </div>
           </div>
+
+          <button type="button" id="supple-btn-submit-intake-inline" onclick="submitSuppleIntake()"
+            class="w-full py-3 px-4 rounded-2xl bg-emerald-600 text-white text-sm font-extrabold shadow-lg shadow-emerald-500/25 active:scale-[0.99] transition-all">
+            ✓ 登録する
+          </button>
 
         </div>
 
@@ -11326,8 +11769,8 @@
             キャンセル
           </button>
           <button type="button" id="supple-btn-submit-intake" onclick="submitSuppleIntake()"
-            class="flex-2 py-2.5 px-4 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 text-white text-xs font-extrabold shadow-lg shadow-emerald-500/25 active:scale-[0.99] transition-all flex items-center justify-center gap-1.5">
-            ✓ 登録して戻る
+            class="flex-1 min-w-[8rem] py-2.5 px-4 rounded-xl bg-emerald-600 text-white text-xs font-extrabold shadow-lg shadow-emerald-500/25 active:scale-[0.99] transition-all flex items-center justify-center gap-1.5">
+            ✓ 登録する
           </button>
         </div>
 
@@ -13198,7 +13641,7 @@
           </p>
           <div id="unified-panel" class="mt-2 space-y-3">
             <div id="unified-source-chips" class="flex flex-wrap gap-1.5 text-[11px] font-bold"></div>
-            <div>
+            <div class="fortune-inline-profile-picker">
               <label class="block text-xs font-extrabold text-amber-400 mb-1.5">対象プロファイル</label>
               <select id="unified-profile-select" onchange="onUnifiedProfileSelectChange()"
                 class="w-full p-3 border-2 border-amber-800/50 rounded-xl bg-black/40 text-sm font-bold text-amber-50 focus:outline-none focus:border-amber-400 h-12"></select>
@@ -13361,7 +13804,7 @@
             <input type="hidden" id="sanmei-birth-date" value="">
             <input type="hidden" id="sanmei-birth-time" value="">
             <input type="hidden" id="sanmei-birth-gender" value="male">
-            <div>
+            <div class="fortune-inline-profile-picker">
               <label class="block text-xs font-extrabold text-cyan-400 mb-1.5">対象プロファイル</label>
               <select id="sanmei-profile-select" onchange="onSanmeiProfileSelectChange()"
                 class="w-full p-3 border-2 border-cyan-800/50 rounded-xl bg-black/40 text-sm font-bold text-cyan-50 focus:outline-none focus:border-cyan-400 h-12"></select>
@@ -14874,7 +15317,7 @@
             <input type="hidden" id="ziwei-birth-date" value="">
             <input type="hidden" id="ziwei-birth-time" value="">
             <input type="hidden" id="ziwei-birth-gender" value="male">
-            <div>
+            <div class="fortune-inline-profile-picker">
               <label class="block text-xs font-extrabold text-fuchsia-400 mb-1.5">対象プロファイル</label>
               <select id="ziwei-profile-select" onchange="onZiweiProfileSelectChange()"
                 class="w-full p-3 border-2 border-fuchsia-800/50 rounded-xl bg-black/40 text-sm font-bold text-fuchsia-50 focus:outline-none focus:border-fuchsia-400 h-12"></select>
@@ -15219,7 +15662,7 @@
             <input type="hidden" id="bazi-birth-date" value="">
             <input type="hidden" id="bazi-birth-time" value="">
             <input type="hidden" id="bazi-birth-gender" value="male">
-            <div>
+            <div class="fortune-inline-profile-picker">
               <label class="block text-xs font-extrabold text-emerald-400 mb-1.5">対象プロファイル</label>
               <select id="bazi-profile-select" onchange="onBaziProfileSelectChange()"
                 class="w-full p-3 border-2 border-emerald-800/50 rounded-xl bg-black/40 text-sm font-bold text-emerald-50 focus:outline-none focus:border-emerald-400 h-12"></select>
@@ -24654,7 +25097,7 @@
       }
 
       updateFortuneSliderSummary();
-      updateFortuneActiveBirthSync();
+      if (!isFortuneProfileFormOpen()) updateFortuneActiveBirthSync();
     }
 
     function resetFortuneSliderToDefault() {
@@ -24691,7 +25134,7 @@
       updateFortuneSliderLabels();
       setFortuneSliderGender(fortuneActiveInput.gender, { silent: true });
       updateFortuneSliderSummary();
-      updateFortuneNameDisplay();
+      if (!isFortuneProfileFormOpen()) updateFortuneNameDisplay();
     }
 
     function updateFortuneSliderLabels() {
@@ -24714,6 +25157,58 @@
     }
 
     let fortuneAppliedSnapshot = null;
+    let fortuneEditingProfileId = null;
+
+    function setFortuneProfileFormMode(mode) {
+      const isEdit = mode === 'edit';
+      const title = document.getElementById('fortune-modal-register-title');
+      const submit = document.getElementById('fortune-modal-register-submit-btn');
+      if (title) title.textContent = isEdit ? '✏️ 編集' : '✨ 新規作成';
+      if (submit) submit.textContent = isEdit ? '更新する' : '登録する';
+    }
+
+    function applyProfileToFortuneWheels(p) {
+      fortuneActiveInput.gender = p.gender === 'female' ? 'female' : 'male';
+      if (p.date) {
+        const parts = String(p.date).split('-').map((n) => Number(n));
+        if (parts.length === 3 && parts.every((n) => Number.isFinite(n))) {
+          fortuneActiveInput.year = parts[0];
+          fortuneActiveInput.month = parts[1];
+          fortuneActiveInput.day = parts[2];
+        }
+      }
+      if (p.time) {
+        const tParts = String(p.time).split(':').map((n) => Number(n));
+        if (tParts.length >= 2 && Number.isFinite(tParts[0]) && Number.isFinite(tParts[1])) {
+          fortuneActiveInput.hour = tParts[0];
+          fortuneActiveInput.minute = tParts[1];
+          fortuneActiveInput.unknownTime = false;
+        }
+      } else {
+        fortuneActiveInput.hour = 12;
+        fortuneActiveInput.minute = 0;
+        fortuneActiveInput.unknownTime = true;
+      }
+    }
+
+    function isFortuneProfileFormOpen() {
+      const modal = document.getElementById('fortune-profile-modal');
+      const registerView = document.getElementById('fortune-modal-register-view');
+      return Boolean(modal && registerView && !modal.classList.contains('hidden') && !registerView.classList.contains('hidden'));
+    }
+
+    function queueFortuneProfileWheelAlign() {
+      const modal = document.getElementById('fortune-profile-modal');
+      const alignWheels = () => {
+        if (!modal || modal.classList.contains('hidden')) return;
+        syncFortuneSliderUI();
+      };
+      requestAnimationFrame(() => {
+        alignWheels();
+        requestAnimationFrame(alignWheels);
+      });
+      setTimeout(alignWheels, 80);
+    }
 
     function rememberAppliedFortuneInput() {
       fortuneAppliedSnapshot = {
@@ -24779,12 +25274,24 @@
       if (headerName) {
         headerName.textContent = currentName || '未設定';
       }
+      syncFortuneInlineProfilePickers();
+    }
+
+    function hasActiveFortuneTarget() {
+      return Boolean((fortuneActiveInput.name || '').trim() || fortuneActiveInput.profileId);
+    }
+
+    function syncFortuneInlineProfilePickers() {
+      const hide = hasActiveFortuneTarget();
+      document.querySelectorAll('.fortune-inline-profile-picker').forEach((el) => {
+        el.classList.toggle('hidden', hide);
+      });
     }
 
     function onFortuneSliderInput(type) {
       updateFortuneSliderLabels();
       updateFortuneSliderSummary();
-      updateFortuneActiveBirthSync();
+      if (!isFortuneProfileFormOpen()) updateFortuneActiveBirthSync();
     }
 
     function adjustFortuneSlider(type, delta) {
@@ -24816,7 +25323,7 @@
         }
       }
       updateFortuneSliderSummary();
-      if (!opts || !opts.silent) {
+      if ((!opts || !opts.silent) && !isFortuneProfileFormOpen()) {
         updateFortuneActiveBirthSync();
       }
     }
@@ -24826,7 +25333,7 @@
       fortuneActiveInput.unknownTime = uEl ? uEl.checked : false;
       updateFortuneSliderLabels();
       updateFortuneSliderSummary();
-      updateFortuneActiveBirthSync();
+      if (!isFortuneProfileFormOpen()) updateFortuneActiveBirthSync();
     }
 
     function updateFortuneActiveBirthSync() {
@@ -24864,6 +25371,8 @@
     function openFortuneProfileModal() {
       const modal = document.getElementById('fortune-profile-modal');
       if (!modal) return;
+      fortuneEditingProfileId = null;
+      setFortuneProfileFormMode('create');
       rememberAppliedFortuneInput();
       updateFortuneSliderSummary();
       renderFortuneProfileHistoryList();
@@ -24872,24 +25381,40 @@
     }
 
     function showFortuneProfileRegisterView() {
-      const modal = document.getElementById('fortune-profile-modal');
+      fortuneEditingProfileId = null;
+      setFortuneProfileFormMode('create');
       rememberAppliedFortuneInput();
       const input = document.getElementById('fortune-modal-name-input');
       if (input) input.value = '';
       setFortuneProfileModalView('register');
       updateFortuneSliderSummary();
-      const alignWheels = () => {
-        if (!modal || modal.classList.contains('hidden')) return;
-        syncFortuneSliderUI();
-      };
-      requestAnimationFrame(() => {
-        alignWheels();
-        requestAnimationFrame(alignWheels);
-      });
-      setTimeout(alignWheels, 80);
+      queueFortuneProfileWheelAlign();
+    }
+
+    function editFortuneProfileFromHistory(id, event) {
+      if (event) event.stopPropagation();
+      const p = loadProfileBirthList().find((x) => x.id === id);
+      if (!p) return;
+      rememberAppliedFortuneInput();
+      fortuneEditingProfileId = p.id;
+      setFortuneProfileFormMode('edit');
+      applyProfileToFortuneWheels(p);
+      const input = document.getElementById('fortune-modal-name-input');
+      if (input) input.value = p.name || '';
+      setFortuneProfileModalView('register');
+      updateFortuneSliderSummary();
+      queueFortuneProfileWheelAlign();
+      if (input) {
+        setTimeout(() => {
+          input.focus();
+          input.select();
+        }, 90);
+      }
     }
 
     function showFortuneProfileHistoryView() {
+      fortuneEditingProfileId = null;
+      setFortuneProfileFormMode('create');
       restoreAppliedFortuneInput();
       renderFortuneProfileHistoryList();
       setFortuneProfileModalView('history');
@@ -24901,6 +25426,8 @@
       if (registerView && !registerView.classList.contains('hidden')) {
         restoreAppliedFortuneInput();
       }
+      fortuneEditingProfileId = null;
+      setFortuneProfileFormMode('create');
       if (modal) modal.classList.add('hidden');
     }
 
@@ -24914,6 +25441,58 @@
       }
       const curBirth = getProfileBirth();
       const list = loadProfileBirthList();
+      const editingId = fortuneEditingProfileId;
+
+      if (editingId) {
+        const target = list.find((p) => p.id === editingId);
+        if (!target) {
+          alert('編集対象のプロファイルが見つかりません');
+          showFortuneProfileHistoryView();
+          return;
+        }
+        const duplicated = list.find((p) => p.id !== editingId && p.name === name);
+        if (duplicated) {
+          alert('同じ名前のプロファイルがすでにあります');
+          if (input) input.focus();
+          return;
+        }
+        const entry = normalizeProfileBirthEntry({
+          id: editingId,
+          name: name,
+          date: curBirth.date,
+          time: curBirth.time,
+          gender: curBirth.gender
+        });
+        const nextList = list.map((p) => (p.id === editingId ? entry : p));
+        const applied = fortuneAppliedSnapshot;
+        const wasApplied = Boolean(applied && (
+          (applied.profileId && applied.profileId === editingId) ||
+          (!applied.profileId && applied.name && applied.name === target.name)
+        ));
+        const keepActiveId = wasApplied
+          ? editingId
+          : ((applied && applied.profileId && nextList.some((p) => p.id === applied.profileId))
+            ? applied.profileId
+            : getActiveProfileBirthId());
+        saveProfileBirthList(nextList, keepActiveId);
+        fortuneEditingProfileId = null;
+        setFortuneProfileFormMode('create');
+        if (wasApplied) {
+          fortuneActiveInput.name = name;
+          fortuneActiveInput.profileId = editingId;
+          rememberAppliedFortuneInput();
+          updateFortuneNameDisplay();
+          updateFortuneActiveBirthSync();
+        } else {
+          restoreAppliedFortuneInput();
+        }
+        renderFortuneProfileHistoryList();
+        setFortuneProfileModalView('history');
+        if (typeof notifyProfileSaved === 'function') {
+          notifyProfileSaved(name, '更新完了');
+        }
+        return;
+      }
 
       let existing = list.find((p) => p.name === name);
       let targetId = existing ? existing.id : newProfileBirthId();
@@ -24988,9 +25567,12 @@
                 ${p.date || '日付未設定'} ${timeLabel}・${genderLabel}
               </div>
             </div>
-            <div class="flex items-center gap-1.5 ml-2 shrink-0">
-              <button type="button" onclick="applyFortuneProfileFromHistory('${p.id}')" class="px-2.5 py-1 text-xs font-bold rounded-lg bg-sky-900/60 hover:bg-sky-800 text-sky-200 border border-sky-600/40 transition">
+            <div class="flex items-center gap-1 ml-2 shrink-0">
+              <button type="button" onclick="applyFortuneProfileFromHistory('${p.id}')" class="px-2 py-1 text-[11px] font-bold rounded-lg bg-sky-900/60 hover:bg-sky-800 text-sky-200 border border-sky-600/40 transition whitespace-nowrap">
                 適用
+              </button>
+              <button type="button" onclick="editFortuneProfileFromHistory('${p.id}', event)" class="px-2 py-1 text-[11px] font-bold rounded-lg bg-amber-950/50 hover:bg-amber-900/70 text-amber-200 border border-amber-600/40 transition whitespace-nowrap" title="編集">
+                編集
               </button>
               <button type="button" onclick="deleteFortuneProfileFromHistory('${p.id}', event)" class="p-1 text-xs text-rose-400 hover:text-rose-200 hover:bg-rose-950/50 rounded-lg transition" title="削除">
                 🗑
@@ -25069,6 +25651,7 @@
     window.registerCurrentFortuneSliderProfile = registerCurrentFortuneSliderProfile;
     window.clearFortuneActiveName = clearFortuneActiveName;
     window.applyFortuneProfileFromHistory = applyFortuneProfileFromHistory;
+    window.editFortuneProfileFromHistory = editFortuneProfileFromHistory;
     window.deleteFortuneProfileFromHistory = deleteFortuneProfileFromHistory;
 
     function profileBirthOptionLabel(p) {
@@ -37547,14 +38130,288 @@
       }
     }
 
+    const FORTUNE_QUICK_ITEM_H = 36;
+    const fortuneQuickInput = { year: 1995, month: 1, day: 1 };
+    let fortuneQuickReady = false;
+    let fortuneQuickMaxDay = 0;
+    const fortuneQuickLock = { year: false, month: false, day: false };
+    const fortuneQuickRaf = {};
+
+    function fortuneQuickPopulate(type, values, formatFn) {
+      const el = document.getElementById('fortune-quick-wheel-' + type);
+      if (!el) return;
+      const frag = document.createDocumentFragment();
+      values.forEach((val, idx) => {
+        const item = document.createElement('div');
+        item.className = 'fortune-wheel-item';
+        item.dataset.val = String(val);
+        item.dataset.idx = String(idx);
+        item.textContent = formatFn(val);
+        frag.appendChild(item);
+      });
+      el.innerHTML = '';
+      el.appendChild(frag);
+    }
+
+    function fortuneQuickMarkSelected(el, idx) {
+      if (!el) return;
+      const items = el.children;
+      for (let i = 0; i < items.length; i++) items[i].classList.toggle('is-selected', i === idx);
+    }
+
+    function fortuneQuickScrollTo(type, value, smooth) {
+      const el = document.getElementById('fortune-quick-wheel-' + type);
+      if (!el || !el.children.length) return;
+      const target = String(value);
+      let idx = 0;
+      for (let i = 0; i < el.children.length; i++) {
+        if (el.children[i].dataset.val === target) { idx = i; break; }
+      }
+      const top = idx * FORTUNE_QUICK_ITEM_H;
+      if (smooth) {
+        el.scrollTo({ top, behavior: 'smooth' });
+        return;
+      }
+      fortuneQuickLock[type] = true;
+      el.scrollTop = top;
+      fortuneQuickMarkSelected(el, idx);
+      requestAnimationFrame(() => { fortuneQuickLock[type] = false; });
+    }
+
+    function fortuneQuickRebuildDay(maxDay) {
+      if (fortuneQuickMaxDay === maxDay && document.getElementById('fortune-quick-wheel-day')?.children.length === maxDay) return;
+      fortuneQuickMaxDay = maxDay;
+      const days = [];
+      for (let d = 1; d <= maxDay; d++) days.push(d);
+      fortuneQuickLock.day = true;
+      fortuneQuickPopulate('day', days, (d) => `${d}日`);
+      fortuneQuickScrollTo('day', Math.min(fortuneQuickInput.day, maxDay), false);
+    }
+
+    function fortuneQuickOnChange(type, val) {
+      if (fortuneQuickInput[type] === val) return;
+      fortuneQuickInput[type] = val;
+      if (type === 'year' || type === 'month') {
+        const maxDay = new Date(fortuneQuickInput.year, fortuneQuickInput.month, 0).getDate();
+        if (fortuneQuickInput.day > maxDay) fortuneQuickInput.day = maxDay;
+        fortuneQuickRebuildDay(maxDay);
+      }
+      renderFortuneQuickSanmei();
+    }
+
+    function fortuneQuickBind(type) {
+      const el = document.getElementById('fortune-quick-wheel-' + type);
+      if (!el || el.dataset.quickBound === '1') return;
+      el.dataset.quickBound = '1';
+      let dragging = false;
+      let dragMoved = false;
+      let startY = 0;
+      let startTop = 0;
+      el.addEventListener('click', (e) => {
+        if (dragMoved) { dragMoved = false; return; }
+        const item = e.target && e.target.closest ? e.target.closest('.fortune-wheel-item') : null;
+        if (!item || item.parentElement !== el) return;
+        const idx = Number(item.dataset.idx);
+        if (!Number.isNaN(idx)) el.scrollTo({ top: idx * FORTUNE_QUICK_ITEM_H, behavior: 'smooth' });
+      });
+      el.addEventListener('mousedown', (e) => {
+        if (e.button !== 0) return;
+        dragging = true;
+        dragMoved = false;
+        startY = e.clientY;
+        startTop = el.scrollTop;
+        el.classList.add('is-dragging');
+      });
+      const stopDrag = () => {
+        if (!dragging) return;
+        dragging = false;
+        el.classList.remove('is-dragging');
+        const idx = Math.round(el.scrollTop / FORTUNE_QUICK_ITEM_H);
+        el.scrollTo({ top: Math.max(0, idx) * FORTUNE_QUICK_ITEM_H, behavior: 'smooth' });
+      };
+      window.addEventListener('mousemove', (e) => {
+        if (!dragging) return;
+        const dy = e.clientY - startY;
+        if (Math.abs(dy) > 4) dragMoved = true;
+        el.scrollTop = startTop - dy;
+      });
+      window.addEventListener('mouseup', stopDrag);
+      el.addEventListener('scroll', () => {
+        if (fortuneQuickRaf[type]) cancelAnimationFrame(fortuneQuickRaf[type]);
+        fortuneQuickRaf[type] = requestAnimationFrame(() => {
+          const items = el.children;
+          if (!items.length) return;
+          const idx = Math.max(0, Math.min(items.length - 1, Math.round(el.scrollTop / FORTUNE_QUICK_ITEM_H)));
+          fortuneQuickMarkSelected(el, idx);
+          if (fortuneQuickLock[type]) return;
+          const val = Number(items[idx].dataset.val);
+          if (Number.isNaN(val)) return;
+          fortuneQuickOnChange(type, val);
+        });
+      }, { passive: true });
+    }
+
+    function initFortuneQuickWheels() {
+      const years = [];
+      for (let y = FORTUNE_WHEEL_MIN_YEAR; y <= FORTUNE_WHEEL_MAX_YEAR; y++) years.push(y);
+      fortuneQuickPopulate('year', years, (y) => `${y}年`);
+      const months = [];
+      for (let m = 1; m <= 12; m++) months.push(m);
+      fortuneQuickPopulate('month', months, (m) => `${m}月`);
+      fortuneQuickMaxDay = 0;
+      fortuneQuickRebuildDay(new Date(fortuneQuickInput.year, fortuneQuickInput.month, 0).getDate());
+      ['year', 'month', 'day'].forEach(fortuneQuickBind);
+      fortuneQuickScrollTo('year', fortuneQuickInput.year, false);
+      fortuneQuickScrollTo('month', fortuneQuickInput.month, false);
+      fortuneQuickScrollTo('day', fortuneQuickInput.day, false);
+    }
+
+    function fortuneQuickWx(elem) {
+      return sanmeiWuxingClass(elem);
+    }
+
+    function fortuneQuickZokanHtml(branch, dayCount) {
+      const list = SANMEI_ZOKAN[branch] || [];
+      const sel = sanmeiZokanSelectIndex(branch, dayCount);
+      return list.map((entry, i) => {
+        const on = i === sel;
+        return `<span class="${on ? 'font-black text-amber-100' : 'text-slate-500'}">${SANMEI_STEMS[entry.s]}</span>`;
+      }).join('<span class="text-slate-600"> </span>');
+    }
+
+    function renderFortuneQuickSanmei() {
+      const box = document.getElementById('fortune-quick-result');
+      const badge = document.getElementById('fortune-quick-date-badge');
+      const y = fortuneQuickInput.year;
+      const m = fortuneQuickInput.month;
+      const d = fortuneQuickInput.day;
+      const dateStr = `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      if (badge) badge.textContent = dateStr;
+      if (!box || typeof calculateSanmeiChart !== 'function') return;
+      const chart = calculateSanmeiChart(dateStr, '12:00');
+      const hits = sanmeiAnalyzeShukumeiChusatsu(chart);
+      const dayCount = chart.zokan ? chart.zokan.dayCount : null;
+      const tenchu = sanmeiTenchusatsuName(chart.day.stem, chart.day.branch);
+      const tenchuKey = sanmeiTenchusatsuKey(chart.day.stem, chart.day.branch);
+      const typeGuide = (tenchuKey && SANMEI_TENCHUSATSU_TYPE_GUIDE[tenchuKey]) || null;
+      const pillars = [
+        { key: 'year', label: '年柱', pillar: chart.year, hit: hits.year, hitName: '生年中殺' },
+        { key: 'month', label: '月柱', pillar: chart.month, hit: hits.month, hitName: '生月中殺' },
+        { key: 'day', label: '日柱', pillar: chart.day, hit: hits.day, hitName: '生日中殺' }
+      ];
+      const pillarCells = pillars.map((p) => {
+        const stemWx = fortuneQuickWx(sanmeiWuxingNameFromStem(p.pillar.stem));
+        const branchWx = fortuneQuickWx(sanmeiWuxingNameFromBranch(p.pillar.branch));
+        return `<div class="rounded-xl border ${p.hit ? 'border-rose-500/60 bg-rose-950/25' : 'border-cyan-900/50 bg-black/40'} px-1.5 py-2 text-center">
+          <div class="text-[10px] font-bold text-cyan-400/80">${p.label}</div>
+          <div class="mt-1 text-xl font-black ${stemWx ? '' : 'text-cyan-50'}"><span class="inline-flex justify-center min-w-[1.6rem] rounded-md px-1 ${stemWx || ''}">${SANMEI_STEMS[p.pillar.stem]}</span></div>
+          <div class="text-xl font-black ${p.key === 'day' ? 'text-amber-100' : ''}"><span class="inline-flex justify-center min-w-[1.6rem] rounded-md px-1 ${branchWx || ''}">${SANMEI_BRANCHES[p.pillar.branch]}</span></div>
+          <div class="mt-1 text-[11px] font-bold tracking-wide">${fortuneQuickZokanHtml(p.pillar.branch, dayCount)}</div>
+          ${p.hit ? `<div class="sanmei-chusatsu-chip">${p.hitName}</div>` : ''}
+        </div>`;
+      }).join('');
+      const body = chart.body || {};
+      const slots = [
+        null,
+        { title: '頭・北', sub: '年干', star: body.head, hit: hits.year },
+        { title: '初年', sub: '年支', star: body.early, hit: hits.year, ju: true },
+        { title: '右手・西', sub: '日支蔵干', star: body.rightHand, hit: hits.day },
+        { title: '胸', sub: '月支蔵干', star: body.center, hit: hits.month, core: true },
+        { title: '左手・東', sub: '年支蔵干', star: body.leftHand, hit: hits.year },
+        { title: '晩年', sub: '日支', star: body.late, hit: hits.day, ju: true },
+        { title: '腹・南', sub: '月干', star: body.belly, hit: hits.month },
+        { title: '中年', sub: '月支', star: body.mid, hit: hits.month, ju: true }
+      ];
+      const bodyCells = slots.map((slot) => {
+        if (!slot) return '<div></div>';
+        const elem = sanmeiWuxingNameFromStar(slot.star);
+        const wx = fortuneQuickWx(elem);
+        return `<div class="rounded-xl border px-1 py-1.5 text-center ${slot.hit ? 'sanmei-chusatsu-cell border-rose-500/50' : slot.core ? 'border-amber-600/50 bg-amber-950/30' : slot.ju ? 'border-violet-800/50 bg-violet-950/25' : 'border-cyan-900/50 bg-black/40'}">
+          <div class="text-[9px] font-bold ${slot.ju ? 'text-violet-300/90' : 'text-cyan-400/80'}">${slot.title}</div>
+          <div class="text-[12px] font-black leading-tight mt-0.5 ${wx ? '' : 'text-cyan-50'}"><span class="inline-block rounded px-1 ${wx || ''}">${slot.star || ''}</span></div>
+          <div class="text-[9px] font-bold text-slate-500 mt-0.5">${slot.sub}</div>
+          ${slot.hit ? '<div class="sanmei-chusatsu-chip">中殺</div>' : ''}
+        </div>`;
+      }).join('');
+      const shuku = (hits.items || []).filter((it) => it.id !== 'seiji');
+      const shukuHtml = shuku.length
+        ? shuku.map((it) => `<span class="px-2 py-1 rounded-lg border border-rose-600/50 bg-rose-950/40 text-[11px] font-extrabold text-rose-100">${it.name}・${it.hitBranch}</span>`).join('')
+        : '<span class="text-[11px] font-bold text-slate-400">この3柱に宿命中殺はありません</span>';
+      box.innerHTML = `
+        <div class="rounded-2xl border border-cyan-800/50 bg-slate-950/70 p-3.5 space-y-2">
+          <div class="text-xs font-black text-cyan-200">陰占（3柱）</div>
+          <div class="grid grid-cols-3 gap-1.5">${pillarCells}</div>
+          <p class="text-[10px] text-slate-500 font-bold">上から天干・地支・蔵干。明るい蔵干がいま使っている気です。</p>
+        </div>
+        <div class="rounded-2xl border border-violet-800/50 bg-slate-950/70 p-3.5 space-y-3">
+          <div class="flex items-start justify-between gap-2">
+            <div>
+              <div class="text-xs font-black text-violet-200">陽占</div>
+              <div class="text-[10px] text-slate-500 font-bold mt-0.5">人体星図（正面・右手が左）</div>
+            </div>
+            <div class="text-right">
+              <div class="text-[10px] font-bold text-rose-300/80">天中殺</div>
+              <div class="text-sm font-black text-rose-100">${tenchu || '—'}</div>
+            </div>
+          </div>
+          ${typeGuide ? `<p class="text-[11px] font-bold text-rose-100/90 leading-relaxed">${typeGuide.role}</p>` : ''}
+          <div class="grid grid-cols-3 gap-1.5">${bodyCells}</div>
+          <div>
+            <div class="text-[11px] font-black text-rose-200 mb-1.5">宿命中殺</div>
+            <div class="flex flex-wrap gap-1.5">${shukuHtml}</div>
+          </div>
+        </div>`;
+    }
+
+    function openFortuneQuickSearch() {
+      const hub = document.getElementById('fortune-hub');
+      const panel = document.getElementById('fortune-panel-root');
+      const screen = document.getElementById('fortune-quick-screen');
+      if (!fortuneQuickReady) {
+        if (typeof hasActiveFortuneTarget === 'function' && hasActiveFortuneTarget()) {
+          fortuneQuickInput.year = fortuneActiveInput.year;
+          fortuneQuickInput.month = fortuneActiveInput.month;
+          fortuneQuickInput.day = fortuneActiveInput.day;
+        }
+        initFortuneQuickWheels();
+        fortuneQuickReady = true;
+      }
+      if (hub) hub.classList.add('hidden');
+      if (panel) panel.classList.add('hidden');
+      if (screen) screen.classList.remove('hidden');
+      requestAnimationFrame(() => {
+        fortuneQuickScrollTo('year', fortuneQuickInput.year, false);
+        fortuneQuickScrollTo('month', fortuneQuickInput.month, false);
+        fortuneQuickScrollTo('day', fortuneQuickInput.day, false);
+        renderFortuneQuickSanmei();
+      });
+      const mode = document.getElementById('fortune-mode');
+      if (mode) mode.scrollTop = 0;
+    }
+
+    function closeFortuneQuickSearch() {
+      const hub = document.getElementById('fortune-hub');
+      const panel = document.getElementById('fortune-panel-root');
+      const screen = document.getElementById('fortune-quick-screen');
+      if (screen) screen.classList.add('hidden');
+      if (hub) hub.classList.remove('hidden');
+      if (panel) panel.classList.remove('hidden');
+      const mode = document.getElementById('fortune-mode');
+      if (mode) mode.scrollTop = 0;
+    }
+
+    window.openFortuneQuickSearch = openFortuneQuickSearch;
+    window.closeFortuneQuickSearch = closeFortuneQuickSearch;
+
     function openFortuneFeature(key) {
       if (!FORTUNE_FEATURE_KEYS.includes(key)) return;
       const profile = typeof getProfileBirth === 'function' ? getProfileBirth() : null;
-      if (!profile || !profile.date) {
-        alert('先にプロフィールで生年月日を登録してください');
+      if (!hasActiveFortuneTarget() || !profile || !profile.date) {
+        alert('先に対象プロファイルを設定してください');
         openFortuneProfileCard();
         return;
       }
+      syncFortuneInlineProfilePickers();
       ALL_FORTUNE_CARD_KEYS.forEach((k) => {
         const card = document.getElementById('fortune-card-' + k);
         if (card) card.classList.toggle('hidden', k !== key);
@@ -45066,10 +45923,64 @@
       };
     }
 
+    /** 同じ出口から右（または左）へ分かれる線を、1本の縦幹線＋横枝にする */
+    function treeFanCompatible(item) {
+      const fromC = treeNodeCenter(item.from);
+      const toC = treeNodeCenter(item.to);
+      if (item.fromSide === 'r' && item.toSide === 'l') return toC.x > fromC.x + 24;
+      if (item.fromSide === 'l' && item.toSide === 'r') return toC.x < fromC.x - 24;
+      return false;
+    }
+
+    function treeFanPath(from, to, fromSide, toSide, busX) {
+      const a0 = treePortPoint(from, fromSide);
+      const b0 = treePortPoint(to, toSide);
+      const a1 = treePortOut(a0, fromSide, TREE_ROUTE_STUB);
+      const b1 = treePortOut(b0, toSide, TREE_ROUTE_STUB);
+      if (Math.abs(a0.y - b0.y) < 1.5) return treeDedupePathPts([a0, b0]);
+      const pts = treeDedupePathPts([
+        a0, a1,
+        { x: busX, y: a1.y },
+        { x: busX, y: b1.y },
+        b1, b0
+      ]);
+      if (treePathIntersectsNodes(pts, [from.id, to.id])) return null;
+      return pts;
+    }
+
+    function treeFanBusX(from, fromSide, members) {
+      const a1 = treePortOut(treePortPoint(from, fromSide), fromSide, TREE_ROUTE_STUB);
+      const dir = fromSide === 'r' ? 1 : -1;
+      let near = dir > 0 ? Infinity : -Infinity;
+      members.forEach((m) => {
+        const b1 = treePortOut(treePortPoint(m.to, m.toSide), m.toSide, TREE_ROUTE_STUB);
+        if (dir > 0) near = Math.min(near, b1.x);
+        else near = Math.max(near, b1.x);
+      });
+      const room = dir > 0 ? near - a1.x : a1.x - near;
+      if (!(room > 16)) return null;
+      const candidates = [a1.x + dir * 22, (a1.x + near) / 2, near - dir * 22];
+      for (let i = 0; i < candidates.length; i++) {
+        const x = candidates[i];
+        if (dir > 0 && !(x > a1.x + 6 && x < near - 6)) continue;
+        if (dir < 0 && !(x < a1.x - 6 && x > near + 6)) continue;
+        const busX = Math.round(x);
+        let clear = true;
+        for (let m = 0; m < members.length; m++) {
+          if (!treeFanPath(from, members[m].to, fromSide, members[m].toSide, busX)) {
+            clear = false;
+            break;
+          }
+        }
+        if (clear) return busX;
+      }
+      return null;
+    }
+
     /**
      * すべての接続を順番にルーティングする。
-     * 先に確定した線のセグメントを占有情報として渡すことで、
-     * 後の線が交差・重なりを避けて通るようになる。
+     * 同じノードから同じ側へ分かれる線は1本の幹線にまとめ、
+     * それ以外は交差を避けて通す。
      */
     function treeBuildAllEdgeRoutes() {
       if (!treeState) return [];
@@ -45096,11 +46007,37 @@
       // 短い線から確定させると、長い線が迂回しやすくなる
       pending.sort((p, q) => (p.span - q.span) || ((order.get(p.edge.id) || 0) - (order.get(q.edge.id) || 0)));
 
+      const busPts = new Map();
+      const busKeys = new Map();
+      const fanGroups = new Map();
+      pending.forEach((p) => {
+        if (!treeFanCompatible(p)) return;
+        const key = String(p.from.id) + '|' + p.fromSide + '|' + p.toSide;
+        if (!fanGroups.has(key)) fanGroups.set(key, []);
+        fanGroups.get(key).push(p);
+      });
+      fanGroups.forEach((members, key) => {
+        if (members.length < 2) return;
+        const busX = treeFanBusX(members[0].from, members[0].fromSide, members);
+        if (busX == null) return;
+        members.forEach((m) => {
+          const pts = treeFanPath(m.from, m.to, m.fromSide, m.toSide, busX);
+          if (!pts) return;
+          busPts.set(m.edge.id, pts);
+          busKeys.set(m.edge.id, key);
+        });
+      });
+
       const routes = [];
       const occ = [];
       let clock = 0;
       pending.forEach((p) => {
-        const pts = treeRouteEdgePoints(p.from, p.to, p.fromSide, p.toSide, occ);
+        let pts = busPts.get(p.edge.id) || null;
+        if (!pts && treeFanCompatible(p)) {
+          const busX = treeFanBusX(p.from, p.fromSide, [p]);
+          if (busX != null) pts = treeFanPath(p.from, p.to, p.fromSide, p.toSide, busX);
+        }
+        if (!pts) pts = treeRouteEdgePoints(p.from, p.to, p.fromSide, p.toSide, occ);
         const segs = treeRouteOccSegments(pts);
         const fromId = p.from && p.from.id != null ? String(p.from.id) : '';
         const toId = p.to && p.to.id != null ? String(p.to.id) : '';
@@ -45119,7 +46056,8 @@
           pts,
           segs,
           routedAt: clock,
-          changedAt: clock
+          changedAt: clock,
+          busKey: busKeys.get(p.edge.id) || ''
         });
       });
 
@@ -45128,6 +46066,7 @@
         let changed = false;
         for (let i = 0; i < routes.length; i++) {
           const r = routes[i];
+          if (r.busKey) continue;
           if (!routes.some((o) => o !== r && o.changedAt > r.routedAt)) continue;
           const a1 = treePortOut(treePortPoint(r.from, r.fromSide), r.fromSide, TREE_ROUTE_STUB);
           const b1 = treePortOut(treePortPoint(r.to, r.toSide), r.toSide, TREE_ROUTE_STUB);
@@ -45213,7 +46152,12 @@
         });
         const ids = Array.from(byRoute.keys());
         if (ids.length < 2) return;
-        const overlaps = (a, b) => a.some((s) => b.some((o) => Math.min(s.hi, o.hi) - Math.max(s.lo, o.lo) > 8));
+        const overlaps = (a, b) => {
+          const ka = prepared[a[0].ri].r.busKey;
+          const kb = prepared[b[0].ri].r.busKey;
+          if (ka && ka === kb) return false;
+          return a.some((s) => b.some((o) => Math.min(s.hi, o.hi) - Math.max(s.lo, o.lo) > 8));
+        };
         const colors = new Map();
         const used = [];
         ids.forEach((id) => {
@@ -63703,6 +64647,7 @@
 
     var suppleMasters = loadSuppleMasters();
     var suppleIntakes = loadSuppleIntakes();
+    var suppleIntakePicks = [];
     var suppleChartPeriod = 7;
     var suppleChartInstance = null;
     var suppleHtml5QrScanner = null;
@@ -63936,7 +64881,7 @@
                   <span class="font-bold text-slate-100 hover:text-cyan-300 transition-colors">${escapeHtml(s.name)}</span>
                   <span class="w-1.5 h-1.5 rounded-full" style="background-color: ${cat.dot};"></span>
                 </div>
-                ${item.timing || item.note ? `<span class="text-[9px] text-slate-400">${item.timing || ''}${item.note ? '・' + escapeHtml(item.note) : ''}</span>` : ''}
+                <span class="text-[9px] text-slate-400">${intakeQtyOf(item)}個${item.timing ? '・' + item.timing : ''}${item.note ? '・' + escapeHtml(item.note) : ''}</span>
               </div>
             </div>
             <!-- アクションボタン（編集 ＆ 削除） -->
@@ -63974,11 +64919,23 @@
     }
 
     // ◯ 摂取したサプリ 新規登録モーダルを開く
+    function intakeQtyOf(item) {
+      const n = parseInt(item && item.qty, 10);
+      return n > 0 ? n : 1;
+    }
+
+    function setSuppleSubmitLabel(label) {
+      ['supple-btn-submit-intake', 'supple-btn-submit-intake-inline'].forEach((id) => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = label;
+      });
+    }
+
     function openSuppleIntakeModal() {
       document.getElementById('supple-edit-intake-id').value = '';
       document.getElementById('supple-modal-title').textContent = '摂取したサプリの記録';
       document.getElementById('supple-modal-subtitle').textContent = '日付とサプリを選んで登録します';
-      document.getElementById('supple-btn-submit-intake').innerHTML = '✓ 登録して戻る';
+      setSuppleSubmitLabel('✓ 登録する');
       document.getElementById('supple-btn-delete-record').classList.add('hidden');
 
       const dateEl = document.getElementById('supple-input-date');
@@ -63986,10 +64943,8 @@
       if (dateEl) dateEl.value = getSuppleTodayStr(0);
       if (noteEl) noteEl.value = '';
 
-      if (suppleMasters.length > 0) {
-        selectSuppleForIntake(suppleMasters[0].id);
-      }
-      closeSuppleDropdown();
+      suppleIntakePicks = [];
+      renderSuppleDropdownList();
       const modal = document.getElementById('modal-supple-intake');
       if (modal) {
         modal.classList.remove('hidden');
@@ -64008,7 +64963,7 @@
       document.getElementById('supple-edit-intake-id').value = item.id;
       document.getElementById('supple-modal-title').textContent = '摂取記録の編集';
       document.getElementById('supple-modal-subtitle').textContent = '日付・サプリ・メモを変更できます';
-      document.getElementById('supple-btn-submit-intake').innerHTML = '✓ 更新する';
+      setSuppleSubmitLabel('✓ 更新する');
       document.getElementById('supple-btn-delete-record').classList.remove('hidden');
 
       const dateEl = document.getElementById('supple-input-date');
@@ -64019,8 +64974,8 @@
       if (timingEl) timingEl.value = item.timing || '夜';
       if (noteEl) noteEl.value = item.note || '';
 
-      selectSuppleForIntake(item.suppleId);
-      closeSuppleDropdown();
+      suppleIntakePicks = [{ id: item.suppleId, qty: intakeQtyOf(item) }];
+      renderSuppleDropdownList();
 
       const modal = document.getElementById('modal-supple-intake');
       if (modal) {
@@ -64054,7 +65009,6 @@
         modal.classList.remove('flex');
         modal.style.setProperty('display', 'none', 'important');
       }
-      closeSuppleDropdown();
       syncSuppleFabVisibility();
     }
 
@@ -64067,37 +65021,59 @@
     }
 
     // 登録または更新の送信
+    function currentSuppleIntakePicks() {
+      return suppleIntakePicks
+        .map((p) => ({ id: p.id, qty: Math.max(1, Math.min(99, parseInt(p.qty, 10) || 1)) }))
+        .filter((p) => suppleMasters.some((m) => m.id === p.id));
+    }
+
     function submitSuppleIntake() {
       const editId = document.getElementById('supple-edit-intake-id').value;
       const date = document.getElementById('supple-input-date').value;
-      const suppleId = document.getElementById('supple-selected-id').value;
       const timing = document.getElementById('supple-input-timing').value;
       const note = document.getElementById('supple-input-note').value.trim();
+      const picks = currentSuppleIntakePicks();
 
-      if (!date || !suppleId) {
-        alert('日付とサプリを選択してください');
+      if (!date || !picks.length) {
+        alert('日付と、1つ以上のサプリを選択してください');
         return;
       }
 
       if (editId) {
-        // 既存記録の更新（編集モード）
         const idx = suppleIntakes.findIndex(i => i.id === editId);
+        const first = picks[0];
         if (idx !== -1) {
           suppleIntakes[idx].date = date;
-          suppleIntakes[idx].suppleId = suppleId;
+          suppleIntakes[idx].suppleId = first.id;
+          suppleIntakes[idx].qty = first.qty;
           suppleIntakes[idx].timing = timing;
           suppleIntakes[idx].note = note;
           suppleIntakes[idx].updatedAt = new Date().toISOString();
         }
+        const now = Date.now();
+        picks.slice(1).forEach((p, i) => {
+          suppleIntakes.push({
+            id: 'intake_' + now + '_' + i,
+            date: date,
+            suppleId: p.id,
+            qty: p.qty,
+            timing: timing,
+            note: note,
+            createdAt: new Date().toISOString()
+          });
+        });
       } else {
-        // 新規登録
-        suppleIntakes.push({
-          id: 'intake_' + Date.now(),
-          date: date,
-          suppleId: suppleId,
-          timing: timing,
-          note: note,
-          createdAt: new Date().toISOString()
+        const now = Date.now();
+        picks.forEach((p, i) => {
+          suppleIntakes.push({
+            id: 'intake_' + now + '_' + i,
+            date: date,
+            suppleId: p.id,
+            qty: p.qty,
+            timing: timing,
+            note: note,
+            createdAt: new Date().toISOString()
+          });
         });
       }
 
@@ -64107,89 +65083,94 @@
     }
 
     function renderSuppleDropdownList() {
-      const menu = document.getElementById('supple-dropdown-menu');
+      const menu = document.getElementById('supple-pick-list');
+      const summary = document.getElementById('supple-pick-summary');
+      const idInput = document.getElementById('supple-selected-id');
       if (!menu) return;
-      menu.innerHTML = '';
+      suppleIntakePicks = currentSuppleIntakePicks();
+      if (idInput) idInput.value = suppleIntakePicks.length ? suppleIntakePicks[0].id : '';
 
-      suppleMasters.forEach(s => {
-        const item = document.createElement('button');
-        item.type = 'button';
-        item.className = 'w-full px-3 py-2 rounded-xl text-left flex items-center justify-between hover:bg-slate-800 transition-colors group';
-        item.onclick = () => {
-          selectSuppleForIntake(s.id);
-          closeSuppleDropdown();
-        };
+      if (!suppleMasters.length) {
+        menu.innerHTML = '<div class="text-xs text-slate-500 text-center py-4">登録されたサプリはまだありません</div>';
+        if (summary) summary.textContent = '';
+        return;
+      }
 
+      menu.innerHTML = suppleMasters.map((s) => {
+        const pick = suppleIntakePicks.find((p) => p.id === s.id);
+        const on = !!pick;
+        const qty = pick ? pick.qty : 1;
         const thumb = getSupplePhotoThumbHtml(s.photo, 28);
         const cat = SUPPLE_CATEGORIES.find(c => c.name === s.category) || SUPPLE_CATEGORIES[5];
-
-        item.innerHTML = `
-          <div class="flex items-center gap-2.5">
-            ${thumb}
-            <div>
-              <p class="text-xs font-bold text-slate-100 group-hover:text-cyan-300">${escapeHtml(s.name)}</p>
-              <div class="flex items-center gap-1.5 mt-0.5">
+        return `
+          <div class="flex items-center gap-2 px-2 py-2 rounded-xl ${on ? 'bg-emerald-950/40 border border-emerald-600/40' : 'hover:bg-slate-800/70 border border-transparent'}">
+            <button type="button" onclick="toggleSuppleIntakePick('${s.id}')" class="flex-1 min-w-0 flex items-center gap-2 text-left">
+              <span class="w-4 h-4 rounded border ${on ? 'bg-emerald-500 border-emerald-400 text-white' : 'border-slate-500 text-transparent'} flex items-center justify-center text-[10px] font-black shrink-0">${on ? '✓' : ''}</span>
+              ${thumb}
+              <span class="min-w-0">
+                <span class="block text-xs font-bold text-slate-100 truncate">${escapeHtml(s.name)}</span>
                 <span class="text-[9px] font-semibold px-1.5 py-0.2 rounded-md ${cat.color}">${escapeHtml(s.category)}</span>
-                ${s.barcode ? `<span class="text-[9px] text-slate-500 font-mono">#${escapeHtml(s.barcode)}</span>` : ''}
-              </div>
+              </span>
+            </button>
+            <div class="flex items-center gap-1 shrink-0 ${on ? '' : 'opacity-40 pointer-events-none'}">
+              <button type="button" onclick="changeSuppleIntakeQty('${s.id}', -1, event)" class="w-6 h-6 rounded-lg bg-slate-800 border border-slate-600 text-slate-100 text-sm font-black" aria-label="個数を減らす">−</button>
+              <span class="w-6 text-center text-xs font-black text-cyan-100">${qty}</span>
+              <button type="button" onclick="changeSuppleIntakeQty('${s.id}', 1, event)" class="w-6 h-6 rounded-lg bg-slate-800 border border-slate-600 text-slate-100 text-sm font-black" aria-label="個数を増やす">＋</button>
             </div>
+            <button type="button" onclick="deleteSuppleMasterFromPicker('${s.id}', event)" class="w-7 h-7 rounded-lg text-rose-400 hover:text-rose-200 hover:bg-rose-950/50 text-xs shrink-0" title="このサプリを削除" aria-label="このサプリを削除">🗑</button>
           </div>
-          <span class="text-emerald-400 opacity-0 group-hover:opacity-100 text-xs">✓</span>
         `;
-        menu.appendChild(item);
-      });
+      }).join('');
 
-      // サプリ一覧の下に「＋ 新しいサプリを登録」枠を配置
-      const addWrap = document.createElement('div');
-      addWrap.className = 'pt-1.5 mt-1.5 border-t border-cyan-900/50';
+      if (summary) {
+        if (!suppleIntakePicks.length) {
+          summary.textContent = 'サプリをタップして選び、個数を指定できます';
+        } else {
+          const total = suppleIntakePicks.reduce((sum, p) => sum + p.qty, 0);
+          summary.textContent = suppleIntakePicks.length + '種を選択（合計 ' + total + '個）';
+        }
+      }
+    }
 
-      const addBtn = document.createElement('button');
-      addBtn.type = 'button';
-      addBtn.className = 'w-full px-3 py-2.5 rounded-xl border border-dashed border-emerald-500/60 bg-emerald-950/30 hover:bg-emerald-900/40 text-emerald-300 text-xs font-extrabold flex items-center justify-center gap-1.5 transition-all active:scale-[0.99]';
-      addBtn.innerHTML = '<span class="text-sm leading-none">＋</span><span>新しいサプリを登録</span>';
-      addBtn.onclick = () => {
-        closeSuppleDropdown();
-        openSuppleMasterModal();
-      };
-      addWrap.appendChild(addBtn);
+    function toggleSuppleIntakePick(suppleId) {
+      const idx = suppleIntakePicks.findIndex((p) => p.id === suppleId);
+      if (idx >= 0) suppleIntakePicks.splice(idx, 1);
+      else suppleIntakePicks.push({ id: suppleId, qty: 1 });
+      renderSuppleDropdownList();
+    }
 
-      menu.appendChild(addWrap);
+    function changeSuppleIntakeQty(suppleId, delta, ev) {
+      if (ev) ev.stopPropagation();
+      const pick = suppleIntakePicks.find((p) => p.id === suppleId);
+      if (!pick) return;
+      pick.qty = Math.max(1, Math.min(99, (parseInt(pick.qty, 10) || 1) + delta));
+      renderSuppleDropdownList();
+    }
+
+    function deleteSuppleMasterFromPicker(suppleId, ev) {
+      if (ev) ev.stopPropagation();
+      const s = suppleMasters.find((m) => m.id === suppleId);
+      if (!s) return;
+      if (!confirm('「' + s.name + '」をサプリ一覧から削除しますか？\n過去の摂取記録は残ります。')) return;
+      suppleMasters = suppleMasters.filter((m) => m.id !== suppleId);
+      saveSuppleMasters(suppleMasters);
+      suppleIntakePicks = suppleIntakePicks.filter((p) => p.id !== suppleId);
+      renderSuppleDropdownList();
+      renderSuppleSummary();
     }
 
     function selectSuppleForIntake(suppleId) {
       const s = suppleMasters.find(m => m.id === suppleId);
       if (!s) return;
-      const idInput = document.getElementById('supple-selected-id');
-      const display = document.getElementById('supple-dropdown-selected');
-      if (idInput) idInput.value = s.id;
-      if (display) {
-        const thumb = getSupplePhotoThumbHtml(s.photo, 28);
-        display.innerHTML = `
-          ${thumb}
-          <div class="flex flex-col text-left">
-            <span class="text-xs font-bold text-slate-100">${escapeHtml(s.name)}</span>
-            <span class="text-[9px] text-slate-400 font-semibold">${escapeHtml(s.category)} ${s.dose ? '・' + escapeHtml(s.dose) : ''}</span>
-          </div>
-        `;
+      if (!suppleIntakePicks.some((p) => p.id === s.id)) {
+        suppleIntakePicks.push({ id: s.id, qty: 1 });
       }
+      renderSuppleDropdownList();
     }
 
-    function toggleSuppleDropdown() {
-      const menu = document.getElementById('supple-dropdown-menu');
-      const arrow = document.getElementById('supple-dropdown-arrow');
-      if (menu) {
-        const isHidden = menu.classList.contains('hidden');
-        menu.classList.toggle('hidden', !isHidden);
-        if (arrow) arrow.style.transform = isHidden ? 'rotate(180deg)' : 'none';
-      }
-    }
+    function toggleSuppleDropdown() { }
 
-    function closeSuppleDropdown() {
-      const menu = document.getElementById('supple-dropdown-menu');
-      const arrow = document.getElementById('supple-dropdown-arrow');
-      if (menu) menu.classList.add('hidden');
-      if (arrow) arrow.style.transform = 'none';
-    }
+    function closeSuppleDropdown() { }
 
     function initSuppleCategorySelector() {
       const c = document.getElementById('supple-category-container');

@@ -89,7 +89,7 @@
     }
   </style>
   <script>
-    window.__DUMP_BUILD__ = 'v446';
+    window.__DUMP_BUILD__ = 'v449';
     // かつてここで「既知の最新ビルドより古い＝巻き戻り」と判定し、キャッシュ全消し＋SW登録解除を
     // していたが、その直後はオフライン用の控えが無く、ネットワークが不調だと起動不能になった。
     // 判定値(dump_known_good_build)は下がらない一方通行のため、一度ずれると毎回自己破壊を繰り返す。
@@ -168,8 +168,22 @@
           var s = document.createElement('script');
           s.src = src;
           s.async = true;
-          s.onload = function () { resolve(true); };
-          s.onerror = function () { resolve(false); };
+          s.onload = function () {
+            var ok = true;
+            try {
+              if (typeof isReady === 'function') ok = !!isReady();
+            } catch (_) { ok = false; }
+            if (!ok) {
+              delete loadingScripts[src];
+              if (s.parentNode) s.parentNode.removeChild(s);
+            }
+            resolve(ok);
+          };
+          s.onerror = function () {
+            delete loadingScripts[src];
+            if (s.parentNode) s.parentNode.removeChild(s);
+            resolve(false);
+          };
           document.head.appendChild(s);
         });
         return loadingScripts[src];
@@ -1213,11 +1227,12 @@
     html.theme-light #app-bottom-nav button,
     html.theme-light #memo-sub-nav button {
       color: #475569 !important;
+      background: transparent;
     }
 
     html.theme-light #app-bottom-nav button.text-cyan-300,
     html.theme-light #memo-sub-nav button.text-cyan-300,
-    html.theme-light #tab-memo-mode {
+    html.theme-light #tab-memo-mode.text-cyan-300 {
       color: #0f766e !important;
       background: rgba(15, 118, 110, 0.12);
       border-radius: 0.85rem;
@@ -1226,11 +1241,12 @@
     html.theme-soft #app-bottom-nav button,
     html.theme-soft #memo-sub-nav button {
       color: #cbb89a !important;
+      background: transparent;
     }
 
     html.theme-soft #app-bottom-nav button.text-cyan-300,
     html.theme-soft #memo-sub-nav button.text-cyan-300,
-    html.theme-soft #tab-memo-mode {
+    html.theme-soft #tab-memo-mode.text-cyan-300 {
       color: #fff8ee !important;
       background: rgba(244, 201, 127, 0.18);
       border-radius: 0.85rem;
@@ -1239,11 +1255,12 @@
     html.theme-soft-light #app-bottom-nav button,
     html.theme-soft-light #memo-sub-nav button {
       color: #6b5d4d !important;
+      background: transparent;
     }
 
     html.theme-soft-light #app-bottom-nav button.text-cyan-300,
     html.theme-soft-light #memo-sub-nav button.text-cyan-300,
-    html.theme-soft-light #tab-memo-mode {
+    html.theme-soft-light #tab-memo-mode.text-cyan-300 {
       color: #7c3a12 !important;
       background: rgba(154, 107, 47, 0.18);
       border-radius: 0.85rem;
@@ -4320,7 +4337,11 @@
     body:has(#modal-supple-scanner:not(.hidden)) #supple-fab-add,
     body:has(#modal-supple-intake:not(.hidden)) #app-bottom-nav,
     body:has(#modal-supple-master:not(.hidden)) #app-bottom-nav,
-    body:has(#modal-supple-scanner:not(.hidden)) #app-bottom-nav {
+    body:has(#modal-supple-scanner:not(.hidden)) #app-bottom-nav,
+    html.supple-modal-open #supple-fab-add,
+    body.supple-modal-open #supple-fab-add,
+    html.supple-modal-open #app-bottom-nav,
+    body.supple-modal-open #app-bottom-nav {
       display: none !important;
     }
 
@@ -4339,12 +4360,30 @@
     }
 
     /* サプリ記録・マスタ登録モーダルの全画面展開（モバイル） */
+    #modal-supple-intake,
+    #modal-supple-master {
+      position: fixed;
+      inset: 0;
+    }
+
+    #modal-supple-intake>div,
+    #modal-supple-master>div {
+      display: flex !important;
+      flex-direction: column !important;
+      overflow: hidden !important;
+      min-height: 0 !important;
+    }
+
     @media (max-width: 639px) {
 
       #modal-supple-intake,
       #modal-supple-master {
-        height: 100% !important;
-        height: 100dvh !important;
+        top: 0 !important;
+        right: 0 !important;
+        bottom: 0 !important;
+        left: 0 !important;
+        height: auto !important;
+        max-height: 100% !important;
         width: 100% !important;
       }
 
@@ -4355,9 +4394,6 @@
         min-height: 0 !important;
         width: 100% !important;
         border-radius: 0 !important;
-        display: flex !important;
-        flex-direction: column !important;
-        overflow: hidden !important;
       }
     }
 
@@ -6658,7 +6694,24 @@
           target.innerHTML = '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;"><div class="splash-zoom-logo">DUMP</div><div style="margin-top:16px;font-size:11px;font-weight:800;letter-spacing:0.25em;color:rgba(34,211,238,0.7);font-family:ui-monospace,monospace;">' + b + '</div></div>';
         } else if (style === 'daily-insight') {
           var q = quoteList[Math.floor(Math.random() * quoteList.length)];
-          target.innerHTML = '<div class="splash-fade-in splash-insight-box"><div class="splash-insight-badge">◇ 本日の道標</div><div class="splash-insight-quote">' + q + '</div><div class="splash-insight-brand">DUMP · ' + b + '</div></div>';
+          try {
+            var rawInsight = localStorage.getItem('dump_daily_fortune_insight');
+            if (rawInsight) {
+              var parsedInsight = JSON.parse(rawInsight);
+              var nowD = new Date();
+              var todayIso = nowD.getFullYear() + '-' + String(nowD.getMonth() + 1).padStart(2, '0') + '-' + String(nowD.getDate()).padStart(2, '0');
+              if (parsedInsight && parsedInsight.date === todayIso && typeof parsedInsight.text === 'string' && parsedInsight.text.trim()) {
+                q = parsedInsight.text.trim();
+              }
+            }
+          } catch (_) { }
+          var safeQ = String(q)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+          target.innerHTML = '<div class="splash-fade-in splash-insight-box"><div class="splash-insight-badge">◇ 本日の道標</div><div class="splash-insight-quote">' + safeQ + '</div><div class="splash-insight-brand">DUMP · ' + b + '</div></div>';
         } else if (style === 'minimal-bar') {
           target.innerHTML = '<div class="splash-fade-in splash-minimal-wrap"><div class="splash-minimal-logo">DUMP</div><div class="splash-minimal-progress-track"><div class="splash-minimal-progress-bar"></div></div><div style="margin-top:14px;font-size:10px;font-weight:800;letter-spacing:0.15em;color:rgba(255,255,255,0.4);font-family:ui-monospace,monospace;">' + b + '</div></div>';
         } else if (style === 'instant') {
@@ -7198,6 +7251,14 @@
     }
     // ⚠️【必須設定】ここに発行したGASのウェブアプリURLを貼り付けてください
     const GAS_API_URL = "https://script.google.com/macros/s/AKfycbxP-ENobvgAGiVgXKgzLmKBLZn4_6KzZXwXXZAbDBqmSdLxiJOCf5whFrUv5ikUo5evvQ/exec";
+    const DUMP_API_TOKEN_KEY = 'dump_api_token';
+    function getDumpApiToken() {
+      try {
+        return String(localStorage.getItem(DUMP_API_TOKEN_KEY) || '').trim();
+      } catch (_) {
+        return '';
+      }
+    }
     function isApiFailure(res) {
       return !res || res.error || res.success === false;
     }
@@ -7249,7 +7310,9 @@
         }, timeoutMs);
       }
       try {
-        const body = JSON.stringify({ action, ...data });
+        const apiToken = getDumpApiToken();
+        const reqPayload = apiToken ? { action, ...data, apiToken } : { action, ...data };
+        const body = JSON.stringify(reqPayload);
         const useKeepalive = options.keepalive === true
           || (options.keepalive !== false
             && KEEPALIVE_WRITE_ACTIONS.has(action)
@@ -7860,12 +7923,62 @@
     let crossDeviceLastStamp = '';
     let crossDevicePollTimer = null;
     const CROSS_DEVICE_MIN_GAP_MS = 1200;
-    const CROSS_DEVICE_POLL_MS = 8000;
+    const CROSS_DEVICE_POLL_MS = 12000;
     const CROSS_DEVICE_DEEP_GAP_MS = 35000;
     const CROSS_DEVICE_STORED_REFRESH_GAP_MS = 25000;
     const CROSS_DEVICE_HISTORY_FORCE_GAP_MS = 16000;
     const ORGANIZER_SHARED_TTL_MS = 5000;
     let organizerDataShared = { data: null, fetchedAt: 0, promise: null };
+
+    const pollSeenStamps = new Map();
+    async function checkPollStampChanged(scopeKey) {
+      try {
+        const res = await callAPI('getSyncStamp', {}, { silent: true });
+        const stamp = res && res.stamp != null ? String(res.stamp) : '';
+        if (!stamp) return true;
+        const prev = pollSeenStamps.get(scopeKey);
+        pollSeenStamps.set(scopeKey, stamp);
+        if (!prev) return true;
+        return prev !== stamp;
+      } catch (_) {
+        return true;
+      }
+    }
+
+    /** __SYSTEM__ スナップショットのインプレース更新（ゴミ箱肥大化防止） */
+    async function upsertSystemSnapshotRecord({ cloudId, extraIds, folder, file, content }) {
+      const targetId = cloudId ? String(cloudId) : '';
+      const extras = Array.isArray(extraIds)
+        ? extraIds.map((id) => String(id || '')).filter((id) => id && id !== targetId)
+        : [];
+      if (targetId) {
+        const upd = await callAPI('updateDataRecord', {
+          id: targetId,
+          folder,
+          file,
+          content
+        }, { silent: true });
+        if (upd && upd.success && !upd.error) {
+          if (extras.length) {
+            callAPI('deleteDataRecords', { ids: extras }, { silent: true }).catch(() => { });
+          }
+          return { success: true, id: targetId };
+        }
+        if (!upd || upd.error !== 'not_found') {
+          throw new Error('system_snapshot_update_failed');
+        }
+      }
+      const addRes = await callAPI('addDataRecord', { folder, file, content }, { silent: true });
+      if (!addRes || !addRes.success || !addRes.id) {
+        throw new Error('system_snapshot_add_failed');
+      }
+      const newId = String(addRes.id);
+      const toDel = (targetId ? [targetId, ...extras] : extras).filter((id) => id && id !== newId);
+      if (toDel.length) {
+        callAPI('deleteDataRecords', { ids: toDel }, { silent: true }).catch(() => { });
+      }
+      return { success: true, id: newId };
+    }
 
     async function fetchOrganizerDataShared(options) {
       options = options || {};
@@ -8015,6 +8128,12 @@
       }
       if (typeof syncAbstinenceSlips === 'function') {
         tasks.push(syncAbstinenceSlips({ render: tab === 'abstinence-mode' && !silent }));
+      }
+      if (typeof syncFavorites === 'function') {
+        tasks.push(syncFavorites());
+      }
+      if (typeof syncSuppleData === 'function') {
+        tasks.push(syncSuppleData({ render: tab === 'supplement-mode' && !silent }));
       }
       if (typeof syncTreeLibrary === 'function') {
         // ツリー編集中／未送信は deep sync で上書きしない
@@ -8548,8 +8667,10 @@
           return false;
         });
         const cache = await caches.open(PENDING_WRITES_CACHE);
+        const apiToken = typeof getDumpApiToken === 'function' ? getDumpApiToken() : '';
         const payload = {
           gasUrl: GAS_API_URL,
+          apiToken,
           updatedAt: Date.now(),
           writes: writes.map((j) => {
             if (j.type === 'history_replace') {
@@ -10693,8 +10814,6 @@
                 <div class="flex items-center gap-2">
                   <span id="app-build-tag" class="text-[9px] font-mono font-bold text-cyan-800/80"
                     title="アプリのビルド番号"></span>
-                  <button type="button" id="input-tab-history-clear-btn" onclick="clearInputTabHistory()"
-                    class="hidden text-[11px] font-bold text-rose-400/90 hover:text-rose-300 bg-rose-950/40 px-2.5 py-1 rounded-lg border border-rose-800/50 transition active:scale-95">すべて削除</button>
                   <span id="input-tab-history-count" class="bg-cyan-900/50 px-2.5 py-0.5 rounded text-xs">0件</span>
                 </div>
               </h3>
@@ -10868,6 +10987,12 @@
             class="border-2 border-rose-900/50 text-rose-400 hover:bg-rose-950/50 font-extrabold h-14 rounded-xl transition active:scale-95 text-base">🗑️
             削除</button>
         </div>
+        <div class="grid grid-cols-2 gap-2 mt-2 pb-1 shrink-0">
+          <button type="button" onclick="sendReviewDetailToGantt(this)"
+            class="bg-emerald-950/40 text-emerald-200 border border-emerald-700/50 hover:bg-emerald-900/50 font-extrabold h-10 rounded-xl transition active:scale-95 text-xs">📅 ガントへ送る</button>
+          <button type="button" onclick="sendReviewDetailToTree()"
+            class="bg-indigo-950/40 text-indigo-200 border border-indigo-700/50 hover:bg-indigo-900/50 font-extrabold h-10 rounded-xl transition active:scale-95 text-xs">🌳 ツリーへ送る</button>
+        </div>
         <div id="review-move-section" class="border-t-2 border-cyan-900/50 pt-4 mt-3 hidden" aria-hidden="true"
           data-retired="folder-move">
           <label class="hidden">📤 この情報を別の場所へ仕分け（移動）</label>
@@ -10998,6 +11123,12 @@
           class="flex-1 w-full min-h-0 m-0 p-4 bg-transparent text-cyan-50 font-mono text-base leading-relaxed resize-none focus:outline-none placeholder-cyan-800"></textarea>
         <div class="px-4 py-3 border-t border-cyan-900/50 shrink-0 space-y-2">
           <p id="check-blocks-expand-status" class="text-center text-xs font-bold text-cyan-400/80 min-h-[1rem]"></p>
+          <div class="grid grid-cols-2 gap-2">
+            <button type="button" onclick="sendCheckBlockExpandToGantt()"
+              class="h-10 rounded-xl bg-emerald-950/40 text-emerald-200 border border-emerald-700/50 hover:bg-emerald-900/50 font-extrabold text-xs transition active:scale-95">📅 ガントへ</button>
+            <button type="button" onclick="sendCheckBlockExpandToTree()"
+              class="h-10 rounded-xl bg-indigo-950/40 text-indigo-200 border border-indigo-700/50 hover:bg-indigo-900/50 font-extrabold text-xs transition active:scale-95">🌳 ツリーへ</button>
+          </div>
           <button type="button" id="check-blocks-expand-save" onclick="saveCheckBlockExpand()"
             class="w-full h-14 rounded-xl bg-gradient-to-r from-cyan-600 to-indigo-700 hover:from-cyan-500 hover:to-indigo-600 text-white font-extrabold text-base border border-cyan-500/30 shadow-[0_0_15px_rgba(34,211,238,0.2)] transition active:scale-[0.98]">保存する</button>
         </div>
@@ -11621,10 +11752,13 @@
             </div>
             <div>
               <h2 class="text-base sm:text-lg font-black text-cyan-50 tracking-wide leading-none">サプリ管理</h2>
-
+              <p id="supple-sync-status" class="text-[10px] font-bold text-cyan-500/80 mt-0.5 min-h-[14px]"></p>
             </div>
           </div>
           <div class="flex items-center gap-2">
+            <button type="button" id="supple-sync-btn" onclick="syncSuppleData({ force: true, render: true })"
+              title="クラウドと同期" aria-label="クラウドと同期"
+              class="w-8 h-8 rounded-full bg-cyan-950/70 border border-cyan-700/50 text-cyan-200 hover:bg-cyan-900 text-sm font-black flex items-center justify-center active:scale-95 transition">↻</button>
             <span id="supple-today-badge"
               class="text-[11px] font-extrabold px-2.5 py-1 rounded-full bg-emerald-950/60 text-emerald-300 border border-emerald-700/50"></span>
           </div>
@@ -11632,6 +11766,15 @@
 
         <!-- メインエリア -->
         <div class="w-full max-w-2xl mx-auto px-3 sm:px-5 pt-4 space-y-4">
+
+          <!-- 残数アラートバナー -->
+          <div id="supple-low-stock-banner"
+            class="hidden rounded-2xl border border-amber-600/60 bg-amber-950/40 px-4 py-3 space-y-1">
+            <div class="text-xs font-black text-amber-200 flex items-center gap-1.5">
+              <span>⚠️</span><span>残数が少ないサプリがあります</span>
+            </div>
+            <div id="supple-low-stock-list" class="text-[11px] font-bold text-amber-100/90 space-y-0.5"></div>
+          </div>
 
           <!-- 上側：グラフセクション -->
           <section
@@ -11675,6 +11818,44 @@
             </div>
           </section>
 
+          <!-- クイックセット（一括記録） -->
+          <section id="supple-routines-section"
+            class="bg-[#0b1021]/90 rounded-3xl p-4 border border-cyan-900/50 space-y-2.5">
+            <div class="flex items-center justify-between gap-2">
+              <div class="flex items-center gap-1.5">
+                <span class="text-sm">⚡</span>
+                <h3 class="font-extrabold text-cyan-50 text-xs sm:text-sm">クイックセット（1タップ記録）</h3>
+              </div>
+              <button type="button" onclick="openSuppleIntakeModal()"
+                class="text-[11px] font-bold text-emerald-300 hover:text-emerald-200 px-2.5 py-1 rounded-lg bg-emerald-950/40 border border-emerald-700/50 transition active:scale-95">
+                ＋ 選んで作成
+              </button>
+            </div>
+            <div id="supple-routines-list" class="flex flex-wrap gap-2"></div>
+          </section>
+
+          <!-- 登録サプリ・在庫一覧（折りたたみ） -->
+          <details id="supple-master-list-section"
+            class="bg-[#0b1021]/90 rounded-3xl border border-cyan-900/50 overflow-hidden">
+            <summary
+              class="cursor-pointer list-none px-4 py-3.5 flex items-center justify-between gap-2 text-xs sm:text-sm font-extrabold text-cyan-100 hover:bg-cyan-950/30 select-none">
+              <span class="flex items-center gap-1.5"><span>📦</span><span>登録サプリ・在庫管理</span></span>
+              <span class="flex items-center gap-2">
+                <span id="supple-master-list-badge" class="text-[11px] text-cyan-400/80 font-bold"></span>
+                <span class="text-cyan-400 text-xs">▾</span>
+              </span>
+            </summary>
+            <div class="px-4 pb-4 pt-1 border-t border-cyan-900/30 space-y-2.5">
+              <div class="flex justify-end">
+                <button type="button" onclick="openSuppleMasterModal()"
+                  class="px-3 py-1.5 rounded-xl bg-emerald-950/50 border border-emerald-600/50 text-emerald-300 text-[11px] font-extrabold hover:bg-emerald-900/50 transition active:scale-95">
+                  ＋ 新しいサプリを追加
+                </button>
+              </div>
+              <div id="supple-master-list-container" class="space-y-2"></div>
+            </div>
+          </details>
+
           <!-- 摂取履歴タイムライン一覧 -->
           <section class="space-y-3">
             <div class="flex items-center justify-between px-1">
@@ -11698,311 +11879,13 @@
       </div>
     </div>
 
-    <!-- ===== ◯ 摂取したサプリ 登録・編集モーダル ===== -->
-    <div id="modal-supple-intake"
-      class="fixed inset-0 hidden bg-black/85 backdrop-blur-sm flex-col justify-start sm:justify-center items-center p-0 sm:p-4 w-full h-full"
-      style="z-index: 10000; display: none;">
-      <div
-        class="bg-[#0b1021] w-full max-w-xl h-full sm:h-auto sm:max-h-[92vh] min-h-0 rounded-none sm:rounded-3xl shadow-2xl border-0 sm:border border-cyan-800/60 flex flex-col overflow-hidden text-slate-100">
-
-        <!-- ヘッダー -->
-        <div
-          class="px-5 pt-[calc(1.2rem+env(safe-area-inset-top,0px))] pb-4 border-b border-cyan-900/40 flex items-center justify-between bg-[#070a14]/95 shrink-0">
-          <div class="flex items-center gap-2.5">
-            <div id="supple-modal-icon"
-              class="w-8 h-8 rounded-xl bg-emerald-950 text-emerald-400 border border-emerald-700/50 flex items-center justify-center text-sm font-bold">
-              ✓
-            </div>
-            <div>
-              <h3 id="supple-modal-title" class="font-extrabold text-cyan-50 text-base">摂取したサプリの記録</h3>
-              <p id="supple-modal-subtitle" class="text-[11px] text-cyan-400/80">日付とサプリを選んで登録します</p>
-            </div>
-          </div>
-          <button type="button" onclick="closeSuppleIntakeModal()"
-            class="w-8 h-8 rounded-full bg-slate-800 text-slate-400 hover:text-white flex items-center justify-center transition-colors">✕</button>
-        </div>
-
-        <!-- ボディ（いっぱいまで展開: flex-1 min-h-0） -->
-        <div class="flex-1 min-h-0 p-5 space-y-4 overflow-y-auto">
-          <!-- 編集中のID保持 hidden -->
-          <input type="hidden" id="supple-edit-intake-id" value="" />
-
-          <!-- 1. 日付 -->
-          <div>
-            <label class="block text-xs font-bold text-cyan-200 mb-1.5">📅 摂取した日付</label>
-            <input type="date" id="supple-input-date"
-              class="w-full px-4 py-2.5 rounded-2xl bg-black/40 border border-cyan-800/60 text-white text-sm font-semibold focus:outline-hidden focus:border-cyan-400 transition-all" />
-          </div>
-
-          <!-- 2. サプリ選択（複数・個数・削除） -->
-          <div>
-            <div class="flex items-center justify-between gap-2 mb-1.5">
-              <label class="min-w-0 text-xs font-bold text-cyan-200 leading-tight">📦 摂取したサプリを選択</label>
-              <button type="button" onclick="openSuppleMasterModal()"
-                class="shrink-0 whitespace-nowrap inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl border border-dashed border-emerald-500/60 bg-emerald-950/30 hover:bg-emerald-900/40 text-emerald-300 text-[11px] font-extrabold transition active:scale-[0.98]">
-                <span class="text-sm leading-none">＋</span><span>新規登録</span>
-              </button>
-            </div>
-            <div id="supple-pick-list"
-              class="max-h-64 overflow-y-auto space-y-1 rounded-2xl border border-cyan-800/60 bg-black/30 p-1.5"></div>
-            <p id="supple-pick-summary" class="text-[11px] text-slate-400 font-bold mt-1.5"></p>
-            <input type="hidden" id="supple-selected-id" value="" />
-          </div>
-
-          <!-- 3. タイミング / メモ -->
-          <div>
-            <label class="block text-xs font-bold text-cyan-200 mb-1.5">🕒 摂取タイミング / メモ（任意）</label>
-            <div class="flex gap-2">
-              <select id="supple-input-timing"
-                class="px-3 py-2 rounded-xl bg-black/40 border border-cyan-800/60 text-xs font-bold text-cyan-100 focus:outline-hidden focus:border-cyan-400">
-                <option value="朝">朝食後</option>
-                <option value="昼">昼食後</option>
-                <option value="夜" selected>夕食後 / 就寝前</option>
-                <option value="運動前後">運動前後</option>
-                <option value="随時">随時</option>
-              </select>
-              <input type="text" id="supple-input-note" placeholder="例: 食後、多めの水で"
-                class="flex-1 px-3.5 py-2 rounded-xl bg-black/40 border border-cyan-800/60 text-xs text-white placeholder-slate-500 focus:outline-hidden focus:border-cyan-400" />
-            </div>
-          </div>
-
-          <button type="button" id="supple-btn-submit-intake-inline" onclick="submitSuppleIntake()"
-            class="w-full py-3 px-4 rounded-2xl bg-emerald-600 text-white text-sm font-extrabold shadow-lg shadow-emerald-500/25 active:scale-[0.99] transition-all">
-            ✓ 登録する
-          </button>
-
-        </div>
-
-        <!-- フッター（削除ボタン & 更新/登録ボタン） -->
-        <div
-          class="px-5 pt-3.5 pb-[calc(1.5rem+env(safe-area-inset-bottom,0px))] border-t border-cyan-900/40 bg-[#070a14]/95 flex items-center gap-2.5 shrink-0">
-          <button type="button" id="supple-btn-delete-record" onclick="deleteCurrentEditingIntake()"
-            class="hidden py-2.5 px-3.5 rounded-xl bg-rose-950/80 border border-rose-700/60 text-rose-300 hover:bg-rose-900 text-xs font-bold transition-colors flex items-center gap-1 shrink-0">
-            🗑️ 削除
-          </button>
-          <button type="button" onclick="closeSuppleIntakeModal()"
-            class="flex-1 py-2.5 px-3 rounded-xl bg-slate-800 border border-slate-700 text-slate-300 text-xs font-bold hover:bg-slate-700 transition-colors">
-            キャンセル
-          </button>
-          <button type="button" id="supple-btn-submit-intake" onclick="submitSuppleIntake()"
-            class="flex-1 min-w-[8rem] py-2.5 px-4 rounded-xl bg-emerald-600 text-white text-xs font-extrabold shadow-lg shadow-emerald-500/25 active:scale-[0.99] transition-all flex items-center justify-center gap-1.5">
-            ✓ 登録する
-          </button>
-        </div>
-
-      </div>
-    </div>
-
-    <!-- ===== ◯ サプリマスター新規登録モーダル ===== -->
-    <div id="modal-supple-master"
-      class="fixed inset-0 hidden bg-black/85 backdrop-blur-sm flex-col justify-start sm:justify-center items-center p-0 sm:p-4 w-full h-full"
-      style="z-index: 10010; display: none;">
-      <div
-        class="bg-[#0b1021] w-full max-w-xl h-full sm:h-auto sm:max-h-[92vh] min-h-0 rounded-none sm:rounded-3xl shadow-2xl border-0 sm:border border-cyan-800/60 flex flex-col overflow-hidden text-slate-100">
-
-        <!-- ヘッダー -->
-        <div
-          class="px-5 pt-[calc(1rem+env(safe-area-inset-top,0px))] pb-3.5 border-b border-cyan-900/40 flex items-center justify-between bg-[#070a14]/90 shrink-0 gap-2">
-          <div class="flex items-center gap-2.5 min-w-0">
-            <div
-              class="w-8 h-8 rounded-xl bg-teal-950 text-teal-400 border border-teal-700/50 flex items-center justify-center text-sm font-bold shrink-0">
-              ✨
-            </div>
-            <div class="min-w-0">
-              <h3 class="font-extrabold text-cyan-50 text-base truncate">新しいサプリを登録</h3>
-              <p class="text-[11px] text-cyan-400/80 truncate">バーコード・写真・名前・カテゴリを設定</p>
-            </div>
-          </div>
-          <button type="button" onclick="closeSuppleMasterModal()"
-            class="w-8 h-8 rounded-full bg-slate-800 text-slate-400 hover:text-white flex items-center justify-center transition-colors shrink-0">✕</button>
-        </div>
-
-        <!-- フォーム（スクロール領域: flex-1 min-h-0） -->
-        <div id="supple-master-scroll-body" class="flex-1 min-h-0 p-5 space-y-4 overflow-y-auto">
-
-          <!-- バーコード登録 & JAN検索 -->
-          <div class="bg-black/30 p-3.5 rounded-2xl border border-cyan-900/40 space-y-2">
-            <div class="flex items-center justify-between">
-              <label class="block text-xs font-bold text-cyan-200">🏷️ バーコード (JANコード)</label>
-              <span class="text-[10px] text-slate-400 font-medium">読み取りで商品名を自動入力</span>
-            </div>
-            <div class="flex gap-1.5">
-              <input type="text" id="supple-master-barcode" placeholder="スキャンまたは番号入力 (例: 4987035...)"
-                oninput="checkSuppleMasterBarcodeDuplicate()"
-                class="flex-1 min-w-0 px-3 py-2 rounded-xl bg-black/40 border border-cyan-800/60 text-white text-xs font-mono font-bold focus:outline-hidden focus:border-cyan-400" />
-              <button type="button"
-                onclick="lookupSuppleNameByBarcode(document.getElementById('supple-master-barcode').value, { overwrite: true })"
-                class="px-2.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-cyan-800/60 text-cyan-200 text-xs font-bold flex items-center gap-1 active:scale-95 transition-all whitespace-nowrap shrink-0"
-                title="バーコードから商品名を取得してサプリ名に入力">
-                🔍
-              </button>
-              <button type="button" onclick="openSuppleBarcodeScanner('master')"
-                class="px-3 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-600 text-white text-xs font-bold flex items-center gap-1 shadow-xs active:scale-95 transition-all whitespace-nowrap shrink-0">
-                📷 スキャン
-              </button>
-            </div>
-            <p id="supple-barcode-lookup-status" class="hidden text-[11px] font-medium px-0.5 leading-snug"></p>
-          </div>
-
-          <!-- 写真設定 -->
-          <div class="bg-black/30 p-3.5 rounded-2xl border border-cyan-900/40 space-y-3">
-            <div class="flex items-center justify-between gap-2">
-              <label class="block text-xs font-bold text-cyan-200">📸 サプリの写真 (任意)</label>
-              <button type="button" onclick="clearSupplePhoto()" id="supple-btn-clear-photo"
-                class="hidden text-[11px] text-rose-400 hover:text-rose-300 font-bold px-2 py-0.5 rounded-lg bg-rose-950/50 border border-rose-800/40 transition-colors active:scale-95">🗑️
-                削除</button>
-            </div>
-
-            <!-- 上段: 固定サイズプレビュー + 操作ボタン -->
-            <div class="flex items-center gap-3">
-              <div
-                class="relative w-20 h-20 rounded-2xl bg-black/50 border-2 border-dashed border-cyan-800/60 flex items-center justify-center overflow-hidden shrink-0"
-                style="width: 80px; height: 80px;">
-                <img id="supple-master-preview" src="" alt="プレビュー"
-                  class="w-full h-full object-contain bg-white/5 hidden" />
-                <div id="supple-master-placeholder"
-                  class="text-slate-400 flex flex-col items-center justify-center text-center">
-                  <span class="text-xl">🖼️</span>
-                  <span class="text-[9px] font-medium text-slate-500 mt-0.5">未設定</span>
-                </div>
-              </div>
-
-              <div class="flex-1 min-w-0 grid grid-cols-2 gap-2">
-                <!-- Web画像検索 -->
-                <button type="button" onclick="openSuppleJanGoogleImageSearch()"
-                  class="px-2.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-cyan-200 text-xs font-bold flex items-center justify-center gap-1.5 border border-cyan-900/40 transition-colors active:scale-95 shadow-2xs whitespace-nowrap"
-                  title="Google画像検索を別画面で開く">
-                  <span>🌐</span>
-                  <span>Web検索</span>
-                </button>
-
-                <!-- クリップボード貼付 -->
-                <button type="button" onclick="pasteSuppleImageFromClipboard()"
-                  class="px-2.5 py-2 rounded-xl bg-cyan-950/80 hover:bg-cyan-900 text-cyan-200 text-xs font-bold flex items-center justify-center gap-1.5 border border-cyan-700/60 transition-colors active:scale-95 shadow-2xs whitespace-nowrap"
-                  title="クリップボードから画像を貼り付ける">
-                  <span>📋</span>
-                  <span>貼付</span>
-                </button>
-
-                <!-- カメラ起動 -->
-                <label
-                  class="cursor-pointer px-2.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-cyan-200 text-xs font-bold flex items-center justify-center gap-1.5 border border-cyan-900/40 transition-colors active:scale-95 shadow-2xs whitespace-nowrap">
-                  <span>📷</span>
-                  <span>カメラ</span>
-                  <input type="file" id="supple-master-file-camera" accept="image/*" capture="environment"
-                    class="hidden" onchange="handleSupplePhotoUpload(event)" />
-                </label>
-
-                <!-- ギャラリーから選ぶ -->
-                <label
-                  class="cursor-pointer px-2.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-cyan-200 text-xs font-bold flex items-center justify-center gap-1.5 border border-cyan-900/40 transition-colors active:scale-95 shadow-2xs whitespace-nowrap">
-                  <span>🖼️</span>
-                  <span>ギャラリー</span>
-                  <input type="file" id="supple-master-file-gallery" accept="image/*" class="hidden"
-                    onchange="handleSupplePhotoUpload(event)" />
-                </label>
-              </div>
-            </div>
-
-            <p id="supple-paste-status" class="hidden text-[11px] font-medium px-0.5 leading-snug"></p>
-
-            <input type="hidden" id="supple-master-photo-data" value="" />
-          </div>
-
-          <!-- 名前 -->
-          <div>
-            <label class="block text-xs font-bold text-cyan-200 mb-1.5">💊 サプリ名 <span
-                class="text-rose-400">*</span></label>
-            <input type="text" id="supple-master-name" placeholder="例: ビタミンC 1000mg、亜鉛サプリ"
-              class="w-full px-4 py-2.5 rounded-2xl bg-black/40 border border-cyan-800/60 text-white text-sm font-semibold focus:outline-hidden focus:border-cyan-400 transition-all" />
-          </div>
-
-          <!-- カテゴリ -->
-          <div>
-            <label class="block text-xs font-bold text-cyan-200 mb-1.5">📂 カテゴリ <span
-                class="text-rose-400">*</span></label>
-            <div class="grid grid-cols-3 gap-2" id="supple-category-container"></div>
-            <input type="hidden" id="supple-master-category" value="ビタミン" />
-          </div>
-
-          <!-- 目安量 -->
-          <div>
-            <label class="block text-xs font-bold text-cyan-200 mb-1.5">📝 目安量・メモ（任意）</label>
-            <input type="text" id="supple-master-dose" placeholder="例: 1日1回 2粒"
-              class="w-full px-4 py-2 rounded-2xl bg-black/40 border border-cyan-800/60 text-white text-xs focus:outline-hidden focus:border-cyan-400 transition-all" />
-          </div>
-
-        </div>
-
-        <!-- フッター（戻る & 登録ボタンを常に下部固定） -->
-        <div
-          class="px-5 pt-3.5 pb-[calc(1.5rem+env(safe-area-inset-bottom,0px))] border-t border-cyan-900/40 bg-[#070a14]/95 flex items-center gap-2.5 shrink-0">
-          <button type="button" onclick="closeSuppleMasterModal()"
-            class="flex-1 py-3 px-4 rounded-xl bg-slate-800 border border-slate-700 text-slate-300 text-xs font-bold hover:bg-slate-700 transition-colors">
-            戻る
-          </button>
-          <button type="button" onclick="submitSuppleMaster()" style="flex: 2;"
-            class="py-3 px-4 rounded-xl bg-gradient-to-r from-teal-500 to-emerald-500 text-white text-sm font-extrabold shadow-lg shadow-teal-500/25 active:scale-[0.99] transition-all flex items-center justify-center gap-1.5">
-            💾 サプリを登録
-          </button>
-        </div>
-
-      </div>
-    </div>
-
-    <!-- ===== ◯ バーコードスキャナーモーダル ===== -->
-    <div id="modal-supple-scanner"
-      class="fixed inset-0 hidden bg-black/85 backdrop-blur-md flex items-center justify-center p-4"
-      style="z-index: 10020; display: none;">
-      <div
-        class="bg-[#0b1021] w-full max-w-sm rounded-3xl shadow-2xl border border-cyan-700/60 overflow-hidden flex flex-col text-white">
-
-        <div class="px-5 py-4 border-b border-cyan-900/40 flex items-center justify-between bg-[#070a14]/90">
-          <div class="flex items-center gap-2">
-            <span class="text-base">📷</span>
-            <div>
-              <h4 class="font-extrabold text-sm text-cyan-100" id="supple-scanner-title">バーコードをスキャン</h4>
-              <p class="text-[10px] text-cyan-400/80" id="supple-scanner-subtitle">カメラをバーコードに合わせてください</p>
-            </div>
-          </div>
-          <button type="button" onclick="closeSupplementBarcodeScanner()"
-            class="w-8 h-8 rounded-full bg-slate-800 text-slate-400 hover:text-white flex items-center justify-center transition-colors">✕</button>
-        </div>
-
-        <div class="relative bg-black flex items-center justify-center min-h-[250px] overflow-hidden">
-          <div id="supple-barcode-reader" class="w-full h-full"></div>
-          <div class="supple-laser pointer-events-none"></div>
-          <div
-            class="absolute inset-x-8 inset-y-10 border-2 border-dashed border-emerald-400/70 rounded-2xl pointer-events-none flex items-center justify-center">
-            <span class="bg-black/70 text-emerald-300 text-[10px] font-bold px-2 py-0.5 rounded-full">JAN / バーコード</span>
-          </div>
-        </div>
-
-        <div class="p-4 bg-[#070a14] space-y-2.5">
-          <div class="flex gap-2">
-            <input type="text" id="supple-scanner-manual-input" placeholder="バーコード番号を直接入力"
-              class="flex-1 px-3 py-2 rounded-xl bg-slate-900 border border-cyan-900/60 text-white text-xs font-mono focus:outline-hidden focus:border-cyan-400" />
-            <button type="button" onclick="submitSuppleManualBarcode()"
-              class="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold active:scale-95 transition-all">
-              決定
-            </button>
-          </div>
-          <button type="button" onclick="closeSupplementBarcodeScanner()"
-            class="w-full py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition-colors">
-            閉じる
-          </button>
-        </div>
-
-      </div>
-    </div>
-
     <div id="qr-mode" class="tab-content">
       <div class="qr-shell">
         <div
           class="flex justify-between items-center gap-3 px-3 sm:px-4 pt-[calc(0.65rem+env(safe-area-inset-top,0px))] pb-2.5 border-b border-cyan-900/40 bg-[#070a14]/95 shrink-0">
           <div class="min-w-0">
             <h2 class="text-base sm:text-lg font-black text-cyan-50 tracking-wide">QRカメラ</h2>
-            <p class="text-[10px] sm:text-[11px] text-cyan-400/80 font-bold mt-0.5">読み取ったらすぐ開きます</p>
+            <p class="text-[10px] sm:text-[11px] text-cyan-400/80 font-bold mt-0.5">確認してから開く・コピー・INBOX保存</p>
           </div>
           <div class="flex items-center gap-1.5 shrink-0">
             <button type="button" id="qr-torch-btn" onclick="toggleQrTorch()"
@@ -12019,18 +11902,33 @@
               class="inline-block text-[11px] font-extrabold text-cyan-100/90 bg-black/55 border border-cyan-800/40 rounded-full px-3 py-1">枠内にQRを合わせてください</span>
           </div>
         </div>
-        <div class="shrink-0 px-3 sm:px-4 py-3 border-t border-cyan-900/40 bg-[#070a14]/95 space-y-2">
-          <p id="qr-status" class="text-[11px] font-extrabold text-cyan-300/90 leading-relaxed min-h-[1.25rem]">カメラ起動待ち…
-          </p>
-          <p id="qr-last" class="text-[11px] font-mono text-slate-400 break-all line-clamp-2 min-h-[1rem]"></p>
+        <div class="shrink-0 px-3 sm:px-4 py-3 border-t border-cyan-900/40 bg-[#070a14]/95 space-y-2.5">
+          <div class="flex items-center justify-between gap-2">
+            <p id="qr-status" class="text-[11px] font-extrabold text-cyan-300/90 leading-relaxed min-h-[1.25rem]">カメラ起動待ち…
+            </p>
+            <label class="inline-flex items-center gap-1.5 shrink-0 text-[11px] font-bold text-slate-300 cursor-pointer select-none">
+              <input type="checkbox" id="qr-auto-open-toggle" onchange="setQrAutoOpenEnabled(this.checked)"
+                class="w-4 h-4 accent-cyan-500 rounded cursor-pointer">
+              <span>自動オープン</span>
+            </label>
+          </div>
+          <div id="qr-result-card" class="rounded-xl border border-cyan-900/50 bg-black/40 px-3 py-2">
+            <p id="qr-last" class="text-[11px] font-mono text-slate-300 break-all line-clamp-2 min-h-[1.1rem]">まだ読み取り結果がありません</p>
+          </div>
           <div class="flex flex-wrap gap-2">
             <button type="button" id="qr-start-btn" onclick="startQrScanner()"
-              class="h-11 px-4 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-700 text-white text-sm font-extrabold border border-cyan-400/20 shadow-[0_0_16px_rgba(34,211,238,0.25)] active:scale-95 transition">カメラ開始</button>
+              class="h-10 px-3.5 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-700 text-white text-xs sm:text-sm font-extrabold border border-cyan-400/20 shadow-[0_0_16px_rgba(34,211,238,0.25)] active:scale-95 transition">カメラ開始</button>
             <button type="button" id="qr-stop-btn" onclick="stopQrScanner()"
-              class="h-11 px-4 rounded-xl bg-slate-900/80 text-slate-200 text-sm font-bold border border-slate-600/60 active:scale-95 transition">停止</button>
+              class="h-10 px-3.5 rounded-xl bg-slate-900/80 text-slate-200 text-xs sm:text-sm font-bold border border-slate-600/60 active:scale-95 transition">停止</button>
             <button type="button" id="qr-open-last-btn" onclick="openLastQrResult()"
-              class="h-11 px-4 rounded-xl bg-emerald-950/60 text-emerald-200 text-sm font-bold border border-emerald-700/50 active:scale-95 transition disabled:opacity-40"
-              disabled>再オープン</button>
+              class="h-10 px-3.5 rounded-xl bg-emerald-950/60 text-emerald-200 text-xs sm:text-sm font-bold border border-emerald-700/50 active:scale-95 transition disabled:opacity-40"
+              disabled>🔗 開く</button>
+            <button type="button" id="qr-copy-last-btn" onclick="copyLastQrResult()"
+              class="h-10 px-3.5 rounded-xl bg-slate-800/80 text-slate-200 text-xs sm:text-sm font-bold border border-slate-600/60 active:scale-95 transition disabled:opacity-40"
+              disabled>📋 コピー</button>
+            <button type="button" id="qr-dump-last-btn" onclick="dumpLastQrToInbox()"
+              class="h-10 px-3.5 rounded-xl bg-indigo-950/70 text-indigo-200 text-xs sm:text-sm font-bold border border-indigo-600/50 active:scale-95 transition disabled:opacity-40"
+              disabled>📥 INBOXへDUMP</button>
           </div>
         </div>
       </div>
@@ -12194,6 +12092,56 @@
             class="text-xs text-cyan-100/70 font-bold leading-relaxed">
             ONにすると、入力画面のリング・パーティクル・背景などの装飾アニメーションを停止し、描画負荷とバッテリー消費を抑えます。設定は次回起動時にも維持されます。
           </p>
+        </div>
+
+        <div id="settings-card-backup"
+          class="bg-black/40 border-2 border-cyan-800/50 rounded-2xl p-5 shadow-[inset_0_0_10px_rgba(0,0,0,0.5)]">
+          <h3 class="text-base font-extrabold text-cyan-300">📦 全データ バックアップ / 復元（JSON）</h3>
+          <p class="text-xs text-cyan-100/70 font-bold leading-relaxed">
+            設定・プロファイル・サプリ・ガント・ツリー等のローカル保存データを1つの JSON ファイルに書き出したり、読み込んで復元したりできます（GAS API トークンは含まれません）。
+          </p>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+            <button type="button" onclick="exportAllDumpDataJson()"
+              class="h-11 px-3 rounded-xl bg-cyan-950/70 hover:bg-cyan-900/70 border border-cyan-600/50 text-cyan-100 text-xs font-extrabold transition active:scale-95">⬇️ JSON バックアップを保存</button>
+            <label
+              class="h-11 px-3 rounded-xl bg-indigo-950/70 hover:bg-indigo-900/70 border border-indigo-600/50 text-indigo-100 text-xs font-extrabold transition active:scale-95 inline-flex items-center justify-center cursor-pointer">
+              <span>⬆️ JSON から復元</span>
+              <input type="file" id="setting-json-restore-input" accept="application/json,.json" class="hidden"
+                onchange="importAllDumpDataJson(this)">
+            </label>
+          </div>
+          <p id="json-backup-status" class="text-[11px] font-bold text-slate-400 min-h-[1rem]"></p>
+        </div>
+
+        <div id="settings-card-trash-purge"
+          class="bg-black/40 border-2 border-amber-800/40 rounded-2xl p-5 shadow-[inset_0_0_10px_rgba(0,0,0,0.5)]">
+          <h3 class="text-base font-extrabold text-amber-300">🧹 クラウド最適化（ゴミ箱のシステム履歴を整理）</h3>
+          <p class="text-xs text-cyan-100/70 font-bold leading-relaxed">
+            Google スプレッドシートのゴミ箱内に溜まったシステム同期用スナップショット（パレット・ツリー・ガント・サプリ等の旧履歴）だけを完全に整理します。メモ本文は削除しません。
+          </p>
+          <div class="flex flex-wrap items-center gap-2.5 pt-1">
+            <button type="button" id="btn-purge-system-trash" onclick="runPurgeSystemTrash()"
+              class="h-10 px-4 rounded-xl bg-amber-950/70 hover:bg-amber-900/70 border border-amber-600/50 text-amber-100 text-xs font-extrabold transition active:scale-95">🧹 システム履歴を整理する</button>
+            <span id="purge-system-trash-status" class="text-[11px] font-bold text-slate-400"></span>
+          </div>
+        </div>
+
+        <div id="settings-card-api-token"
+          class="bg-black/40 border-2 border-cyan-800/50 rounded-2xl p-5 shadow-[inset_0_0_10px_rgba(0,0,0,0.5)]">
+          <h3 class="text-base font-extrabold text-cyan-300">🔐 GAS API トークン（任意セキュリティ）</h3>
+          <p class="text-xs text-cyan-100/70 font-bold leading-relaxed">
+            GAS スクリプトプロパティに <code>DUMP_API_TOKEN</code> を設定している場合のみ、同じトークンを入力して保存してください（この端末のブラウザにのみ保存されます）。
+          </p>
+          <div class="flex flex-wrap items-center gap-2 pt-1">
+            <input type="password" id="setting-gas-api-token" autocomplete="off"
+              placeholder="未設定（任意）"
+              class="flex-1 min-w-[160px] h-10 px-3 rounded-xl bg-black/50 border border-cyan-800/60 text-cyan-50 text-xs font-mono font-bold focus:outline-none focus:border-cyan-400">
+            <button type="button" onclick="saveDumpApiToken()"
+              class="h-10 px-3.5 rounded-xl bg-cyan-800/80 hover:bg-cyan-700 border border-cyan-500/50 text-cyan-50 text-xs font-extrabold transition active:scale-95">保存</button>
+            <button type="button" onclick="clearDumpApiToken()"
+              class="h-10 px-3 rounded-xl bg-slate-800/80 hover:bg-slate-700 border border-slate-600/60 text-slate-200 text-xs font-extrabold transition active:scale-95">消去</button>
+          </div>
+          <p id="gas-api-token-status" class="text-[11px] font-bold text-slate-400">状態: 未設定</p>
         </div>
 
         <div id="abstinence-settings-card"
@@ -13831,7 +13779,7 @@
               class="rounded-xl border border-cyan-800/50 bg-cyan-950/20 px-3 py-2.5 text-xs text-cyan-100 font-bold leading-relaxed">
             </div>
             <p class="text-[11px] text-slate-400 font-bold leading-relaxed">※
-              簡易判定・流派差あり。目安であり断定ではありません。節入りは日付＋おおよその時刻の近似です。</p>
+              簡易判定・流派差あり。目安であり断定ではありません。節入りは太陽黄経による天文計算（JST）です。</p>
             <button type="button" onclick="executeSanmeiReading()"
               class="w-full text-sm text-cyan-50 font-bold bg-gradient-to-r from-cyan-700 to-sky-700 hover:from-cyan-600 hover:to-sky-600 px-4 py-3 rounded-xl border border-cyan-500/30 shadow-[0_0_15px_rgba(6,182,212,0.2)] transition active:scale-95">算命学の命式を鑑定</button>
 
@@ -14967,6 +14915,7 @@
                     <div id="sanmei-jokaku-guide"
                       class="rounded-lg border border-cyan-900/40 bg-black/30 p-2.5 space-y-1 text-[11px] font-bold leading-relaxed">
                     </div>
+                    <div id="sanmei-jokaku-wealth" class="hidden pt-2 mt-2 border-t border-cyan-900/40 space-y-2"></div>
                   </div>
                   <div class="space-y-3">
                     <div>
@@ -15160,7 +15109,7 @@
                 <div class="sanmei-acc-content hidden p-4 pt-1 border-t border-cyan-900/40 space-y-3">
                   <p data-info-title="月ごとの起こりやすいこと（今年）" data-info-key="sanmei-monthly"
                     class="text-[11px] text-slate-400 font-bold leading-relaxed">
-                    今年の暦月ごとに、日干×その月の干支（主星）と、生まれ月・日柱との位相（冲・合など）を混ぜた「起こりやすいテーマ」です。節入り近似の月柱で見ます。断定ではなく目安です。</p>
+                    今年の暦月ごとに、日干×その月の干支（主星）と、生まれ月・日柱との位相（冲・合など）を混ぜた「起こりやすいテーマ」です。節入りは太陽黄経による天文計算（JST）の月柱で見ます。断定ではなく目安です。</p>
                   <div id="sanmei-monthly-year-label" class="text-[11px] text-teal-400/90 font-bold"></div>
                   <div id="sanmei-monthly-list" class="space-y-2"></div>
                   <p class="text-[10px] text-slate-500 font-bold leading-relaxed">※
@@ -15342,6 +15291,14 @@
             </div>
             <div id="ziwei-profile-source"
               class="rounded-xl border border-fuchsia-800/50 bg-fuchsia-950/20 px-3 py-2.5 text-xs text-fuchsia-100 font-bold leading-relaxed">
+            </div>
+            <div class="rounded-xl border border-fuchsia-800/40 bg-black/30 px-3 py-2 flex items-center justify-between gap-2">
+              <label for="ziwei-late-rat-mode" class="text-[11px] font-extrabold text-fuchsia-300 shrink-0">23時台の扱い（子時）</label>
+              <select id="ziwei-late-rat-mode" onchange="onZiweiLateRatModeChange(this.value)"
+                class="bg-slate-950/90 border border-fuchsia-700/60 rounded-lg px-2.5 py-1.5 text-xs font-bold text-fuchsia-100 focus:outline-none focus:border-fuchsia-400">
+                <option value="early">早子（23時〜当日扱い）</option>
+                <option value="late">晩子（iztro 23時晩子扱い）</option>
+              </select>
             </div>
             <p class="text-[11px] text-slate-400 font-bold leading-relaxed">※
               簡易判定・流派差あり。目安であり断定ではありません。本命の地図・十四の主役の星・生まれ年の変化に加え、10年の流れ・今年の流れも表示します。</p>
@@ -15714,7 +15671,7 @@
               </div>
             </div>
             <p class="text-[11px] text-slate-400 font-bold leading-relaxed">※
-              簡易判定・流派差あり。目安であり断定ではありません。節入り・蔵干・大運は算命学パネルと同じ近似です。</p>
+              簡易判定・流派差あり。目安であり断定ではありません。節入りは太陽黄経による天文計算（JST）、蔵干・大運も算命学パネルと共通です。</p>
             <button type="button" onclick="executeBaziReading()"
               class="w-full text-sm text-emerald-50 font-bold bg-gradient-to-r from-emerald-700 to-teal-700 hover:from-emerald-600 hover:to-teal-600 px-4 py-3 rounded-xl border border-emerald-500/30 shadow-[0_0_15px_rgba(16,185,129,0.2)] transition active:scale-95">四柱推命の命式を鑑定</button>
 
@@ -16557,6 +16514,325 @@
       </button>
     </div>
   </nav>
+  <!-- ===== ◯ 摂取したサプリ 登録・編集モーダル ===== -->
+  <div id="modal-supple-intake"
+    class="fixed inset-0 hidden bg-black/85 backdrop-blur-sm flex-col justify-start sm:justify-center items-center p-0 sm:p-4 w-full h-full"
+    style="z-index: 10000; display: none;">
+    <div
+      class="bg-[#0b1021] w-full max-w-xl h-full sm:h-auto sm:max-h-[92vh] min-h-0 rounded-none sm:rounded-3xl shadow-2xl border-0 sm:border border-cyan-800/60 flex flex-col overflow-hidden text-slate-100">
+
+      <!-- ヘッダー -->
+      <div
+        class="px-5 pt-[calc(1.2rem+env(safe-area-inset-top,0px))] pb-4 border-b border-cyan-900/40 flex items-center justify-between bg-[#070a14]/95 shrink-0">
+        <div class="flex items-center gap-2.5">
+          <div id="supple-modal-icon"
+            class="w-8 h-8 rounded-xl bg-emerald-950 text-emerald-400 border border-emerald-700/50 flex items-center justify-center text-sm font-bold">
+            ✓
+          </div>
+          <div>
+            <h3 id="supple-modal-title" class="font-extrabold text-cyan-50 text-base">摂取したサプリの記録</h3>
+            <p id="supple-modal-subtitle" class="text-[11px] text-cyan-400/80">日付とサプリを選んで登録します</p>
+          </div>
+        </div>
+        <button type="button" onclick="closeSuppleIntakeModal()"
+          class="w-8 h-8 rounded-full bg-slate-800 text-slate-400 hover:text-white flex items-center justify-center transition-colors">✕</button>
+      </div>
+
+      <!-- ボディ（いっぱいまで展開: flex-1 min-h-0） -->
+      <div class="flex-1 min-h-0 p-5 space-y-4 overflow-y-auto">
+        <!-- 編集中のID保持 hidden -->
+        <input type="hidden" id="supple-edit-intake-id" value="" />
+
+        <!-- 1. 日付 -->
+        <div>
+          <label class="block text-xs font-bold text-cyan-200 mb-1.5">📅 摂取した日付</label>
+          <input type="date" id="supple-input-date"
+            class="w-full px-4 py-2.5 rounded-2xl bg-black/40 border border-cyan-800/60 text-white text-sm font-semibold focus:outline-hidden focus:border-cyan-400 transition-all" />
+        </div>
+
+        <!-- 2. サプリ選択（複数・個数・削除） -->
+        <div>
+          <div class="flex items-center justify-between gap-2 mb-1.5">
+            <label class="min-w-0 text-xs font-bold text-cyan-200 leading-tight">📦 摂取したサプリを選択</label>
+            <button type="button" onclick="openSuppleMasterModal()"
+              class="shrink-0 whitespace-nowrap inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl border border-dashed border-emerald-500/60 bg-emerald-950/30 hover:bg-emerald-900/40 text-emerald-300 text-[11px] font-extrabold transition active:scale-[0.98]">
+              <span class="text-sm leading-none">＋</span><span>新規登録</span>
+            </button>
+          </div>
+          <div id="supple-pick-list"
+            class="max-h-64 overflow-y-auto space-y-1 rounded-2xl border border-cyan-800/60 bg-black/30 p-1.5"></div>
+          <p id="supple-pick-summary" class="text-[11px] text-slate-400 font-bold mt-1.5"></p>
+          <input type="hidden" id="supple-selected-id" value="" />
+        </div>
+
+        <!-- 3. タイミング / メモ -->
+        <div>
+          <label class="block text-xs font-bold text-cyan-200 mb-1.5">🕒 摂取タイミング / メモ（任意）</label>
+          <div class="flex gap-2">
+            <select id="supple-input-timing"
+              class="px-3 py-2 rounded-xl bg-black/40 border border-cyan-800/60 text-xs font-bold text-cyan-100 focus:outline-hidden focus:border-cyan-400">
+              <option value="朝">朝食後</option>
+              <option value="昼">昼食後</option>
+              <option value="夜" selected>夕食後 / 就寝前</option>
+              <option value="運動前後">運動前後</option>
+              <option value="随時">随時</option>
+            </select>
+            <input type="text" id="supple-input-note" placeholder="例: 食後、多めの水で"
+              class="flex-1 px-3.5 py-2 rounded-xl bg-black/40 border border-cyan-800/60 text-xs text-white placeholder-slate-500 focus:outline-hidden focus:border-cyan-400" />
+          </div>
+        </div>
+
+        <div class="flex flex-col sm:flex-row gap-2">
+          <button type="button" id="supple-btn-submit-intake-inline" onclick="submitSuppleIntake()"
+            class="flex-1 py-3 px-4 rounded-2xl bg-emerald-600 text-white text-sm font-extrabold shadow-lg shadow-emerald-500/25 active:scale-[0.99] transition-all">
+            ✓ 登録する
+          </button>
+          <button type="button" id="supple-btn-save-routine" onclick="saveCurrentSuppleRoutine()"
+            class="py-3 px-4 rounded-2xl bg-amber-950/60 border border-amber-600/50 text-amber-200 hover:bg-amber-900/60 text-xs sm:text-sm font-extrabold active:scale-[0.99] transition-all whitespace-nowrap">
+            ⭐ この選択をセット保存
+          </button>
+        </div>
+
+      </div>
+
+      <!-- フッター（削除ボタン & 更新/登録ボタン） -->
+      <div
+        class="px-5 pt-3.5 pb-[calc(1.5rem+env(safe-area-inset-bottom,0px))] border-t border-cyan-900/40 bg-[#070a14]/95 flex items-center gap-2.5 shrink-0">
+        <button type="button" id="supple-btn-delete-record" onclick="deleteCurrentEditingIntake()"
+          class="hidden py-2.5 px-3.5 rounded-xl bg-rose-950/80 border border-rose-700/60 text-rose-300 hover:bg-rose-900 text-xs font-bold transition-colors flex items-center gap-1 shrink-0">
+          🗑️ 削除
+        </button>
+        <button type="button" onclick="closeSuppleIntakeModal()"
+          class="flex-1 py-2.5 px-3 rounded-xl bg-slate-800 border border-slate-700 text-slate-300 text-xs font-bold hover:bg-slate-700 transition-colors">
+          キャンセル
+        </button>
+        <button type="button" id="supple-btn-submit-intake" onclick="submitSuppleIntake()"
+          class="flex-1 min-w-[8rem] py-2.5 px-4 rounded-xl bg-emerald-600 text-white text-xs font-extrabold shadow-lg shadow-emerald-500/25 active:scale-[0.99] transition-all flex items-center justify-center gap-1.5">
+          ✓ 登録する
+        </button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ===== ◯ サプリマスター新規登録モーダル ===== -->
+  <div id="modal-supple-master"
+    class="fixed inset-0 hidden bg-black/85 backdrop-blur-sm flex-col justify-start sm:justify-center items-center p-0 sm:p-4 w-full h-full"
+    style="z-index: 10010; display: none;">
+    <div
+      class="bg-[#0b1021] w-full max-w-xl h-full sm:h-auto sm:max-h-[92vh] min-h-0 rounded-none sm:rounded-3xl shadow-2xl border-0 sm:border border-cyan-800/60 flex flex-col overflow-hidden text-slate-100">
+
+      <!-- ヘッダー -->
+      <div
+        class="px-5 pt-[calc(1rem+env(safe-area-inset-top,0px))] pb-3.5 border-b border-cyan-900/40 flex items-center justify-between bg-[#070a14]/90 shrink-0 gap-2">
+        <div class="flex items-center gap-2.5 min-w-0">
+          <div
+            class="w-8 h-8 rounded-xl bg-teal-950 text-teal-400 border border-teal-700/50 flex items-center justify-center text-sm font-bold shrink-0">
+            ✨
+          </div>
+          <div class="min-w-0">
+            <h3 id="supple-master-modal-title" class="font-extrabold text-cyan-50 text-base truncate">新しいサプリを登録</h3>
+            <p id="supple-master-modal-subtitle" class="text-[11px] text-cyan-400/80 truncate">バーコード・写真・名前・カテゴリを設定</p>
+          </div>
+        </div>
+        <button type="button" onclick="closeSuppleMasterModal()"
+          class="w-8 h-8 rounded-full bg-slate-800 text-slate-400 hover:text-white flex items-center justify-center transition-colors shrink-0">✕</button>
+      </div>
+
+      <!-- フォーム（スクロール領域: flex-1 min-h-0） -->
+      <div id="supple-master-scroll-body" class="flex-1 min-h-0 p-5 pb-8 space-y-4 overflow-y-auto overscroll-contain touch-pan-y">
+        <input type="hidden" id="supple-master-edit-id" value="" />
+
+        <!-- バーコード登録 & JAN検索 -->
+        <div class="bg-black/30 p-3.5 rounded-2xl border border-cyan-900/40 space-y-2">
+          <div class="flex items-center justify-between">
+            <label class="block text-xs font-bold text-cyan-200">🏷️ バーコード (JANコード)</label>
+            <span class="text-[10px] text-slate-400 font-medium">読み取りで商品名を自動入力</span>
+          </div>
+          <div class="flex gap-1.5">
+            <input type="text" id="supple-master-barcode" placeholder="スキャンまたは番号入力 (例: 4987035...)"
+              oninput="checkSuppleMasterBarcodeDuplicate()"
+              class="flex-1 min-w-0 px-3 py-2 rounded-xl bg-black/40 border border-cyan-800/60 text-white text-xs font-mono font-bold focus:outline-hidden focus:border-cyan-400" />
+            <button type="button"
+              onclick="lookupSuppleNameByBarcode(document.getElementById('supple-master-barcode').value, { overwrite: true })"
+              class="px-2.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-cyan-800/60 text-cyan-200 text-xs font-bold flex items-center gap-1 active:scale-95 transition-all whitespace-nowrap shrink-0"
+              title="バーコードから商品名を取得してサプリ名に入力">
+              🔍
+            </button>
+            <button type="button" onclick="openSuppleBarcodeScanner('master')"
+              class="px-3 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-600 text-white text-xs font-bold flex items-center gap-1 shadow-xs active:scale-95 transition-all whitespace-nowrap shrink-0">
+              📷 スキャン
+            </button>
+          </div>
+          <p id="supple-barcode-lookup-status" class="hidden text-[11px] font-medium px-0.5 leading-snug"></p>
+        </div>
+
+        <!-- 写真設定 -->
+        <div class="bg-black/30 p-3.5 rounded-2xl border border-cyan-900/40 space-y-3">
+          <div class="flex items-center justify-between gap-2">
+            <label class="block text-xs font-bold text-cyan-200">📸 サプリの写真 (任意)</label>
+            <button type="button" onclick="clearSupplePhoto()" id="supple-btn-clear-photo"
+              class="hidden text-[11px] text-rose-400 hover:text-rose-300 font-bold px-2 py-0.5 rounded-lg bg-rose-950/50 border border-rose-800/40 transition-colors active:scale-95">🗑️
+              削除</button>
+          </div>
+
+          <!-- 上段: 固定サイズプレビュー + 操作ボタン -->
+          <div class="flex items-center gap-3">
+            <div
+              class="relative w-20 h-20 rounded-2xl bg-black/50 border-2 border-dashed border-cyan-800/60 flex items-center justify-center overflow-hidden shrink-0"
+              style="width: 80px; height: 80px;">
+              <img id="supple-master-preview" src="" alt="プレビュー"
+                class="w-full h-full object-contain bg-white/5 hidden" />
+              <div id="supple-master-placeholder"
+                class="text-slate-400 flex flex-col items-center justify-center text-center">
+                <span class="text-xl">🖼️</span>
+                <span class="text-[9px] font-medium text-slate-500 mt-0.5">未設定</span>
+              </div>
+            </div>
+
+            <div class="flex-1 min-w-0 grid grid-cols-2 gap-2">
+              <!-- Web画像検索 -->
+              <button type="button" onclick="openSuppleJanGoogleImageSearch()"
+                class="px-2.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-cyan-200 text-xs font-bold flex items-center justify-center gap-1.5 border border-cyan-900/40 transition-colors active:scale-95 shadow-2xs whitespace-nowrap"
+                title="Google画像検索を別画面で開く">
+                <span>🌐</span>
+                <span>Web検索</span>
+              </button>
+
+              <!-- クリップボード貼付 -->
+              <button type="button" onclick="pasteSuppleImageFromClipboard()"
+                class="px-2.5 py-2 rounded-xl bg-cyan-950/80 hover:bg-cyan-900 text-cyan-200 text-xs font-bold flex items-center justify-center gap-1.5 border border-cyan-700/60 transition-colors active:scale-95 shadow-2xs whitespace-nowrap"
+                title="クリップボードから画像を貼り付ける">
+                <span>📋</span>
+                <span>貼付</span>
+              </button>
+
+              <!-- カメラ起動 -->
+              <label
+                class="cursor-pointer px-2.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-cyan-200 text-xs font-bold flex items-center justify-center gap-1.5 border border-cyan-900/40 transition-colors active:scale-95 shadow-2xs whitespace-nowrap">
+                <span>📷</span>
+                <span>カメラ</span>
+                <input type="file" id="supple-master-file-camera" accept="image/*" capture="environment"
+                  class="hidden" onchange="handleSupplePhotoUpload(event)" />
+              </label>
+
+              <!-- ギャラリーから選ぶ -->
+              <label
+                class="cursor-pointer px-2.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-cyan-200 text-xs font-bold flex items-center justify-center gap-1.5 border border-cyan-900/40 transition-colors active:scale-95 shadow-2xs whitespace-nowrap">
+                <span>🖼️</span>
+                <span>ギャラリー</span>
+                <input type="file" id="supple-master-file-gallery" accept="image/*" class="hidden"
+                  onchange="handleSupplePhotoUpload(event)" />
+              </label>
+            </div>
+          </div>
+
+          <p id="supple-paste-status" class="hidden text-[11px] font-medium px-0.5 leading-snug"></p>
+
+          <input type="hidden" id="supple-master-photo-data" value="" />
+        </div>
+
+        <!-- 名前 -->
+        <div>
+          <label class="block text-xs font-bold text-cyan-200 mb-1.5">💊 サプリ名 <span
+              class="text-rose-400">*</span></label>
+          <input type="text" id="supple-master-name" placeholder="例: ビタミンC 1000mg、亜鉛サプリ"
+            class="w-full px-4 py-2.5 rounded-2xl bg-black/40 border border-cyan-800/60 text-white text-sm font-semibold focus:outline-hidden focus:border-cyan-400 transition-all" />
+        </div>
+
+        <!-- カテゴリ -->
+        <div>
+          <label class="block text-xs font-bold text-cyan-200 mb-1.5">📂 カテゴリ <span
+              class="text-rose-400">*</span></label>
+          <div class="grid grid-cols-3 gap-2" id="supple-category-container"></div>
+          <input type="hidden" id="supple-master-category" value="ビタミン" />
+        </div>
+
+        <!-- 目安量 -->
+        <div>
+          <label class="block text-xs font-bold text-cyan-200 mb-1.5">📝 目安量・メモ（任意）</label>
+          <input type="text" id="supple-master-dose" placeholder="例: 1日1回 2粒"
+            class="w-full px-4 py-2 rounded-2xl bg-black/40 border border-cyan-800/60 text-white text-xs focus:outline-hidden focus:border-cyan-400 transition-all" />
+        </div>
+
+        <!-- 在庫・残数管理（任意） -->
+        <div class="grid grid-cols-2 gap-2.5">
+          <div>
+            <label class="block text-[11px] font-bold text-cyan-200 mb-1">📦 現在の残数（任意）</label>
+            <input type="number" id="supple-master-stock" min="0" max="9999" inputmode="numeric" placeholder="例: 60"
+              class="w-full px-3.5 py-2 rounded-2xl bg-black/40 border border-cyan-800/60 text-white text-xs font-bold focus:outline-hidden focus:border-cyan-400 transition-all" />
+          </div>
+          <div>
+            <label class="block text-[11px] font-bold text-cyan-200 mb-1">⏱️ 1日の目安消費数</label>
+            <input type="number" id="supple-master-daily-dose" min="0" max="99" step="0.5" inputmode="decimal" placeholder="例: 2"
+              class="w-full px-3.5 py-2 rounded-2xl bg-black/40 border border-cyan-800/60 text-white text-xs font-bold focus:outline-hidden focus:border-cyan-400 transition-all" />
+          </div>
+        </div>
+
+      </div>
+
+      <!-- フッター（戻る & 登録ボタンを常に下部固定） -->
+      <div
+        class="px-5 pt-3.5 pb-[calc(1.5rem+env(safe-area-inset-bottom,0px))] border-t border-cyan-900/40 bg-[#070a14]/95 flex items-center gap-2.5 shrink-0">
+        <button type="button" onclick="closeSuppleMasterModal()"
+          class="flex-1 py-3 px-4 rounded-xl bg-slate-800 border border-slate-700 text-slate-300 text-xs font-bold hover:bg-slate-700 transition-colors">
+          戻る
+        </button>
+        <button type="button" id="supple-master-submit-btn" onclick="submitSuppleMaster()" style="flex: 2;"
+          class="py-3 px-4 rounded-xl bg-gradient-to-r from-teal-500 to-emerald-500 text-white text-sm font-extrabold shadow-lg shadow-teal-500/25 active:scale-[0.99] transition-all flex items-center justify-center gap-1.5">
+          💾 サプリを登録
+        </button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ===== ◯ バーコードスキャナーモーダル ===== -->
+  <div id="modal-supple-scanner"
+    class="fixed inset-0 hidden bg-black/85 backdrop-blur-md flex items-center justify-center p-4"
+    style="z-index: 10020; display: none;">
+    <div
+      class="bg-[#0b1021] w-full max-w-sm rounded-3xl shadow-2xl border border-cyan-700/60 overflow-hidden flex flex-col text-white">
+
+      <div class="px-5 py-4 border-b border-cyan-900/40 flex items-center justify-between bg-[#070a14]/90">
+        <div class="flex items-center gap-2">
+          <span class="text-base">📷</span>
+          <div>
+            <h4 class="font-extrabold text-sm text-cyan-100" id="supple-scanner-title">バーコードをスキャン</h4>
+            <p class="text-[10px] text-cyan-400/80" id="supple-scanner-subtitle">カメラをバーコードに合わせてください</p>
+          </div>
+        </div>
+        <button type="button" onclick="closeSupplementBarcodeScanner()"
+          class="w-8 h-8 rounded-full bg-slate-800 text-slate-400 hover:text-white flex items-center justify-center transition-colors">✕</button>
+      </div>
+
+      <div class="relative bg-black flex items-center justify-center min-h-[250px] overflow-hidden">
+        <div id="supple-barcode-reader" class="w-full h-full"></div>
+        <div class="supple-laser pointer-events-none"></div>
+        <div
+          class="absolute inset-x-8 inset-y-10 border-2 border-dashed border-emerald-400/70 rounded-2xl pointer-events-none flex items-center justify-center">
+          <span class="bg-black/70 text-emerald-300 text-[10px] font-bold px-2 py-0.5 rounded-full">JAN / バーコード</span>
+        </div>
+      </div>
+
+      <div class="p-4 bg-[#070a14] space-y-2.5">
+        <div class="flex gap-2">
+          <input type="text" id="supple-scanner-manual-input" placeholder="バーコード番号を直接入力"
+            class="flex-1 px-3 py-2 rounded-xl bg-slate-900 border border-cyan-900/60 text-white text-xs font-mono focus:outline-hidden focus:border-cyan-400" />
+          <button type="button" onclick="submitSuppleManualBarcode()"
+            class="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold active:scale-95 transition-all">
+            決定
+          </button>
+        </div>
+        <button type="button" onclick="closeSupplementBarcodeScanner()"
+          class="w-full py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition-colors">
+          閉じる
+        </button>
+      </div>
+
+    </div>
+  </div>
+
   <!-- Dump Image Lightbox / Fullscreen Preview Modal -->
   <div id="dump-image-modal" role="dialog" aria-modal="true" aria-label="写真の拡大表示"
     class="fixed inset-0 bg-black/90 backdrop-blur-md z-[120] flex items-center justify-center p-2 sm:p-4 opacity-0 pointer-events-none transition-opacity duration-200 select-none"
@@ -19429,22 +19705,84 @@
       return ((year - 4) % 12 + 12) % 12;
     }
 
-    // 節入り近似（日付 + おおよその時刻）。その時刻以降で新しい地支月へ切替
-    // h は日本時間の目安（年によって前後するため完全一致ではない）
+    // 二十四節気「節」の基準太陽黄経 (lon) と地支 (branch)。
+    // 各年の節入り日時（JST）は太陽視黄経の天文計算で求めてキャッシュする
     const SANMEI_JIE = [
-      { m: 2, d: 4, h: 12, branch: 2 },   // 立春 -> 寅
-      { m: 3, d: 6, h: 12, branch: 3 },   // 驚蟄 -> 卯
-      { m: 4, d: 5, h: 12, branch: 4 },   // 清明 -> 辰
-      { m: 5, d: 6, h: 12, branch: 5 },   // 立夏 -> 巳
-      { m: 6, d: 6, h: 12, branch: 6 },   // 芒種 -> 午
-      { m: 7, d: 7, h: 12, branch: 7 },   // 小暑 -> 未
-      { m: 8, d: 8, h: 12, branch: 8 },   // 立秋 -> 申
-      { m: 9, d: 8, h: 12, branch: 9 },   // 白露 -> 酉
-      { m: 10, d: 8, h: 12, branch: 10 }, // 寒露 -> 戌
-      { m: 11, d: 7, h: 12, branch: 11 }, // 立冬 -> 亥（例: 1996年は11/7 11:20）
-      { m: 12, d: 7, h: 12, branch: 0 },  // 大雪 -> 子
-      { m: 1, d: 6, h: 12, branch: 1 }    // 小寒 -> 丑
+      { m: 2, d: 4, h: 12, lon: 315, branch: 2 },   // 立春 -> 寅
+      { m: 3, d: 6, h: 12, lon: 345, branch: 3 },   // 驚蟄 -> 卯
+      { m: 4, d: 5, h: 12, lon: 15, branch: 4 },    // 清明 -> 辰
+      { m: 5, d: 6, h: 12, lon: 45, branch: 5 },    // 立夏 -> 巳
+      { m: 6, d: 6, h: 12, lon: 75, branch: 6 },    // 芒種 -> 午
+      { m: 7, d: 7, h: 12, lon: 105, branch: 7 },   // 小暑 -> 未
+      { m: 8, d: 8, h: 12, lon: 135, branch: 8 },   // 立秋 -> 申
+      { m: 9, d: 8, h: 12, lon: 165, branch: 9 },   // 白露 -> 酉
+      { m: 10, d: 8, h: 12, lon: 195, branch: 10 }, // 寒露 -> 戌
+      { m: 11, d: 7, h: 12, lon: 225, branch: 11 }, // 立冬 -> 亥
+      { m: 12, d: 7, h: 12, lon: 255, branch: 0 },  // 大雪 -> 子
+      { m: 1, d: 6, h: 12, lon: 285, branch: 1 }    // 小寒 -> 丑
     ];
+
+    const _sanmeiJieYearCache = new Map();
+
+    // Meeus Chapter 25 太陽視黄経（度: 0〜360）
+    function sanmeiApparentSunLon(jd) {
+      const T = (jd - 2451545.0) / 36525.0;
+      const L0 = 280.46646 + T * (36000.76983 + 0.0003032 * T);
+      const M = 357.52911 + T * (35999.05029 - 0.0001537 * T);
+      const rad = Math.PI / 180;
+      const Mrad = M * rad;
+      const C = (1.914602 - T * (0.004817 + 0.000014 * T)) * Math.sin(Mrad)
+        + (0.019993 - 0.000101 * T) * Math.sin(2 * Mrad)
+        + 0.000289 * Math.sin(3 * Mrad);
+      const trueLon = L0 + C;
+      const omega = 125.04 - 1934.136 * T;
+      let lambda = trueLon - 0.00569 - 0.00478 * Math.sin(omega * rad);
+      lambda = ((lambda % 360) + 360) % 360;
+      return lambda;
+    }
+
+    // 指定年・指定節気の節入り時刻（JST）を天文計算で求める
+    function sanmeiCalcJieJstInfo(year, jie) {
+      const approxUtcMs = Date.UTC(year, jie.m - 1, jie.d, 3, 0, 0);
+      let jd = approxUtcMs / 86400000 + 2440587.5;
+      for (let iter = 0; iter < 5; iter++) {
+        const sunLon = sanmeiApparentSunLon(jd);
+        let diff = jie.lon - sunLon;
+        while (diff > 180) diff -= 360;
+        while (diff < -180) diff += 360;
+        if (Math.abs(diff) < 1e-7) break;
+        jd += diff * (365.2422 / 360.0);
+      }
+      const utcMs = (jd - 2440587.5) * 86400000 - 69000;
+      const jstClock = new Date(utcMs + 9 * 3600000);
+      const jy = jstClock.getUTCFullYear();
+      const jm = jstClock.getUTCMonth();
+      const jdDay = jstClock.getUTCDate();
+      const jh = jstClock.getUTCHours();
+      const jmin = jstClock.getUTCMinutes();
+      const jsec = jstClock.getUTCSeconds();
+      return {
+        branch: jie.branch,
+        lon: jie.lon,
+        m: jm + 1,
+        d: jdDay,
+        h: jh,
+        min: jmin,
+        s: jsec,
+        jstUtcMs: Date.UTC(jy, jm, jdDay, jh, jmin, jsec),
+        date: new Date(jy, jm, jdDay, jh, jmin, jsec)
+      };
+    }
+
+    function sanmeiGetYearJieList(year) {
+      const y = Number(year);
+      if (!Number.isFinite(y)) return [];
+      const cached = _sanmeiJieYearCache.get(y);
+      if (cached) return cached;
+      const list = SANMEI_JIE.map((jie) => sanmeiCalcJieJstInfo(y, jie));
+      _sanmeiJieYearCache.set(y, list);
+      return list;
+    }
 
     // 十二支の本気（蔵干の主気）
     const SANMEI_BRANCH_HONKI = [9, 5, 0, 1, 4, 2, 3, 5, 6, 7, 4, 8]; // 子癸…亥壬
@@ -19492,8 +19830,8 @@
         if (c.getTime() <= birth.getTime()) last = c;
       }
       if (!last) return 1;
-      const days = Math.floor(
-        (new Date(y, m - 1, d).getTime() - new Date(last.getFullYear(), last.getMonth(), last.getDate()).getTime()) / 86400000
+      const days = Math.round(
+        (Date.UTC(y, m - 1, d) - Date.UTC(last.getFullYear(), last.getMonth(), last.getDate())) / 86400000
       );
       return days + 1;
     }
@@ -20400,31 +20738,30 @@
 
     function sanmeiGetMonthBranchIndex(y, month, day, hour, minute) {
       // 返すのは地支 index（寅=2 ... 丑=1）
-      const key = sanmeiDateTimeKey(month, day, hour, minute);
-      const lichun = SANMEI_JIE[0];
-      const xiaohan = SANMEI_JIE[11];
+      const targetMs = Date.UTC(y, month - 1, day, hour || 0, minute || 0, 0);
+      const list = sanmeiGetYearJieList(y);
+      const lichun = list[0];
+      const xiaohan = list[11];
       // 立春前: 小寒以降なら丑、それ以前（年始）は子
-      if (key < sanmeiJieKey(lichun)) {
-        if (key >= sanmeiJieKey(xiaohan) || month === 1) {
-          // 1/1〜小寒前は子、小寒〜立春前は丑
-          if (month === 1 && key < sanmeiJieKey(xiaohan)) return 0;
-          return 1;
-        }
+      if (lichun && targetMs < lichun.jstUtcMs) {
+        if (xiaohan && targetMs >= xiaohan.jstUtcMs) return 1;
         return 0;
       }
       let branch = 2;
-      for (let i = 0; i < SANMEI_JIE.length; i++) {
-        const jie = SANMEI_JIE[i];
-        if (jie.m === 1) continue; // 小寒は年始側で処理済み
-        if (key >= sanmeiJieKey(jie)) branch = jie.branch;
+      for (let i = 0; i < list.length; i++) {
+        const jie = list[i];
+        if (jie.lon === 285) continue; // 小寒は年始側で処理済み
+        if (targetMs >= jie.jstUtcMs) branch = jie.branch;
       }
       return branch;
     }
 
     function sanmeiGetYearForPillar(y, month, day, hour, minute) {
-      // 立春の近似時刻前は前年
-      const key = sanmeiDateTimeKey(month, day, hour, minute);
-      if (key < sanmeiJieKey(SANMEI_JIE[0])) return y - 1;
+      // 天文計算による立春時刻前は前年扱い
+      const targetMs = Date.UTC(y, month - 1, day, hour || 0, minute || 0, 0);
+      const list = sanmeiGetYearJieList(y);
+      const lichun = list[0];
+      if (lichun && targetMs < lichun.jstUtcMs) return y - 1;
       return y;
     }
 
@@ -24698,6 +25035,7 @@
     const PROFILE_BIRTH_SYNC_FILE = 'profile_birth_profiles';
     let profileBirthSyncTimer = null;
     let profileBirthSyncing = false;
+    let profileBirthStoreReady = false;
 
     function setProfileBirthSyncStatus(text, tone = 'normal') {
       const el = document.getElementById('profile-birth-sync-status');
@@ -24709,10 +25047,12 @@
     }
 
     async function ensureProfileBirthSyncStore() {
+      if (profileBirthStoreReady) return;
       await callAPI('addConfigRecord', {
         folder: PROFILE_BIRTH_SYNC_FOLDER,
         file: PROFILE_BIRTH_SYNC_FILE
       }, { silent: true });
+      profileBirthStoreReady = true;
     }
 
     function parseProfileBirthSnapshot(row) {
@@ -24755,15 +25095,18 @@
       localStorage.setItem(PROFILE_BIRTH_UPDATED_AT_KEY, updatedAt);
       await ensureProfileBirthSyncStore();
       const oldSnapshots = await fetchCloudProfileBirthSnapshots();
-      const result = await callAPI('addDataRecord', {
-        folder: PROFILE_BIRTH_SYNC_FOLDER,
-        file: PROFILE_BIRTH_SYNC_FILE,
-        content: JSON.stringify({ v: 1, profiles, activeId, updatedAt })
-      }, { silent: true });
-      if (!result || !result.success || !result.id) throw new Error('profile_birth_sync_failed');
-      const oldIds = oldSnapshots.map((s) => s.cloudId).filter((id) => id && id !== String(result.id));
-      if (oldIds.length) {
-        callAPI('deleteDataRecords', { ids: oldIds }, { silent: true }).catch(() => { });
+      const primaryId = oldSnapshots[0] ? oldSnapshots[0].cloudId : '';
+      const extraIds = oldSnapshots.slice(1).map((s) => s.cloudId).filter(Boolean);
+      try {
+        await upsertSystemSnapshotRecord({
+          cloudId: primaryId,
+          extraIds,
+          folder: PROFILE_BIRTH_SYNC_FOLDER,
+          file: PROFILE_BIRTH_SYNC_FILE,
+          content: JSON.stringify({ v: 1, profiles, activeId, updatedAt })
+        });
+      } catch (_) {
+        throw new Error('profile_birth_sync_failed');
       }
       setProfileBirthSyncStatus('端末間で同期済み');
       return true;
@@ -26119,12 +26462,15 @@
       }
     }
 
-    function executeZiweiReading() {
+    async function executeZiweiReading() {
       const p = getProfileBirth();
       if (!p || !p.date) {
         alert('生年月日が設定されていません。パーソナライズから生年月日を登録してください。');
         openFortuneProfileCard();
         return;
+      }
+      if (!ziweiGetAstroApi()) {
+        await ensureZiweiLibraryLoaded();
       }
       applyBirthToPanel('ziwei', p, { recalc: false });
       calculateZiweiChart(false);
@@ -26512,8 +26858,9 @@
     function sanmeiJieCandidatesAround(year) {
       const list = [];
       for (let yy = year - 1; yy <= year + 1; yy++) {
-        for (const jie of SANMEI_JIE) {
-          list.push(new Date(yy, jie.m - 1, jie.d, jie.h || 12, 0, 0));
+        const entries = sanmeiGetYearJieList(yy);
+        for (const entry of entries) {
+          list.push(new Date(entry.date.getTime()));
         }
       }
       list.sort((a, b) => a.getTime() - b.getTime());
@@ -29638,7 +29985,7 @@
       const rows = sanmeiBuildYearMonthlyOutlook(natalChart, year);
       rows.forEach((r) => { r.isCurrent = r.month === currentMonth; });
       if (yearEl) {
-        yearEl.textContent = `${year}年（節入り近似・各月15日正午の月柱）／日干 ${SANMEI_STEMS[natalChart.day.stem]} × 月干支＋生まれ月・日柱の位相`;
+        yearEl.textContent = `${year}年（天文計算・各月15日正午の月柱）／日干 ${SANMEI_STEMS[natalChart.day.stem]} × 月干支＋生まれ月・日柱の位相`;
       }
       const cur = rows.find((r) => r.isCurrent);
       if (badgeEl) {
@@ -32617,7 +32964,7 @@
           </div>`;
         };
         liuEl.innerHTML = `
-          <p class="text-[10px] text-slate-500 font-bold">基準: ${liunian.asOf} ${liunian.asOfTime || ''}（節入り近似・時柱は出生時間刻み）</p>
+          <p class="text-[10px] text-slate-500 font-bold">基準: ${liunian.asOf} ${liunian.asOfTime || ''}（天文計算の節入り・時柱は出生時間刻み）</p>
           ${card('流年（年運）', liunian.year)}
           ${card('流月（月運）', liunian.month)}
           ${card('流日（日運）', liunian.day)}
@@ -36715,10 +37062,36 @@
       if (resultEl) resultEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }
 
+    const ZIWEI_LATE_RAT_KEY = 'ziwei_late_rat_mode';
+
+    function getZiweiLateRatMode() {
+      try {
+        return localStorage.getItem(ZIWEI_LATE_RAT_KEY) === 'late' ? 'late' : 'early';
+      } catch (_) {
+        return 'early';
+      }
+    }
+
+    function syncZiweiLateRatSelect() {
+      const sel = document.getElementById('ziwei-late-rat-mode');
+      if (sel) sel.value = getZiweiLateRatMode();
+    }
+
+    function onZiweiLateRatModeChange(val) {
+      const mode = val === 'late' ? 'late' : 'early';
+      try { localStorage.setItem(ZIWEI_LATE_RAT_KEY, mode); } catch (_) { }
+      syncZiweiLateRatSelect();
+      const resultEl = document.getElementById('ziwei-result');
+      if (resultEl && !resultEl.classList.contains('hidden') && typeof calculateZiweiChart === 'function') {
+        calculateZiweiChart(true);
+      }
+    }
+
     function ziweiTimeIndex(hour, minute) {
       const total = (hour || 0) * 60 + (minute || 0);
-      // iztro: 0=早子(23-01) … 11=亥(21-23), 12=晚子（ここでは早子に寄せる）
-      if (total >= 23 * 60 || total < 60) return 0;
+      // iztro: 0=早子(00-01 / 23-01早子設定), 1..11=丑..亥, 12=晚子(23-24晩子設定)
+      if (total >= 23 * 60) return getZiweiLateRatMode() === 'late' ? 12 : 0;
+      if (total < 60) return 0;
       if (total < 3 * 60) return 1;
       if (total < 5 * 60) return 2;
       if (total < 7 * 60) return 3;
@@ -36742,6 +37115,15 @@
       if (typeof iztro !== 'undefined' && iztro.astro) return iztro.astro;
       if (typeof window !== 'undefined' && window.iztro && window.iztro.astro) return window.iztro.astro;
       return null;
+    }
+
+    async function ensureZiweiLibraryLoaded() {
+      if (ziweiGetAstroApi()) return true;
+      if (typeof window.__ensureExternalScript === 'function') {
+        const ok = await window.__ensureExternalScript('./iztro.min.js', () => !!ziweiGetAstroApi());
+        if (ok && ziweiGetAstroApi()) return true;
+      }
+      return !!ziweiGetAstroApi();
     }
 
     function ziweiFindMingPalace(astrolabe) {
@@ -37018,7 +37400,7 @@
       }
     }
 
-    function calculateZiweiCompatibility() {
+    async function calculateZiweiCompatibility() {
       saveZiweiPartnerInput();
       const self = window.__ziweiAstrolabe;
       if (!self) {
@@ -37032,6 +37414,9 @@
       if (!dateStr) {
         alert('相手の生年月日を入力するか、パーソナライズから選んでください。');
         return;
+      }
+      if (!ziweiGetAstroApi()) {
+        await ensureZiweiLibraryLoaded();
       }
       let partner;
       try {
@@ -37616,7 +38001,7 @@
       renderZiweiHoroscope(astrolabe, dateEl && dateEl.value);
     }
 
-    function calculateZiweiChart(fromRestore = false) {
+    function calculateZiweiChart(fromRestore = false, _retried = false) {
       if (!isZiweiEnabled() && !fromRestore) return;
       const dateEl = document.getElementById('ziwei-birth-date');
       const timeEl = document.getElementById('ziwei-birth-time');
@@ -37630,7 +38015,17 @@
       }
       const api = ziweiGetAstroApi();
       if (!api || typeof api.bySolar !== 'function') {
-        if (!fromRestore) alert('紫微斗数ライブラリ（iztro）の読込に失敗しました。ページを再読み込みしてください。');
+        if (!_retried) {
+          ensureZiweiLibraryLoaded().then((ok) => {
+            if (ok) {
+              calculateZiweiChart(fromRestore, true);
+            } else if (!fromRestore) {
+              alert('紫微斗数ライブラリ（iztro）の読込に失敗しました。ページを再読み込みしてください。');
+            }
+          });
+        } else if (!fromRestore) {
+          alert('紫微斗数ライブラリ（iztro）の読込に失敗しました。ページを再読み込みしてください。');
+        }
         return;
       }
 
@@ -38098,6 +38493,29 @@
         cell.appendChild(ganzi);
         pillarsEl.appendChild(cell);
       });
+      try {
+        const dayPillar = (pack.pillars || []).find((p) => p.key === 'day') || (pack.pillars && pack.pillars[2]);
+        if (dayPillar && dayPillar.ganzi) {
+          const nowD = new Date();
+          const todayIso = `${nowD.getFullYear()}-${String(nowD.getMonth() + 1).padStart(2, '0')}-${String(nowD.getDate()).padStart(2, '0')}`;
+          const stemElemIdx = Math.floor((dayPillar.stem || 0) / 2);
+          const elemThemes = [
+            '木気：芽吹き・アイデアを伸ばす日',
+            '火気：直感・熱量を言葉にする日',
+            '土気：整理・思考の輪郭を固める日',
+            '金気：決断・余分を削ぎ落とす日',
+            '水気：内省・柔軟に流れを読む日'
+          ];
+          const guide = elemThemes[stemElemIdx] || '';
+          const insightText = guide
+            ? `今日の干支：${dayPillar.ganzi}（${guide}）`
+            : `今日の干支：${dayPillar.ganzi}`;
+          localStorage.setItem('dump_daily_fortune_insight', JSON.stringify({
+            date: todayIso,
+            text: insightText
+          }));
+        }
+      } catch (_) { }
     }
 
     function refreshFortuneHome() {
@@ -38125,6 +38543,7 @@
         resetFortuneSliderToDefault();
       }
       refreshFortuneHome();
+      if (typeof syncZiweiLateRatSelect === 'function') syncZiweiLateRatSelect();
       if (typeof refreshUnifiedSourceChips === 'function') refreshUnifiedSourceChips();
     }
 
@@ -38448,6 +38867,7 @@
         applyBirthToPanel('bazi', profile, { recalc: false });
       } else {
         applyBirthToPanel(key, profile, { recalc: false });
+        if (key === 'ziwei' && typeof syncZiweiLateRatSelect === 'function') syncZiweiLateRatSelect();
       }
       const card = document.getElementById('fortune-card-' + key);
       if (card) {
@@ -38647,6 +39067,8 @@
       if (directDestEl) directDestEl.checked = isDirectDestinationEnabled();
       toggleDirectDestinationUI();
       if (typeof updateBootSplashSettingsUI === 'function') updateBootSplashSettingsUI();
+      if (typeof syncDumpApiTokenUI === 'function') syncDumpApiTokenUI();
+      if (typeof syncZiweiLateRatSelect === 'function') syncZiweiLateRatSelect();
 
       initAbstinenceHub();
       initFortuneHub();
@@ -38785,6 +39207,183 @@
           setCaptureChrome(true);
         }
       }
+    }
+
+    const DUMP_BACKUP_KEY_PREFIXES = [
+      'dump_',
+      'setting_',
+      'abstinence_',
+      'profile_',
+      'sanmei_',
+      'ziwei_',
+      'bazi_',
+      'gantt_',
+      'input_',
+      'operation_',
+      'memo_',
+      'similar_',
+      'lastDumpTime'
+    ];
+
+    function isDumpBackupLocalKey(key) {
+      const k = String(key || '');
+      if (!k || k === DUMP_API_TOKEN_KEY) return false;
+      return DUMP_BACKUP_KEY_PREFIXES.some((prefix) => k.startsWith(prefix));
+    }
+
+    function exportAllDumpDataJson() {
+      const statusEl = document.getElementById('json-backup-status');
+      try {
+        const data = {};
+        for (let i = 0; i < localStorage.length; i++) {
+          const k = localStorage.key(i);
+          if (!isDumpBackupLocalKey(k)) continue;
+          const v = localStorage.getItem(k);
+          if (typeof v === 'string') data[k] = v;
+        }
+        const payload = {
+          app: 'DUMP',
+          version: window.__DUMP_BUILD__ || 'unknown',
+          exportedAt: new Date().toISOString(),
+          data
+        };
+        const json = JSON.stringify(payload, null, 2);
+        const blob = new Blob([json], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const now = new Date();
+        const pad2 = (n) => String(n).padStart(2, '0');
+        const fname = `dump-backup-${now.getFullYear()}${pad2(now.getMonth() + 1)}${pad2(now.getDate())}-${pad2(now.getHours())}${pad2(now.getMinutes())}.json`;
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = fname;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+        if (statusEl) {
+          statusEl.textContent = `エクスポート完了（${Object.keys(data).length}件のキーを保存: ${fname}）`;
+          statusEl.className = 'text-[11px] font-bold text-emerald-400 min-h-[1rem]';
+        }
+      } catch (err) {
+        console.warn('exportAllDumpDataJson failed:', err);
+        if (statusEl) {
+          statusEl.textContent = 'エクスポートに失敗しました: ' + (err && err.message ? err.message : String(err));
+          statusEl.className = 'text-[11px] font-bold text-rose-400 min-h-[1rem]';
+        }
+      }
+    }
+
+    async function importAllDumpDataJson(inputEl) {
+      const statusEl = document.getElementById('json-backup-status');
+      const file = inputEl && inputEl.files && inputEl.files[0];
+      if (!file) return;
+      try {
+        const raw = await file.text();
+        const parsed = JSON.parse(raw);
+        if (!parsed || parsed.app !== 'DUMP' || !parsed.data || typeof parsed.data !== 'object' || Array.isArray(parsed.data)) {
+          throw new Error('DUMP のバックアップ JSON 形式ではありません');
+        }
+        const entries = Object.entries(parsed.data).filter(([k, v]) => isDumpBackupLocalKey(k) && typeof v === 'string');
+        if (!entries.length) {
+          throw new Error('復元可能な DUMP データが見つかりませんでした');
+        }
+        const exportedLabel = parsed.exportedAt ? String(parsed.exportedAt) : '不明';
+        const ok = confirm(
+          `${entries.length}件の設定・ローカルデータを復元しますか？\n` +
+          `作成日時: ${exportedLabel}\n` +
+          'この端末の既存の設定やローカルデータは上書きされ、画面を再読み込みします。'
+        );
+        if (!ok) {
+          if (statusEl) {
+            statusEl.textContent = '復元をキャンセルしました';
+            statusEl.className = 'text-[11px] font-bold text-slate-400 min-h-[1rem]';
+          }
+          return;
+        }
+        entries.forEach(([k, v]) => {
+          localStorage.setItem(k, v);
+        });
+        if (statusEl) {
+          statusEl.textContent = `復元完了（${entries.length}件）。再読み込みします…`;
+          statusEl.className = 'text-[11px] font-bold text-emerald-400 min-h-[1rem]';
+        }
+        setTimeout(() => location.reload(), 200);
+      } catch (err) {
+        console.warn('importAllDumpDataJson failed:', err);
+        const msg = err && err.message ? err.message : String(err);
+        if (statusEl) {
+          statusEl.textContent = '復元に失敗しました: ' + msg;
+          statusEl.className = 'text-[11px] font-bold text-rose-400 min-h-[1rem]';
+        }
+        alert('JSON 復元に失敗しました: ' + msg);
+      } finally {
+        if (inputEl) inputEl.value = '';
+      }
+    }
+
+    async function runPurgeSystemTrash() {
+      const ok = confirm('Google スプレッドシートのゴミ箱内に溜まったシステム同期用の旧履歴データを完全に削除しますか？（メモ本文やゴミ箱の通常メモは削除しません）');
+      if (!ok) return;
+      const btn = document.getElementById('btn-purge-system-trash');
+      const statusEl = document.getElementById('purge-system-trash-status');
+      if (btn) btn.disabled = true;
+      if (statusEl) {
+        statusEl.textContent = '整理中…';
+        statusEl.className = 'text-[11px] font-bold text-amber-300';
+      }
+      try {
+        const res = await callAPI('purgeSystemTrash', {}, { silent: true });
+        if (res && res.success) {
+          const cnt = Number(res.count || 0);
+          if (statusEl) {
+            statusEl.textContent = cnt > 0
+              ? `完了: ${cnt}件のシステム旧履歴を整理しました`
+              : '完了: 整理対象のシステム旧履歴はありませんでした';
+            statusEl.className = 'text-[11px] font-bold text-emerald-400';
+          }
+        } else {
+          const msg = (res && res.error) ? String(res.error) : '通信エラー';
+          if (statusEl) {
+            statusEl.textContent = '失敗: ' + msg;
+            statusEl.className = 'text-[11px] font-bold text-rose-400';
+          }
+        }
+      } catch (err) {
+        const msg = err && err.message ? err.message : String(err);
+        if (statusEl) {
+          statusEl.textContent = '失敗: ' + msg;
+          statusEl.className = 'text-[11px] font-bold text-rose-400';
+        }
+      } finally {
+        if (btn) btn.disabled = false;
+      }
+    }
+
+    function syncDumpApiTokenUI() {
+      const input = document.getElementById('setting-gas-api-token');
+      const statusEl = document.getElementById('gas-api-token-status');
+      const tok = typeof getDumpApiToken === 'function' ? getDumpApiToken() : '';
+      if (input) input.value = tok;
+      if (statusEl) {
+        statusEl.textContent = tok ? '状態: 設定済み（この端末に保存中）' : '状態: 未設定';
+        statusEl.className = tok ? 'text-[11px] font-bold text-emerald-400' : 'text-[11px] font-bold text-slate-400';
+      }
+    }
+
+    function saveDumpApiToken() {
+      const input = document.getElementById('setting-gas-api-token');
+      const val = String((input && input.value) || '').trim();
+      if (!val) {
+        clearDumpApiToken();
+        return;
+      }
+      try { localStorage.setItem(DUMP_API_TOKEN_KEY, val); } catch (_) { }
+      syncDumpApiTokenUI();
+    }
+
+    function clearDumpApiToken() {
+      try { localStorage.removeItem(DUMP_API_TOKEN_KEY); } catch (_) { }
+      syncDumpApiTokenUI();
     }
 
     // ==========================================
@@ -40481,11 +41080,14 @@
       }, { silent: true });
     }
 
+    let abstinenceTimerStoreReady = false;
     async function ensureAbstinenceTimerStore() {
+      if (abstinenceTimerStoreReady) return;
       await callAPI('addConfigRecord', {
         folder: ABSTINENCE_SLIPS_FOLDER,
         file: ABSTINENCE_TIMER_FILE
       }, { silent: true });
+      abstinenceTimerStoreReady = true;
     }
 
     function parseAbstinenceTimerRecord(row) {
@@ -40513,10 +41115,13 @@
         file: ABSTINENCE_TIMER_FILE
       }, { silent: true });
       if (!Array.isArray(items)) return null;
-      return items
+      const list = items
         .map(parseAbstinenceTimerRecord)
         .filter(Boolean)
-        .sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt))[0] || null;
+        .sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
+      if (!list.length) return null;
+      list[0].extraIds = list.slice(1).map((x) => x.id).filter(Boolean);
+      return list[0];
     }
 
     async function publishAbstinenceTimerReset(startAt) {
@@ -40526,7 +41131,11 @@
       localStorage.setItem(ABSTINENCE_TIMER_SYNCED_AT_KEY, updatedAt);
       try {
         await ensureAbstinenceTimerStore();
-        const result = await callAPI('addDataRecord', {
+        let existing = null;
+        try { existing = await fetchCloudAbstinenceTimer(); } catch (_) { existing = null; }
+        await upsertSystemSnapshotRecord({
+          cloudId: existing && existing.id,
+          extraIds: existing && existing.extraIds,
           folder: ABSTINENCE_SLIPS_FOLDER,
           file: ABSTINENCE_TIMER_FILE,
           content: JSON.stringify({
@@ -40536,17 +41145,14 @@
             resetStats: getAbstinenceResetStats(),
             paramResidual: getAbstinenceParamResidual()
           })
-        }, { silent: true });
-        if (!result || !result.success || !result.id) {
-          throw new Error('abstinence_timer_sync_failed');
-        }
+        });
       } catch (e) {
         if (previousSyncedAt == null) {
           localStorage.removeItem(ABSTINENCE_TIMER_SYNCED_AT_KEY);
         } else {
           localStorage.setItem(ABSTINENCE_TIMER_SYNCED_AT_KEY, previousSyncedAt);
         }
-        throw e;
+        throw new Error('abstinence_timer_sync_failed');
       }
     }
 
@@ -43059,6 +43665,9 @@
         );
       }
       updateColorThemeUI(t);
+      if (typeof renderSuppleChart === 'function' && document.getElementById('suppleIntakeChart')) {
+        try { renderSuppleChart(); } catch (_) { }
+      }
     }
     function setColorTheme(theme) {
       const t = normalizeColorTheme(theme);
@@ -43351,7 +43960,7 @@
     let treeHistoryLoadToken = 0;
     let treeHistorySnaps = [];
     const TREE_MEMO_PAINT_CHUNK = 36;
-    const TREE_SYNC_POLL_MS = 3000;
+    const TREE_SYNC_POLL_MS = 15000;
     let treeLibraryPollTimer = null;
     let treeSyncPendingPull = false;
 
@@ -43783,7 +44392,9 @@
       if (!Array.isArray(items) || !items.length) return null;
       const parsed = items.map(parseTreeLibrarySnapshot).filter(Boolean)
         .sort((a, b) => b.updatedAt - a.updatedAt);
-      return parsed[0] || null;
+      if (!parsed.length) return null;
+      parsed[0].extraIds = parsed.slice(1).map((p) => p.cloudId).filter(Boolean);
+      return parsed[0];
     }
 
     function treeLibrarySignature(lib) {
@@ -43876,18 +44487,17 @@
           palettes: treeLibrary.palettes
         }
       });
-      const ops = [];
-      if (existing && existing.cloudId) {
-        ops.push({ action: 'deleteDataRecord', id: existing.cloudId });
+      try {
+        await upsertSystemSnapshotRecord({
+          cloudId: existing && existing.cloudId,
+          extraIds: existing && existing.extraIds,
+          folder: TREE_LIBRARY_FOLDER,
+          file: TREE_LIBRARY_FILE,
+          content: payload
+        });
+      } catch (_) {
+        throw new Error('tree_library_sync');
       }
-      ops.push({
-        action: 'addDataRecord',
-        folder: TREE_LIBRARY_FOLDER,
-        file: TREE_LIBRARY_FILE,
-        content: payload
-      });
-      const res = await callBatch(ops, { silent: true });
-      if (res && (res.error || res.success === false)) throw new Error('tree_library_sync');
       treeClearLibraryDirty();
     }
 
@@ -44015,18 +44625,29 @@
       }
     }
 
+    let treePollChecking = false;
     function startTreeLibraryPoll() {
       if (treeLibraryPollTimer) return;
-      treeLibraryPollTimer = setInterval(() => {
+      treeLibraryPollTimer = setInterval(async () => {
         if (document.visibilityState !== 'visible') return;
+        if (treePollChecking) return;
         const onTree = !!(document.getElementById('tree-mode')
           && document.getElementById('tree-mode').classList.contains('active'));
+        if (!onTree && !treeLibraryDirty) return;
         // 編集中／未送信は取り込みせず、送信だけ試みる
-        if (treeShouldProtectLocalEdits()) {
+        if (treeShouldProtectLocalEdits() || !onTree) {
           if (treeLibraryDirty) queueTreeLibraryCloudSync();
           return;
         }
-        syncTreeLibrary({ render: onTree }).catch(() => { });
+        treePollChecking = true;
+        try {
+          const changed = await checkPollStampChanged('tree');
+          if (changed) {
+            await syncTreeLibrary({ render: true }).catch(() => { });
+          }
+        } finally {
+          treePollChecking = false;
+        }
       }, TREE_SYNC_POLL_MS);
     }
 
@@ -48487,8 +49108,29 @@
     let qrCooldownUntil = 0;
     let qrTorchOn = false;
     let qrRunning = false;
+    let qrStartSeq = 0;
+    const QR_AUTO_OPEN_KEY = 'setting_qr_auto_open';
     const QR_COOLDOWN_MS = 2800;
     const QR_DUP_MS = 4500;
+
+    function isQrAutoOpenEnabled() {
+      try {
+        return localStorage.getItem(QR_AUTO_OPEN_KEY) === 'true';
+      } catch (_) {
+        return false;
+      }
+    }
+
+    function setQrAutoOpenEnabled(enabled) {
+      try {
+        localStorage.setItem(QR_AUTO_OPEN_KEY, enabled ? 'true' : 'false');
+      } catch (_) { }
+    }
+
+    function syncQrAutoOpenToggle() {
+      const toggle = document.getElementById('qr-auto-open-toggle');
+      if (toggle) toggle.checked = isQrAutoOpenEnabled();
+    }
 
     function setQrStatus(text) {
       const el = document.getElementById('qr-status');
@@ -48497,9 +49139,14 @@
 
     function setQrLastDisplay(text) {
       const el = document.getElementById('qr-last');
-      if (el) el.textContent = text || '';
-      const btn = document.getElementById('qr-open-last-btn');
-      if (btn) btn.disabled = !text;
+      if (el) el.textContent = text || 'まだ読み取り結果がありません';
+      const url = text ? normalizeQrOpenTarget(text) : null;
+      const openBtn = document.getElementById('qr-open-last-btn');
+      if (openBtn) openBtn.disabled = !url;
+      const copyBtn = document.getElementById('qr-copy-last-btn');
+      if (copyBtn) copyBtn.disabled = !text;
+      const dumpBtn = document.getElementById('qr-dump-last-btn');
+      if (dumpBtn) dumpBtn.disabled = !text;
     }
 
     function normalizeQrOpenTarget(raw) {
@@ -48521,24 +49168,24 @@
       setQrLastDisplay(text);
       const url = normalizeQrOpenTarget(text);
       if (url) {
-        setQrStatus(opts.reopen ? '再オープン中…' : '読み取り → 開いています');
+        if (!opts.reopen && !isQrAutoOpenEnabled()) {
+          setQrStatus('URLを読み取りました（下の「🔗 開く」または「📥 INBOXへDUMP」を選べます）');
+          return false;
+        }
+        setQrStatus(opts.reopen ? '新しいタブで開いています…' : '読み取り → 開いています');
         try {
           const opened = window.open(url, '_blank', 'noopener,noreferrer');
           if (!opened) {
-            // ポップアップブロック時は同一タブ遷移
-            location.assign(url);
+            setQrStatus('ポップアップがブロックされました。下の「🔗 開く」を押してください');
+            return false;
           }
         } catch (e) {
-          try { location.assign(url); } catch (_) { }
+          setQrStatus('URLを開けませんでした。下の「🔗 開く」または「📋 コピー」をお使いください');
+          return false;
         }
         return true;
       }
-      setQrStatus('URL以外の内容です（コピー可）');
-      try {
-        if (navigator.clipboard && navigator.clipboard.writeText) {
-          navigator.clipboard.writeText(text).catch(() => { });
-        }
-      } catch (_) { }
+      setQrStatus('テキストを読み取りました（コピー・INBOX保存できます）');
       return false;
     }
 
@@ -48568,6 +49215,91 @@
       openQrTarget(qrLastRaw, { reopen: true });
     }
 
+    async function copyLastQrResult() {
+      if (!qrLastRaw) return;
+      try {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          await navigator.clipboard.writeText(qrLastRaw);
+        } else {
+          const ta = document.createElement('textarea');
+          ta.value = qrLastRaw;
+          ta.style.cssText = 'position:fixed;opacity:0;';
+          document.body.appendChild(ta);
+          ta.select();
+          document.execCommand('copy');
+          document.body.removeChild(ta);
+        }
+        setQrStatus('📋 クリップボードにコピーしました');
+      } catch (_) {
+        setQrStatus('コピーに失敗しました');
+      }
+    }
+
+    function dumpLastQrToInbox() {
+      const text = String(qrLastRaw || '').trim();
+      if (!text) return;
+      try {
+        if (typeof appendLocalInputHistory === 'function') {
+          appendLocalInputHistory([text], 'INBOX', '未整理');
+        }
+        if (typeof rememberDumpedItems === 'function' && typeof makeTempId === 'function') {
+          rememberDumpedItems([{
+            id: makeTempId(),
+            content: text,
+            timestamp: new Date().toISOString(),
+            folder: '📥 INBOX',
+            file: '未整理',
+            isInbox: true,
+            _pending: true
+          }]);
+        }
+        if (typeof bumpBadgeOptimistic === 'function') bumpBadgeOptimistic(1);
+        const historyId = typeof logOperation === 'function'
+          ? logOperation('ADD', 'QRから 1件を INBOX に追加', { folder: 'INBOX', file: '未整理', contents: [text] })
+          : '';
+        if (typeof addPendingInboxWrite === 'function' && typeof enqueueInboxWrite === 'function') {
+          const dumpJob = {
+            id: makePendingWriteId(),
+            type: 'dump_add',
+            addedChunks: [text],
+            replaceDupChunks: [],
+            destFolder: 'INBOX',
+            destFile: '未整理',
+            isInboxDest: true,
+            directFolder: '',
+            historyId,
+            pendingReplaceId: ''
+          };
+          addPendingInboxWrite(dumpJob);
+          markPendingWriteQueued(dumpJob.id);
+          enqueueInboxWrite(async () => {
+            pendingWriteRunningIds.add(dumpJob.id);
+            try {
+              await executeDumpAddJob(dumpJob);
+              removePendingInboxWrite(dumpJob.id);
+              setQrStatus('✅ INBOXへDUMPしました');
+            } catch (err) {
+              if (typeof handlePendingWriteError === 'function') {
+                handlePendingWriteError(dumpJob, err);
+              }
+              setQrStatus('⚠️ 端末に記録しました（後で自動再送されます）');
+            } finally {
+              pendingWriteRunningIds.delete(dumpJob.id);
+            }
+          });
+          setQrStatus('📥 INBOXへ保存を受け付けました');
+          return;
+        }
+        callAPI('addInbox', { content: text }, { silent: true }).then((res) => {
+          if (res && res.success) setQrStatus('✅ INBOXへDUMPしました');
+          else setQrStatus('⚠️ INBOX保存に失敗しました');
+        });
+      } catch (e) {
+        console.warn('dumpLastQrToInbox failed', e);
+        setQrStatus('⚠️ INBOX保存に失敗しました');
+      }
+    }
+
     function loadJsQRLibrary() {
       if (qrJsQRReady || (typeof jsQR === 'function')) {
         qrJsQRReady = true;
@@ -48580,10 +49312,19 @@
         s.async = true;
         s.onload = () => {
           qrJsQRReady = typeof jsQR === 'function';
-          if (qrJsQRReady) resolve();
-          else reject(new Error('jsQR load failed'));
+          if (qrJsQRReady) {
+            resolve();
+          } else {
+            qrJsQRLoading = null;
+            if (s.parentNode) s.parentNode.removeChild(s);
+            reject(new Error('jsQR load failed'));
+          }
         };
-        s.onerror = () => reject(new Error('jsQR network error'));
+        s.onerror = () => {
+          qrJsQRLoading = null;
+          if (s.parentNode) s.parentNode.removeChild(s);
+          reject(new Error('jsQR network error'));
+        };
         document.head.appendChild(s);
       });
       return qrJsQRLoading;
@@ -48686,6 +49427,7 @@
     }
 
     async function startQrScanner() {
+      syncQrAutoOpenToggle();
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
         setQrStatus('この環境ではカメラを使えません（HTTPSが必要な場合があります）');
         return;
@@ -48694,6 +49436,7 @@
         setQrStatus('スキャン中… 枠内にQRを合わせてください');
         return;
       }
+      const seq = ++qrStartSeq;
       stopQrScanLoop();
       setQrStatus('カメラを起動しています…');
       try {
@@ -48709,12 +49452,32 @@
             height: { ideal: 720 }
           }
         });
+        const isStillQrTab = () => {
+          const qrEl = document.getElementById('qr-mode');
+          return !!(qrEl && qrEl.classList.contains('active'));
+        };
+        if (seq !== qrStartSeq || !isStillQrTab()) {
+          try { stream.getTracks().forEach((t) => t.stop()); } catch (_) { }
+          return;
+        }
         qrStream = stream;
         const video = document.getElementById('qr-video');
-        if (!video) return;
+        if (!video) {
+          try { stream.getTracks().forEach((t) => t.stop()); } catch (_) { }
+          qrStream = null;
+          return;
+        }
         video.srcObject = stream;
         await video.play().catch(() => { });
+        if (seq !== qrStartSeq || !isStillQrTab()) {
+          stopQrScanner({ silent: true });
+          return;
+        }
         const mode = await ensureQrDetector();
+        if (seq !== qrStartSeq || !isStillQrTab()) {
+          stopQrScanner({ silent: true });
+          return;
+        }
         qrRunning = true;
         qrTorchOn = false;
         await updateQrTorchButton();
@@ -48722,6 +49485,7 @@
         if (mode === 'native') qrScanTickNative();
         else qrScanTickJsQR();
       } catch (e) {
+        if (seq !== qrStartSeq) return;
         qrRunning = false;
         const name = (e && e.name) || '';
         if (name === 'NotAllowedError' || name === 'PermissionDeniedError') {
@@ -48736,6 +49500,7 @@
 
     function stopQrScanner(opts) {
       opts = opts || {};
+      qrStartSeq++;
       qrRunning = false;
       stopQrScanLoop();
       qrTorchOn = false;
@@ -52541,11 +53306,6 @@
       }
     }
 
-    function isCaptureOverlayOpen() {
-      const inputMode = document.getElementById('input-mode');
-      return !!(inputMode && inputMode.classList.contains('active'));
-    }
-
     function resetCaptureOverlayViewport() {
       const overlay = document.getElementById('capture-overlay');
       if (!overlay) return;
@@ -55991,8 +56751,11 @@
       const t = new Date(localStorage.getItem(GANTT_UPDATED_AT_KEY) || 0).getTime();
       return Number.isFinite(t) ? t : 0;
     }
+    let ganttStoreReady = false;
     async function ensureGanttStore() {
+      if (ganttStoreReady) return;
       await callAPI('addConfigRecord', { folder: GANTT_FOLDER, file: GANTT_FILE }, { silent: true });
+      ganttStoreReady = true;
     }
     function parseGanttSnapshot(row) {
       if (!row || row.content == null) return null;
@@ -56017,8 +56780,11 @@
         file: GANTT_FILE
       }, { silent: true });
       if (!Array.isArray(items) || !items.length) return null;
-      return items.map(parseGanttSnapshot).filter(Boolean)
-        .sort((a, b) => b.updatedAt - a.updatedAt)[0] || null;
+      const list = items.map(parseGanttSnapshot).filter(Boolean)
+        .sort((a, b) => b.updatedAt - a.updatedAt);
+      if (!list.length) return null;
+      list[0].extraIds = list.slice(1).map((x) => x.cloudId).filter(Boolean);
+      return list[0];
     }
     function applyGanttFromCloud(tasks, updatedAtIso) {
       if (ganttShouldProtectLocal()) return false;
@@ -56047,11 +56813,17 @@
       const updatedAt = new Date(Math.max(localUpdatedAt, Date.now())).toISOString();
       localStorage.setItem(GANTT_UPDATED_AT_KEY, updatedAt);
       const payload = JSON.stringify({ v: 1, updatedAt, tasks: ganttTasks });
-      const ops = [];
-      if (existing && existing.cloudId) ops.push({ action: 'deleteDataRecord', id: existing.cloudId });
-      ops.push({ action: 'addDataRecord', folder: GANTT_FOLDER, file: GANTT_FILE, content: payload });
-      const res = await callBatch(ops, { silent: true });
-      if (res && (res.error || res.success === false)) throw new Error('gantt_sync');
+      try {
+        await upsertSystemSnapshotRecord({
+          cloudId: existing && existing.cloudId,
+          extraIds: existing && existing.extraIds,
+          folder: GANTT_FOLDER,
+          file: GANTT_FILE,
+          content: payload
+        });
+      } catch (_) {
+        throw new Error('gantt_sync');
+      }
       ganttClearDirty();
     }
     function queueGanttCloudSync() {
@@ -57214,6 +57986,7 @@
         folderListContainer.innerHTML = '';
 
         const inboxBtn = document.createElement('button');
+        inboxBtn.type = 'button';
         inboxBtn.className = "w-full bg-gradient-to-r from-emerald-900/50 to-teal-900/50 border-2 border-emerald-700/50 hover:bg-emerald-800/60 text-emerald-300 font-black h-[4.5rem] rounded-xl text-left px-5 flex items-center justify-between transition active:scale-[0.99] shadow-sm text-lg mb-3";
         inboxBtn.innerHTML = `<span>📥 INBOX (未整理) を確認</span> <span class="text-base text-emerald-400 font-bold">${organizer.inbox ? organizer.inbox.length : 0}件</span>`;
         inboxBtn.onclick = () => selectReviewInbox(organizer.inbox || []);
@@ -57223,8 +57996,15 @@
           const items = pendingByFolder[folder];
           if (!Array.isArray(items) || items.length === 0) return;
           const dynInboxBtn = document.createElement('button');
+          dynInboxBtn.type = 'button';
           dynInboxBtn.className = "w-full bg-gradient-to-r from-teal-900/40 to-cyan-900/40 border-2 border-teal-700/50 hover:bg-teal-800/50 text-teal-300 font-black h-[4.5rem] rounded-xl text-left px-5 flex items-center justify-between transition active:scale-[0.99] shadow-sm text-lg mb-3";
-          dynInboxBtn.innerHTML = `<span>📁 ${folder} (未整理) を確認</span> <span class="text-base text-teal-400 font-bold">${items.length}件</span>`;
+          const labelSpan = document.createElement('span');
+          labelSpan.textContent = `📁 ${folder} (未整理) を確認`;
+          const countSpan = document.createElement('span');
+          countSpan.className = 'text-base text-teal-400 font-bold';
+          countSpan.textContent = `${items.length}件`;
+          dynInboxBtn.appendChild(labelSpan);
+          dynInboxBtn.appendChild(countSpan);
           dynInboxBtn.onclick = () => selectReviewFolderInbox(folder, items);
           folderListContainer.appendChild(dynInboxBtn);
         });
@@ -57236,21 +58016,37 @@
         } else {
           folders.forEach(folder => {
             const btn = document.createElement('button');
+            btn.type = 'button';
             btn.className = "w-full bg-cyan-950/40 border-2 border-cyan-800/50 hover:bg-cyan-900/60 text-cyan-100 font-black h-[4.5rem] rounded-xl text-left px-5 flex items-center justify-between transition active:scale-[0.99] shadow-sm text-lg mb-2";
-            btn.innerHTML = `
-              <div class="flex items-center gap-1">
-                <span>📁 ${folder}</span>
-                <span onclick="renameReviewFolder('${folder}', event)" class="text-sm bg-slate-800/80 hover:bg-slate-700 text-slate-300 px-2.5 py-1.5 rounded-md ml-2 border border-slate-600/50 transition active:scale-95">✏️変更</span>
-                <span onclick="deleteReviewFolder('${folder}', event)" class="text-sm bg-rose-950/60 hover:bg-rose-900/70 text-rose-400 px-2.5 py-1.5 rounded-md border border-rose-800/50 transition active:scale-95">🗑️削除</span>
-              </div>
-              <span class="text-base text-cyan-500/70 font-bold">${configData[folder].length} Files</span>
-            `;
+            const left = document.createElement('div');
+            left.className = 'flex items-center gap-1';
+            const titleSpan = document.createElement('span');
+            titleSpan.textContent = `📁 ${folder}`;
+            const renameSpan = document.createElement('span');
+            renameSpan.className = 'text-sm bg-slate-800/80 hover:bg-slate-700 text-slate-300 px-2.5 py-1.5 rounded-md ml-2 border border-slate-600/50 transition active:scale-95';
+            renameSpan.textContent = '✏️変更';
+            renameSpan.addEventListener('click', (ev) => renameReviewFolder(folder, ev));
+            const deleteSpan = document.createElement('span');
+            deleteSpan.className = 'text-sm bg-rose-950/60 hover:bg-rose-900/70 text-rose-400 px-2.5 py-1.5 rounded-md border border-rose-800/50 transition active:scale-95';
+            deleteSpan.textContent = '🗑️削除';
+            deleteSpan.addEventListener('click', (ev) => deleteReviewFolder(folder, ev));
+            left.appendChild(titleSpan);
+            left.appendChild(renameSpan);
+            left.appendChild(deleteSpan);
+
+            const right = document.createElement('span');
+            right.className = 'text-base text-cyan-500/70 font-bold';
+            right.textContent = `${configData[folder].length} Files`;
+
+            btn.appendChild(left);
+            btn.appendChild(right);
             btn.onclick = () => selectReviewFolder(folder);
             folderListContainer.appendChild(btn);
           });
         }
 
         const newFolderBtn = document.createElement('button');
+        newFolderBtn.type = 'button';
         newFolderBtn.className = "w-full bg-cyan-950/40 border-2 border-cyan-800/50 hover:bg-cyan-900/60 text-cyan-300 font-black h-[4.5rem] rounded-xl text-left px-5 flex items-center justify-between transition active:scale-[0.99] shadow-sm text-lg mt-2";
         newFolderBtn.innerHTML = `<span>➕ 新規フォルダを追加</span>`;
         newFolderBtn.onclick = () => createNewReviewFolder();
@@ -57275,23 +58071,23 @@
       });
     }
     async function renameReviewFolder(oldFolder, e) {
-      e.stopPropagation();
+      if (e) e.stopPropagation();
       const newFolder = prompt(`「${oldFolder}」の新しいフォルダ名を入力してください:`, oldFolder);
-      if (!newFolder || !newFolder.trim() || newFolder === oldFolder) return;
+      if (!newFolder || !newFolder.trim() || newFolder.trim() === oldFolder) return;
 
-      const files = configData[oldFolder] || [];
       const targetFolder = newFolder.trim();
 
       try {
-        await callBatch(
-          files.map(file => ({
-            action: 'updateConfigRecord',
-            oldFolder,
-            oldFile: file,
-            newFolder: targetFolder,
-            newFile: file
-          }))
-        );
+        const res = await callAPI('updateConfigRecord', {
+          oldFolder,
+          oldFile: '',
+          newFolder: targetFolder,
+          newFile: ''
+        });
+        if (!res || res.error || res.success === false) {
+          alert('フォルダ名の変更に失敗しました');
+          return;
+        }
         initReviewMode();
       } catch (err) {
         alert("エラーが発生しました");
@@ -57325,16 +58121,35 @@
       }
       files.forEach(file => {
         const btn = document.createElement('button');
+        btn.type = 'button';
         btn.className = "w-full bg-cyan-950/40 border-2 border-cyan-800/50 hover:bg-cyan-900/60 text-cyan-100 font-black h-[4.5rem] rounded-xl text-left px-5 flex items-center justify-between transition active:scale-[0.99] shadow-sm text-lg";
-        btn.innerHTML = `
-          <div class="flex items-center gap-1 flex-wrap">
-            <span>📄 ${file}</span>
-            <span onclick="renameReviewFile('${file}', event)" class="text-sm bg-slate-800/80 hover:bg-slate-700 text-slate-300 px-2.5 py-1.5 rounded-md ml-2 border border-slate-600/50 transition active:scale-95">✏️変更</span>
-            <span onclick="moveReviewFile('${file}', event)" class="text-sm bg-indigo-950/60 hover:bg-indigo-900/70 text-indigo-300 px-2.5 py-1.5 rounded-md border border-indigo-800/50 transition active:scale-95">📁移動</span>
-            <span onclick="deleteReviewFile('${file}', event)" class="text-sm bg-rose-950/60 hover:bg-rose-900/70 text-rose-400 px-2.5 py-1.5 rounded-md border border-rose-800/50 transition active:scale-95">🗑️削除</span>
-          </div>
-          <span class="text-cyan-500/70 text-lg">→</span>
-        `;
+        const left = document.createElement('div');
+        left.className = 'flex items-center gap-1 flex-wrap';
+        const titleSpan = document.createElement('span');
+        titleSpan.textContent = `📄 ${file}`;
+        const renameSpan = document.createElement('span');
+        renameSpan.className = 'text-sm bg-slate-800/80 hover:bg-slate-700 text-slate-300 px-2.5 py-1.5 rounded-md ml-2 border border-slate-600/50 transition active:scale-95';
+        renameSpan.textContent = '✏️変更';
+        renameSpan.addEventListener('click', (ev) => renameReviewFile(file, ev));
+        const moveSpan = document.createElement('span');
+        moveSpan.className = 'text-sm bg-indigo-950/60 hover:bg-indigo-900/70 text-indigo-300 px-2.5 py-1.5 rounded-md border border-indigo-800/50 transition active:scale-95';
+        moveSpan.textContent = '📁移動';
+        moveSpan.addEventListener('click', (ev) => moveReviewFile(file, ev));
+        const deleteSpan = document.createElement('span');
+        deleteSpan.className = 'text-sm bg-rose-950/60 hover:bg-rose-900/70 text-rose-400 px-2.5 py-1.5 rounded-md border border-rose-800/50 transition active:scale-95';
+        deleteSpan.textContent = '🗑️削除';
+        deleteSpan.addEventListener('click', (ev) => deleteReviewFile(file, ev));
+        left.appendChild(titleSpan);
+        left.appendChild(renameSpan);
+        left.appendChild(moveSpan);
+        left.appendChild(deleteSpan);
+
+        const arrow = document.createElement('span');
+        arrow.className = 'text-cyan-500/70 text-lg';
+        arrow.textContent = '→';
+
+        btn.appendChild(left);
+        btn.appendChild(arrow);
         btn.onclick = () => selectReviewFile(file);
         fileListContainer.appendChild(btn);
       });
@@ -58270,6 +59085,115 @@
         } catch (e) { }
       }
       return null;
+    }
+
+    function sendTextToGanttQuick(rawText, opts) {
+      opts = opts || {};
+      const lines = String(rawText || '').split(/\r?\n/).map((s) => s.trim()).filter(Boolean);
+      const title = (lines[0] || '').slice(0, 60);
+      if (!title) {
+        alert('ガントへ送る内容が空です');
+        return null;
+      }
+      if (!ganttTasks.length && typeof loadGanttCache === 'function') {
+        ganttTasks = loadGanttCache();
+      }
+      const today = typeof ganttTodayStr === 'function' ? ganttTodayStr() : new Date().toISOString().slice(0, 10);
+      const end = typeof ganttAddDays === 'function' ? ganttAddDays(today, 2) : today;
+      const task = normalizeGanttTask({
+        id: ganttNewId(),
+        title,
+        start: today,
+        end,
+        color: GANTT_COLORS[ganttTasks.length % GANTT_COLORS.length],
+        done: false
+      });
+      if (!task) return null;
+      saveGanttCache(ganttTasks.concat([task]));
+      if (!ganttViewStart && typeof ganttMondayOf === 'function') ganttViewStart = ganttMondayOf(today);
+      if (typeof renderGanttAll === 'function') renderGanttAll();
+      if (typeof isGanttGCalSyncEnabled === 'function' && isGanttGCalSyncEnabled() && typeof syncTaskToGCal === 'function') {
+        syncTaskToGCal(task).catch(() => { });
+      }
+      if (opts.statusEl) {
+        opts.statusEl.textContent = `📅 ガントに追加: ${task.title}`;
+        opts.statusEl.className = 'text-center text-xs font-bold text-emerald-300 min-h-[1rem]';
+      }
+      if (opts.btnEl) {
+        const btn = opts.btnEl;
+        const origText = btn.dataset.origLabel || btn.textContent;
+        btn.dataset.origLabel = origText;
+        btn.textContent = '✓ ガントに追加しました';
+        setTimeout(() => { btn.textContent = origText; }, 1800);
+      }
+      if (confirm(`ガントにタスクを追加しました：\n「${task.title}」\n\n今すぐガントタブを開きますか？`)) {
+        let canClose = true;
+        if (typeof opts.closeOverlayFn === 'function') {
+          canClose = opts.closeOverlayFn() !== false;
+        }
+        if (canClose && typeof switchTab === 'function') {
+          switchTab('gantt-mode');
+        }
+      }
+      return task;
+    }
+
+    function sendTextToTreeQuick(rawText, closeOverlayFn) {
+      const content = String(rawText || '').trim();
+      if (!content) {
+        alert('ツリーへ送る内容が空です');
+        return false;
+      }
+      if (typeof closeOverlayFn === 'function') {
+        if (closeOverlayFn() === false) return false;
+      }
+      if (typeof switchTab === 'function') switchTab('tree-mode');
+      requestAnimationFrame(() => {
+        if (typeof initTreeMode === 'function' && (!treeState)) initTreeMode();
+        if (typeof treeInsertMemoAsNode === 'function') {
+          treeInsertMemoAsNode({ content });
+        }
+      });
+      return true;
+    }
+
+    function sendReviewDetailToGantt(btnEl) {
+      const textarea = document.getElementById('review-edit-textarea');
+      const raw = textarea ? textarea.value : '';
+      sendTextToGanttQuick(raw, {
+        btnEl,
+        closeOverlayFn: () => {
+          const overlay = document.getElementById('review-detail-overlay');
+          closeReviewDetail();
+          return !overlay || overlay.classList.contains('hidden');
+        }
+      });
+    }
+
+    function sendReviewDetailToTree() {
+      const textarea = document.getElementById('review-edit-textarea');
+      const raw = textarea ? textarea.value : '';
+      sendTextToTreeQuick(raw, () => {
+        const overlay = document.getElementById('review-detail-overlay');
+        closeReviewDetail();
+        return !overlay || overlay.classList.contains('hidden');
+      });
+    }
+
+    function sendCheckBlockExpandToGantt() {
+      const editor = document.getElementById('check-blocks-editor');
+      const statusEl = document.getElementById('check-blocks-expand-status');
+      const raw = editor ? editor.value : '';
+      sendTextToGanttQuick(raw, {
+        statusEl,
+        closeOverlayFn: () => closeCheckBlockExpand()
+      });
+    }
+
+    function sendCheckBlockExpandToTree() {
+      const editor = document.getElementById('check-blocks-editor');
+      const raw = editor ? editor.value : '';
+      sendTextToTreeQuick(raw, () => closeCheckBlockExpand());
     }
 
     async function saveEditReviewItem() {
@@ -61907,7 +62831,7 @@
     const FAVORITES_REMOVED_KEY = 'dump_favorites_removed';
     const FAVORITES_CLOUD_FOLDER = '__SYSTEM__';
     const FAVORITES_CLOUD_FILE = 'favorites';
-    const FAVORITES_SYNC_POLL_MS = 5000;
+    const FAVORITES_SYNC_POLL_MS = 30000;
     let favoritesCloudTimer = null;
     let favoritesSyncing = false;
     let favoritesPollTimer = null;
@@ -62198,19 +63122,20 @@
         favorites: list,
         removed
       });
-      const ops = [];
       const ids = existing && Array.isArray(existing.cloudIds) && existing.cloudIds.length
         ? existing.cloudIds
         : (existing && existing.cloudId ? [existing.cloudId] : []);
-      ids.forEach((id) => ops.push({ action: 'deleteDataRecord', id }));
-      ops.push({
-        action: 'addDataRecord',
-        folder: FAVORITES_CLOUD_FOLDER,
-        file: FAVORITES_CLOUD_FILE,
-        content: payload
-      });
-      const res = await callBatch(ops, { silent: true });
-      if (res && (res.error || res.success === false)) throw new Error('favorites_sync');
+      try {
+        await upsertSystemSnapshotRecord({
+          cloudId: ids[0] || '',
+          extraIds: ids.slice(1),
+          folder: FAVORITES_CLOUD_FOLDER,
+          file: FAVORITES_CLOUD_FILE,
+          content: payload
+        });
+      } catch (_) {
+        throw new Error('favorites_sync');
+      }
     }
 
     function queueFavoritesCloudSync() {
@@ -62255,11 +63180,24 @@
       }
     }
 
+    let favoritesPollChecking = false;
     function startFavoritesPoll() {
       if (favoritesPollTimer) return;
-      favoritesPollTimer = setInterval(() => {
+      favoritesPollTimer = setInterval(async () => {
         if (document.visibilityState !== 'visible') return;
-        syncFavorites().catch(() => { });
+        if (favoritesPollChecking) return;
+        const onFav = !!(document.getElementById('favorites-mode')
+          && document.getElementById('favorites-mode').classList.contains('active'));
+        if (!onFav) return;
+        favoritesPollChecking = true;
+        try {
+          const changed = await checkPollStampChanged('favorites');
+          if (changed) {
+            await syncFavorites().catch(() => { });
+          }
+        } finally {
+          favoritesPollChecking = false;
+        }
       }, FAVORITES_SYNC_POLL_MS);
     }
 
@@ -64579,1252 +65517,8 @@
         })
         .catch((err) => console.warn('SW register failed', err));
     }
-
-    // ==========================================
-    // サプリ管理アプリ (SuppleLog) 機能モジュール (完全版)
-    // ==========================================
-    const SUPPLE_MASTERS_KEY = 'dump_supple_masters_v1';
-    const SUPPLE_INTAKES_KEY = 'dump_supple_intakes_v1';
-
-    // HTMLエスケープ関数（未定義エラーを完全防止）
-    function escapeHtml(str) {
-      if (str == null) return '';
-      if (typeof escapeHtmlText === 'function') return escapeHtmlText(str);
-      return String(str)
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#039;');
-    }
-
-    const SUPPLE_PRESET_ICONS = [
-      { id: 'preset_vitamin', label: 'ビタミン', emoji: '🍋', bg: '#451a03', color: '#fde047' },
-      { id: 'preset_capsule', label: 'カプセル', emoji: '💊', bg: '#082f49', color: '#38bdf8' },
-      { id: 'preset_tablet', label: 'タブレット', emoji: '⚪', bg: '#1e293b', color: '#cbd5e1' },
-      { id: 'preset_protein', label: 'プロテイン', emoji: '🥛', bg: '#500724', color: '#f472b6' },
-      { id: 'preset_fishoil', label: 'オメガ3', emoji: '🐟', bg: '#022c22', color: '#34d399' },
-      { id: 'preset_herb', label: 'ハーブ', emoji: '🌿', bg: '#064e3b', color: '#6ee7b7' }
-    ];
-
-    const SUPPLE_CATEGORIES = [
-      { name: 'ビタミン', color: 'bg-amber-950/70 text-amber-300 border-amber-600/40', dot: '#f59e0b' },
-      { name: 'ミネラル', color: 'bg-blue-950/70 text-blue-300 border-blue-600/40', dot: '#3b82f6' },
-      { name: 'プロテイン', color: 'bg-pink-950/70 text-pink-300 border-pink-600/40', dot: '#ec4899' },
-      { name: 'オメガ・脂肪酸', color: 'bg-emerald-950/70 text-emerald-300 border-emerald-600/40', dot: '#10b981' },
-      { name: 'アミノ酸', color: 'bg-purple-950/70 text-purple-300 border-purple-600/40', dot: '#a855f7' },
-      { name: 'その他', color: 'bg-slate-900 text-slate-300 border-slate-700', dot: '#94a3b8' }
-    ];
-
-    const SUPPLE_DEFAULT_MASTERS = [
-      { id: 'supple_1', name: 'ビタミンC 1000mg', barcode: '4987035265313', category: 'ビタミン', photo: 'preset_vitamin', dose: '1日2回 1カプセル', createdAt: new Date().toISOString() },
-      { id: 'supple_2', name: 'マルチミネラル＆鉄', barcode: '4903301206132', category: 'ミネラル', photo: 'preset_tablet', dose: '1日1回 2粒', createdAt: new Date().toISOString() },
-      { id: 'supple_3', name: 'オメガ3 DHA/EPA', barcode: '4987072016350', category: 'オメガ・脂肪酸', photo: 'preset_fishoil', dose: '食後 1カプセル', createdAt: new Date().toISOString() },
-      { id: 'supple_4', name: 'ホエイプロテイン', barcode: '4902777323176', category: 'プロテイン', photo: 'preset_protein', dose: 'スプーン1杯（30g）', createdAt: new Date().toISOString() }
-    ];
-
-    function getSuppleTodayStr(offsetDays = 0) {
-      const d = new Date();
-      if (offsetDays !== 0) d.setDate(d.getDate() + offsetDays);
-      const y = d.getFullYear();
-      const m = String(d.getMonth() + 1).padStart(2, '0');
-      const day = String(d.getDate()).padStart(2, '0');
-      return y + '-' + m + '-' + day;
-    }
-
-    // 摂取履歴のロード：初期ダミーデータは一切入れず、ユーザーが登録したもののみ管理
-    function loadSuppleIntakes() {
-      try {
-        const d = localStorage.getItem(SUPPLE_INTAKES_KEY);
-        if (d) {
-          const list = JSON.parse(d);
-          // 過去のダミー初期データ（intake_1 〜 intake_9）があれば自動パージして消去
-          const cleaned = list.filter(item => !/^intake_[1-9]$/.test(item.id));
-          return cleaned;
-        }
-      } catch (e) { }
-      return []; // 初期状態は完全に空
-    }
-
-    function saveSuppleIntakes(intakes) {
-      try { localStorage.setItem(SUPPLE_INTAKES_KEY, JSON.stringify(intakes)); } catch (e) { }
-    }
-
-    function loadSuppleMasters() {
-      try {
-        const d = localStorage.getItem(SUPPLE_MASTERS_KEY);
-        if (d) return JSON.parse(d);
-      } catch (e) { }
-      saveSuppleMasters(SUPPLE_DEFAULT_MASTERS);
-      return SUPPLE_DEFAULT_MASTERS;
-    }
-
-    function saveSuppleMasters(masters) {
-      try { localStorage.setItem(SUPPLE_MASTERS_KEY, JSON.stringify(masters)); } catch (e) { }
-    }
-
-    var suppleMasters = loadSuppleMasters();
-    var suppleIntakes = loadSuppleIntakes();
-    var suppleIntakePicks = [];
-    var suppleChartPeriod = 7;
-    var suppleChartInstance = null;
-    var suppleHtml5QrScanner = null;
-    var suppleCurrentScannerTarget = 'intake';
-    var suppleTabInitialized = false;
-
-    function syncSuppleFabVisibility() {
-      const fab = document.getElementById('supple-fab-add');
-      if (!fab) return;
-      const suppleTab = document.getElementById('supplement-mode');
-      const isSuppleActive = !!(suppleTab && suppleTab.classList.contains('active'));
-      const anyModalOpen = ['modal-supple-intake', 'modal-supple-master', 'modal-supple-scanner'].some((id) => {
-        const el = document.getElementById(id);
-        return el && !el.classList.contains('hidden');
-      });
-      fab.style.setProperty('display', (isSuppleActive && !anyModalOpen) ? 'flex' : 'none', 'important');
-    }
-
-    function initSupplementTab() {
-      syncSuppleFabVisibility();
-      const _syncBtn = document.getElementById('cross-device-sync-btn');
-      if (_syncBtn) _syncBtn.style.setProperty('display', 'none', 'important');
-
-      if (!suppleTabInitialized) {
-        initSuppleCategorySelector();
-        initSupplePresetIcons();
-        suppleTabInitialized = true;
-      }
-      const today = new Date();
-      const badge = document.getElementById('supple-today-badge');
-      if (badge) {
-        badge.textContent = today.toLocaleDateString('ja-JP', { month: 'short', day: 'numeric', weekday: 'short' });
-      }
-      renderSuppleAll();
-    }
-
-    function renderSuppleAll() {
-      renderSuppleSummary();
-      renderSuppleChart();
-      renderSuppleHistory();
-      renderSuppleDropdownList();
-    }
-
-    function setSuppleChartPeriod(days) {
-      suppleChartPeriod = days;
-      const btn7 = document.getElementById('supple-btn-period-7');
-      const btn30 = document.getElementById('supple-btn-period-30');
-      if (btn7 && btn30) {
-        if (days === 7) {
-          btn7.className = "px-2.5 py-1 rounded-lg bg-cyan-900/60 text-cyan-200 shadow-xs transition-all";
-          btn30.className = "px-2.5 py-1 rounded-lg text-slate-400 hover:text-slate-200 transition-all";
-        } else {
-          btn30.className = "px-2.5 py-1 rounded-lg bg-cyan-900/60 text-cyan-200 shadow-xs transition-all";
-          btn7.className = "px-2.5 py-1 rounded-lg text-slate-400 hover:text-slate-200 transition-all";
-        }
-      }
-      renderSuppleChart();
-    }
-
-    function renderSuppleSummary() {
-      const todayStr = getSuppleTodayStr(0);
-      const todayCount = suppleIntakes.filter(i => i.date === todayStr).length;
-      const sevenDaysAgo = new Date();
-      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-      const weekCount = suppleIntakes.filter(i => new Date(i.date) >= sevenDaysAgo).length;
-
-      const elToday = document.getElementById('supple-stat-today');
-      const elWeek = document.getElementById('supple-stat-week');
-      const elCount = document.getElementById('supple-stat-count');
-      const elHistCount = document.getElementById('supple-history-count');
-
-      if (elToday) elToday.innerHTML = todayCount + '<span class="text-[10px] font-normal text-slate-400 ml-0.5">回</span>';
-      if (elWeek) elWeek.innerHTML = weekCount + '<span class="text-[10px] font-normal text-slate-400 ml-0.5">回</span>';
-      if (elCount) elCount.innerHTML = suppleMasters.length + '<span class="text-[10px] font-normal text-slate-400 ml-0.5">種</span>';
-      if (elHistCount) elHistCount.textContent = '全 ' + suppleIntakes.length + ' 件';
-    }
-
-    function renderSuppleChart() {
-      const canvas = document.getElementById('suppleIntakeChart');
-      if (!canvas) return;
-      if (typeof Chart === 'undefined') {
-        if (typeof window.__ensureExternalScript === 'function') {
-          window.__ensureExternalScript('https://cdn.jsdelivr.net/npm/chart.js', () => typeof Chart !== 'undefined')
-            .then((ok) => { if (ok) renderSuppleChart(); });
-        }
-        return;
-      }
-      const ctx = canvas.getContext('2d');
-      const dates = [];
-      const counts = [];
-
-      for (let i = suppleChartPeriod - 1; i >= 0; i--) {
-        const dateStr = getSuppleTodayStr(-i);
-        const d = new Date();
-        d.setDate(d.getDate() - i);
-        const label = suppleChartPeriod === 7
-          ? (d.getMonth() + 1) + '/' + d.getDate() + ' (' + ['日', '月', '火', '水', '木', '金', '土'][d.getDay()] + ')'
-          : (d.getMonth() + 1) + '/' + d.getDate();
-        dates.push(label);
-        counts.push(suppleIntakes.filter(item => item.date === dateStr).length);
-      }
-
-      if (suppleChartInstance) {
-        suppleChartInstance.destroy();
-      }
-
-      const gradient = ctx.createLinearGradient(0, 0, 0, 180);
-      gradient.addColorStop(0, 'rgba(16, 185, 129, 0.45)');
-      gradient.addColorStop(1, 'rgba(16, 185, 129, 0.0)');
-
-      suppleChartInstance = new Chart(ctx, {
-        type: 'line',
-        data: {
-          labels: dates,
-          datasets: [{
-            label: '摂取回数',
-            data: counts,
-            fill: true,
-            backgroundColor: gradient,
-            borderColor: '#10b981',
-            borderWidth: 2.5,
-            pointBackgroundColor: '#10b981',
-            pointBorderColor: '#0b1021',
-            pointBorderWidth: 2,
-            pointRadius: suppleChartPeriod === 7 ? 4.5 : 3,
-            tension: 0.35
-          }]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: {
-            legend: { display: false },
-            tooltip: {
-              backgroundColor: '#02040a',
-              titleFont: { size: 11, weight: 'bold' },
-              bodyFont: { size: 12 },
-              padding: 8,
-              cornerRadius: 10,
-              displayColors: false,
-              callbacks: {
-                label: (c) => '摂取回数: ' + c.raw + ' 回'
-              }
-            }
-          },
-          scales: {
-            x: {
-              grid: { display: false },
-              ticks: { font: { size: 9, weight: '600' }, color: '#64748b', maxRotation: 0, autoSkip: true, maxTicksLimit: suppleChartPeriod === 7 ? 7 : 8 }
-            },
-            y: {
-              beginAtZero: true,
-              suggestedMax: 4,
-              ticks: { stepSize: 1, font: { size: 9 }, color: '#64748b' },
-              grid: { color: 'rgba(51, 65, 85, 0.25)', borderDash: [3, 3] }
-            }
-          }
-        }
-      });
-    }
-
-    // 摂取履歴の描画（編集・削除ボタン付き）
-    function renderSuppleHistory() {
-      const container = document.getElementById('supple-history-container');
-      if (!container) return;
-      container.innerHTML = '';
-
-      if (suppleIntakes.length === 0) {
-        container.innerHTML = `
-          <div class="bg-[#0b1021]/60 rounded-3xl p-6 text-center border border-cyan-900/30">
-            <p class="text-xs font-bold text-slate-300">まだ摂取記録がありません</p>
-            <p class="text-[11px] text-slate-500 mt-1">右下の「＋」ボタンから今日のサプリを記録しましょう</p>
-          </div>
-        `;
-        return;
-      }
-
-      const grouped = {};
-      const sorted = [...suppleIntakes].sort((a, b) => new Date(b.date) - new Date(a.date) || new Date(b.createdAt) - new Date(a.createdAt));
-      sorted.forEach(item => {
-        if (!grouped[item.date]) grouped[item.date] = [];
-        grouped[item.date].push(item);
-      });
-
-      const todayStr = getSuppleTodayStr(0);
-      const yesterdayStr = getSuppleTodayStr(-1);
-
-      Object.keys(grouped).forEach(dateStr => {
-        const items = grouped[dateStr];
-        const dateObj = new Date(dateStr + 'T00:00:00');
-        const dayNames = ['日', '月', '火', '水', '木', '金', '土'];
-        const dayOfWeek = dayNames[dateObj.getDay()];
-
-        let dateLabel = (dateObj.getMonth() + 1) + '月' + dateObj.getDate() + '日 (' + dayOfWeek + ')';
-        let badgeHtml = '';
-        if (dateStr === todayStr) {
-          badgeHtml = '<span class="text-[9px] font-extrabold px-1.5 py-0.2 rounded-sm bg-emerald-500 text-white">今日</span>';
-        } else if (dateStr === yesterdayStr) {
-          badgeHtml = '<span class="text-[9px] font-semibold px-1.5 py-0.2 rounded-sm bg-slate-800 text-slate-300">昨日</span>';
-        }
-
-        const dateGroupEl = document.createElement('div');
-        dateGroupEl.className = 'bg-[#0b1021]/80 rounded-2xl p-3 sm:p-4 border border-cyan-900/40 space-y-2';
-        dateGroupEl.innerHTML = `
-          <div class="flex items-center justify-between pb-1.5 border-b border-cyan-950">
-            <div class="flex items-center gap-2">
-              <span class="font-extrabold text-cyan-50 text-xs sm:text-sm">${dateLabel}</span>
-              ${badgeHtml}
-            </div>
-            <span class="text-[10px] font-semibold text-slate-400">${items.length} 回</span>
-          </div>
-          <div class="flex flex-wrap gap-2 pt-1" id="supple-chips-${dateStr}"></div>
-        `;
-
-        container.appendChild(dateGroupEl);
-        const chipsContainer = dateGroupEl.querySelector('#supple-chips-' + dateStr);
-
-        items.forEach(item => {
-          const s = suppleMasters.find(m => m.id === item.suppleId) || { name: '削除されたサプリ', category: 'その他', photo: 'preset_capsule' };
-          const chip = document.createElement('div');
-          chip.className = 'group inline-flex items-center gap-2 pl-2 pr-1.5 py-1 rounded-xl bg-slate-900/90 border border-cyan-900/50 hover:border-cyan-500 transition-all text-xs';
-
-          const thumb = getSupplePhotoThumbHtml(s.photo, 22);
-          const cat = SUPPLE_CATEGORIES.find(c => c.name === s.category) || SUPPLE_CATEGORIES[5];
-
-          chip.innerHTML = `
-            <div class="flex items-center gap-2 cursor-pointer" onclick="openSuppleEditModal('${item.id}')" title="クリックして編集">
-              ${thumb}
-              <div class="flex flex-col text-left">
-                <div class="flex items-center gap-1">
-                  <span class="font-bold text-slate-100 hover:text-cyan-300 transition-colors">${escapeHtml(s.name)}</span>
-                  <span class="w-1.5 h-1.5 rounded-full" style="background-color: ${cat.dot};"></span>
-                </div>
-                <span class="text-[9px] text-slate-400">${intakeQtyOf(item)}個${item.timing ? '・' + item.timing : ''}${item.note ? '・' + escapeHtml(item.note) : ''}</span>
-              </div>
-            </div>
-            <!-- アクションボタン（編集 ＆ 削除） -->
-            <div class="flex items-center gap-0.5 ml-1 pl-1 border-l border-slate-800">
-              <button type="button" onclick="openSuppleEditModal('${item.id}', event)" class="p-1 rounded-lg text-slate-400 hover:text-cyan-300 hover:bg-slate-800 text-xs transition" title="この記録を編集">✎</button>
-              <button type="button" onclick="deleteSuppleIntake('${item.id}', event)" class="p-1 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-slate-800 text-xs transition" title="この記録を削除">✕</button>
-            </div>
-          `;
-          chipsContainer.appendChild(chip);
-        });
-      });
-    }
-
-    function getSupplePhotoThumbHtml(photoRef, size = 26) {
-      if (!photoRef) {
-        return '<div class="rounded-lg bg-slate-800 flex items-center justify-center text-xs" style="width:' + size + 'px;height:' + size + 'px;">💊</div>';
-      }
-      if (photoRef.startsWith('data:image') || photoRef.startsWith('http://') || photoRef.startsWith('https://')) {
-        return '<img src="' + photoRef + '" class="rounded-lg object-cover border border-cyan-800 shrink-0" style="width:' + size + 'px;height:' + size + 'px;" />';
-      }
-      const preset = SUPPLE_PRESET_ICONS.find(p => p.id === photoRef) || SUPPLE_PRESET_ICONS[1];
-      return '<div class="rounded-lg flex items-center justify-center shrink-0 text-xs border border-white/10" style="width:' + size + 'px;height:' + size + 'px;background-color:' + preset.bg + ';color:' + preset.color + ';">' + preset.emoji + '</div>';
-    }
-
-    // ◯ 摂取記録の削除
-    function deleteSuppleIntake(id, ev) {
-      if (ev) ev.stopPropagation();
-      const target = suppleIntakes.find(i => i.id === id);
-      const s = target ? suppleMasters.find(m => m.id === target.suppleId) : null;
-      const label = s ? '「' + s.name + '」の' : '';
-      if (!confirm(label + '摂取記録を削除しますか？')) return;
-      suppleIntakes = suppleIntakes.filter(i => i.id !== id);
-      saveSuppleIntakes(suppleIntakes);
-      renderSuppleAll();
-    }
-
-    // ◯ 摂取したサプリ 新規登録モーダルを開く
-    function intakeQtyOf(item) {
-      const n = parseInt(item && item.qty, 10);
-      return n > 0 ? n : 1;
-    }
-
-    function setSuppleSubmitLabel(label) {
-      ['supple-btn-submit-intake', 'supple-btn-submit-intake-inline'].forEach((id) => {
-        const el = document.getElementById(id);
-        if (el) el.textContent = label;
-      });
-    }
-
-    function openSuppleIntakeModal() {
-      document.getElementById('supple-edit-intake-id').value = '';
-      document.getElementById('supple-modal-title').textContent = '摂取したサプリの記録';
-      document.getElementById('supple-modal-subtitle').textContent = '日付とサプリを選んで登録します';
-      setSuppleSubmitLabel('✓ 登録する');
-      document.getElementById('supple-btn-delete-record').classList.add('hidden');
-
-      const dateEl = document.getElementById('supple-input-date');
-      const noteEl = document.getElementById('supple-input-note');
-      if (dateEl) dateEl.value = getSuppleTodayStr(0);
-      if (noteEl) noteEl.value = '';
-
-      suppleIntakePicks = [];
-      renderSuppleDropdownList();
-      const modal = document.getElementById('modal-supple-intake');
-      if (modal) {
-        modal.classList.remove('hidden');
-        modal.classList.add('flex');
-        modal.style.setProperty('display', 'flex', 'important');
-      }
-      syncSuppleFabVisibility();
-    }
-
-    // ◯ 摂取記録の編集モーダルを開く
-    function openSuppleEditModal(intakeId, ev) {
-      if (ev) ev.stopPropagation();
-      const item = suppleIntakes.find(i => i.id === intakeId);
-      if (!item) return;
-
-      document.getElementById('supple-edit-intake-id').value = item.id;
-      document.getElementById('supple-modal-title').textContent = '摂取記録の編集';
-      document.getElementById('supple-modal-subtitle').textContent = '日付・サプリ・メモを変更できます';
-      setSuppleSubmitLabel('✓ 更新する');
-      document.getElementById('supple-btn-delete-record').classList.remove('hidden');
-
-      const dateEl = document.getElementById('supple-input-date');
-      const timingEl = document.getElementById('supple-input-timing');
-      const noteEl = document.getElementById('supple-input-note');
-
-      if (dateEl) dateEl.value = item.date;
-      if (timingEl) timingEl.value = item.timing || '夜';
-      if (noteEl) noteEl.value = item.note || '';
-
-      suppleIntakePicks = [{ id: item.suppleId, qty: intakeQtyOf(item) }];
-      renderSuppleDropdownList();
-
-      const modal = document.getElementById('modal-supple-intake');
-      if (modal) {
-        modal.classList.remove('hidden');
-        modal.style.setProperty('display', 'flex', 'important');
-      }
-      syncSuppleFabVisibility();
-    }
-
-
-    // サプリ関連の全モーダルを一括で閉じる
-    function closeSuppleAllModals() {
-      closeSuppleIntakeModal();
-      closeSuppleMasterModal();
-      closeSupplementBarcodeScanner();
-      ['modal-supple-intake', 'modal-supple-master', 'modal-supple-scanner'].forEach(id => {
-        const el = document.getElementById(id);
-        if (el) {
-          el.classList.add('hidden');
-          el.classList.remove('flex');
-          el.style.setProperty('display', 'none', 'important');
-        }
-      });
-      syncSuppleFabVisibility();
-    }
-
-    function closeSuppleIntakeModal() {
-      const modal = document.getElementById('modal-supple-intake');
-      if (modal) {
-        modal.classList.add('hidden');
-        modal.classList.remove('flex');
-        modal.style.setProperty('display', 'none', 'important');
-      }
-      syncSuppleFabVisibility();
-    }
-
-    // 編集モーダル内の「🗑️ 削除」ボタン
-    function deleteCurrentEditingIntake() {
-      const editId = document.getElementById('supple-edit-intake-id').value;
-      if (!editId) return;
-      deleteSuppleIntake(editId);
-      closeSuppleIntakeModal();
-    }
-
-    // 登録または更新の送信
-    function currentSuppleIntakePicks() {
-      return suppleIntakePicks
-        .map((p) => ({ id: p.id, qty: Math.max(1, Math.min(99, parseInt(p.qty, 10) || 1)) }))
-        .filter((p) => suppleMasters.some((m) => m.id === p.id));
-    }
-
-    function submitSuppleIntake() {
-      const editId = document.getElementById('supple-edit-intake-id').value;
-      const date = document.getElementById('supple-input-date').value;
-      const timing = document.getElementById('supple-input-timing').value;
-      const note = document.getElementById('supple-input-note').value.trim();
-      const picks = currentSuppleIntakePicks();
-
-      if (!date || !picks.length) {
-        alert('日付と、1つ以上のサプリを選択してください');
-        return;
-      }
-
-      if (editId) {
-        const idx = suppleIntakes.findIndex(i => i.id === editId);
-        const first = picks[0];
-        if (idx !== -1) {
-          suppleIntakes[idx].date = date;
-          suppleIntakes[idx].suppleId = first.id;
-          suppleIntakes[idx].qty = first.qty;
-          suppleIntakes[idx].timing = timing;
-          suppleIntakes[idx].note = note;
-          suppleIntakes[idx].updatedAt = new Date().toISOString();
-        }
-        const now = Date.now();
-        picks.slice(1).forEach((p, i) => {
-          suppleIntakes.push({
-            id: 'intake_' + now + '_' + i,
-            date: date,
-            suppleId: p.id,
-            qty: p.qty,
-            timing: timing,
-            note: note,
-            createdAt: new Date().toISOString()
-          });
-        });
-      } else {
-        const now = Date.now();
-        picks.forEach((p, i) => {
-          suppleIntakes.push({
-            id: 'intake_' + now + '_' + i,
-            date: date,
-            suppleId: p.id,
-            qty: p.qty,
-            timing: timing,
-            note: note,
-            createdAt: new Date().toISOString()
-          });
-        });
-      }
-
-      saveSuppleIntakes(suppleIntakes);
-      closeSuppleIntakeModal();
-      renderSuppleAll();
-    }
-
-    function renderSuppleDropdownList() {
-      const menu = document.getElementById('supple-pick-list');
-      const summary = document.getElementById('supple-pick-summary');
-      const idInput = document.getElementById('supple-selected-id');
-      if (!menu) return;
-      suppleIntakePicks = currentSuppleIntakePicks();
-      if (idInput) idInput.value = suppleIntakePicks.length ? suppleIntakePicks[0].id : '';
-
-      if (!suppleMasters.length) {
-        menu.innerHTML = '<div class="text-xs text-slate-500 text-center py-4">登録されたサプリはまだありません</div>';
-        if (summary) summary.textContent = '';
-        return;
-      }
-
-      menu.innerHTML = suppleMasters.map((s) => {
-        const pick = suppleIntakePicks.find((p) => p.id === s.id);
-        const on = !!pick;
-        const qty = pick ? pick.qty : 1;
-        const thumb = getSupplePhotoThumbHtml(s.photo, 28);
-        const cat = SUPPLE_CATEGORIES.find(c => c.name === s.category) || SUPPLE_CATEGORIES[5];
-        return `
-          <div class="flex items-center gap-2 px-2 py-2 rounded-xl ${on ? 'bg-emerald-950/40 border border-emerald-600/40' : 'hover:bg-slate-800/70 border border-transparent'}">
-            <button type="button" onclick="toggleSuppleIntakePick('${s.id}')" class="flex-1 min-w-0 flex items-center gap-2 text-left">
-              <span class="w-4 h-4 rounded border ${on ? 'bg-emerald-500 border-emerald-400 text-white' : 'border-slate-500 text-transparent'} flex items-center justify-center text-[10px] font-black shrink-0">${on ? '✓' : ''}</span>
-              ${thumb}
-              <span class="min-w-0">
-                <span class="block text-xs font-bold text-slate-100 truncate">${escapeHtml(s.name)}</span>
-                <span class="text-[9px] font-semibold px-1.5 py-0.2 rounded-md ${cat.color}">${escapeHtml(s.category)}</span>
-              </span>
-            </button>
-            <div class="flex items-center gap-1 shrink-0 ${on ? '' : 'opacity-40 pointer-events-none'}">
-              <button type="button" onclick="changeSuppleIntakeQty('${s.id}', -1, event)" class="w-6 h-6 rounded-lg bg-slate-800 border border-slate-600 text-slate-100 text-sm font-black" aria-label="個数を減らす">−</button>
-              <span class="w-6 text-center text-xs font-black text-cyan-100">${qty}</span>
-              <button type="button" onclick="changeSuppleIntakeQty('${s.id}', 1, event)" class="w-6 h-6 rounded-lg bg-slate-800 border border-slate-600 text-slate-100 text-sm font-black" aria-label="個数を増やす">＋</button>
-            </div>
-            <button type="button" onclick="deleteSuppleMasterFromPicker('${s.id}', event)" class="w-7 h-7 rounded-lg text-rose-400 hover:text-rose-200 hover:bg-rose-950/50 text-xs shrink-0" title="このサプリを削除" aria-label="このサプリを削除">🗑</button>
-          </div>
-        `;
-      }).join('');
-
-      if (summary) {
-        if (!suppleIntakePicks.length) {
-          summary.textContent = 'サプリをタップして選び、個数を指定できます';
-        } else {
-          const total = suppleIntakePicks.reduce((sum, p) => sum + p.qty, 0);
-          summary.textContent = suppleIntakePicks.length + '種を選択（合計 ' + total + '個）';
-        }
-      }
-    }
-
-    function toggleSuppleIntakePick(suppleId) {
-      const idx = suppleIntakePicks.findIndex((p) => p.id === suppleId);
-      if (idx >= 0) suppleIntakePicks.splice(idx, 1);
-      else suppleIntakePicks.push({ id: suppleId, qty: 1 });
-      renderSuppleDropdownList();
-    }
-
-    function changeSuppleIntakeQty(suppleId, delta, ev) {
-      if (ev) ev.stopPropagation();
-      const pick = suppleIntakePicks.find((p) => p.id === suppleId);
-      if (!pick) return;
-      pick.qty = Math.max(1, Math.min(99, (parseInt(pick.qty, 10) || 1) + delta));
-      renderSuppleDropdownList();
-    }
-
-    function deleteSuppleMasterFromPicker(suppleId, ev) {
-      if (ev) ev.stopPropagation();
-      const s = suppleMasters.find((m) => m.id === suppleId);
-      if (!s) return;
-      if (!confirm('「' + s.name + '」をサプリ一覧から削除しますか？\n過去の摂取記録は残ります。')) return;
-      suppleMasters = suppleMasters.filter((m) => m.id !== suppleId);
-      saveSuppleMasters(suppleMasters);
-      suppleIntakePicks = suppleIntakePicks.filter((p) => p.id !== suppleId);
-      renderSuppleDropdownList();
-      renderSuppleSummary();
-    }
-
-    function selectSuppleForIntake(suppleId) {
-      const s = suppleMasters.find(m => m.id === suppleId);
-      if (!s) return;
-      if (!suppleIntakePicks.some((p) => p.id === s.id)) {
-        suppleIntakePicks.push({ id: s.id, qty: 1 });
-      }
-      renderSuppleDropdownList();
-    }
-
-    function toggleSuppleDropdown() { }
-
-    function closeSuppleDropdown() { }
-
-    function initSuppleCategorySelector() {
-      const c = document.getElementById('supple-category-container');
-      if (!c) return;
-      c.innerHTML = '';
-      SUPPLE_CATEGORIES.forEach((cat, idx) => {
-        const btn = document.createElement('button');
-        btn.type = 'button';
-        btn.className = `supple-cat-btn py-1.5 px-2 rounded-xl text-xs font-bold border transition-all text-center flex items-center justify-center gap-1 ${idx === 0 ? 'bg-cyan-600 text-white border-cyan-500 shadow-sm' : 'bg-black/30 text-slate-400 border-cyan-900/40 hover:bg-slate-800'}`;
-        btn.dataset.category = cat.name;
-        btn.innerHTML = '<span class="w-1.5 h-1.5 rounded-full" style="background-color:' + cat.dot + '"></span> ' + cat.name;
-        btn.onclick = () => selectSuppleCategory(cat.name);
-        c.appendChild(btn);
-      });
-    }
-
-    function selectSuppleCategory(catName) {
-      document.getElementById('supple-master-category').value = catName;
-      document.querySelectorAll('.supple-cat-btn').forEach(btn => {
-        if (btn.dataset.category === catName) {
-          btn.className = 'supple-cat-btn py-1.5 px-2 rounded-xl text-xs font-bold border transition-all text-center flex items-center justify-center gap-1 bg-cyan-600 text-white border-cyan-500 shadow-sm';
-        } else {
-          btn.className = 'supple-cat-btn py-1.5 px-2 rounded-xl text-xs font-bold border transition-all text-center flex items-center justify-center gap-1 bg-black/30 text-slate-400 border-cyan-900/40 hover:bg-slate-800';
-        }
-      });
-    }
-
-    function initSupplePresetIcons() {
-      const c = document.getElementById('supple-preset-container');
-      if (!c) return;
-      c.innerHTML = '';
-      SUPPLE_PRESET_ICONS.forEach((p, idx) => {
-        const btn = document.createElement('button');
-        btn.type = 'button';
-        btn.className = 'supple-preset-btn w-8 h-8 rounded-xl flex items-center justify-center text-sm border-2 transition-all hover:scale-105 active:scale-95';
-        btn.style.backgroundColor = p.bg;
-        btn.style.borderColor = idx === 0 ? '#06b6d4' : 'transparent';
-        btn.title = p.label;
-        btn.innerHTML = p.emoji;
-        btn.onclick = () => selectSupplePresetIcon(p.id);
-        c.appendChild(btn);
-      });
-    }
-
-    function selectSupplePresetIcon(presetId) {
-      document.getElementById('supple-master-photo-data').value = presetId;
-      const preview = document.getElementById('supple-master-preview');
-      const placeholder = document.getElementById('supple-master-placeholder');
-      const clearBtn = document.getElementById('supple-btn-clear-photo');
-
-      if (preview) { preview.classList.add('hidden'); preview.src = ''; }
-      if (placeholder) {
-        placeholder.classList.remove('hidden');
-        const p = SUPPLE_PRESET_ICONS.find(item => item.id === presetId);
-        if (p) placeholder.innerHTML = '<span class="text-xl">' + p.emoji + '</span>';
-      }
-      if (clearBtn) clearBtn.classList.remove('hidden');
-
-      document.querySelectorAll('.supple-preset-btn').forEach((btn, idx) => {
-        btn.style.borderColor = (SUPPLE_PRESET_ICONS[idx].id === presetId) ? '#06b6d4' : 'transparent';
-      });
-    }
-
-    const SUPPLE_MAX_IMAGE_DIM = 200;
-    const SUPPLE_MAX_B64_LENGTH = 45000;
-
-    function applySupplePhotoDataUrl(b64, statusMsg) {
-      document.getElementById('supple-master-photo-data').value = b64;
-      const preview = document.getElementById('supple-master-preview');
-      const placeholder = document.getElementById('supple-master-placeholder');
-      const clearBtn = document.getElementById('supple-btn-clear-photo');
-
-      if (preview) { preview.src = b64; preview.classList.remove('hidden'); }
-      if (placeholder) placeholder.classList.add('hidden');
-      if (clearBtn) clearBtn.classList.remove('hidden');
-      document.querySelectorAll('.supple-preset-btn').forEach(btn => btn.style.borderColor = 'transparent');
-
-      if (statusMsg) setSupplePasteStatus(statusMsg, 'success');
-      else setSupplePasteStatus('', 'info');
-    }
-
-    function setSupplePasteStatus(msg, type = 'info') {
-      const el = document.getElementById('supple-paste-status');
-      if (!el) return;
-      if (!msg) {
-        el.classList.add('hidden');
-        el.textContent = '';
-        return;
-      }
-      el.textContent = msg;
-      el.classList.remove('hidden', 'text-cyan-300', 'text-emerald-300', 'text-rose-400');
-      if (type === 'success') el.classList.add('text-emerald-300');
-      else if (type === 'error') el.classList.add('text-rose-400');
-      else el.classList.add('text-cyan-300');
-    }
-
-    function resizeAndApplySuppleImage(img) {
-      const origW = img.naturalWidth || img.width;
-      const origH = img.naturalHeight || img.height;
-      if (!origW || !origH) return false;
-
-      let maxDim = SUPPLE_MAX_IMAGE_DIM;
-      let quality = 0.85;
-      let b64 = '';
-      let outW = origW;
-      let outH = origH;
-
-      for (let attempt = 0; attempt < 6; attempt++) {
-        if (origW >= origH) {
-          outW = maxDim;
-          outH = Math.max(1, Math.round((origH * maxDim) / origW));
-        } else {
-          outH = maxDim;
-          outW = Math.max(1, Math.round((origW * maxDim) / origH));
-        }
-
-        const canvas = document.createElement('canvas');
-        canvas.width = outW;
-        canvas.height = outH;
-        const ctx = canvas.getContext('2d');
-        ctx.fillStyle = '#ffffff';
-        ctx.fillRect(0, 0, outW, outH);
-        ctx.drawImage(img, 0, 0, outW, outH);
-        b64 = canvas.toDataURL('image/jpeg', quality);
-
-        if (b64.length <= SUPPLE_MAX_B64_LENGTH) break;
-        if (quality > 0.55) {
-          quality = Math.max(0.5, quality - 0.15);
-        } else {
-          maxDim = Math.max(96, Math.round(maxDim * 0.8));
-        }
-      }
-
-      applySupplePhotoDataUrl(b64, '');
-      return true;
-    }
-
-    function loadSuppleImageBlob(blob) {
-      if (!blob) return;
-      const reader = new FileReader();
-      reader.onload = function (e) {
-        loadSuppleImageSrc(e.target.result, false);
-      };
-      reader.readAsDataURL(blob);
-    }
-
-    function loadSuppleImageSrc(src, allowUrlFallback = true) {
-      if (!src) return;
-      const img = new Image();
-      if (!src.startsWith('data:')) {
-        img.crossOrigin = 'anonymous';
-      }
-      img.onload = function () {
-        try {
-          resizeAndApplySuppleImage(img);
-        } catch (err) {
-          if (allowUrlFallback && (src.startsWith('http://') || src.startsWith('https://'))) {
-            applySupplePhotoDataUrl(src, '');
-          } else {
-            setSupplePasteStatus('画像の変換に失敗しました。別の画像を試してください。', 'error');
-          }
-        }
-      };
-      img.onerror = function () {
-        if (allowUrlFallback && (src.startsWith('http://') || src.startsWith('https://'))) {
-          applySupplePhotoDataUrl(src, '');
-        } else {
-          setSupplePasteStatus('画像の読み込みに失敗しました。画像そのものをコピーして貼り付けてください。', 'error');
-        }
-      };
-      img.src = src;
-    }
-
-    function handleSupplePhotoUpload(ev) {
-      const file = ev.target.files[0];
-      if (!file) return;
-      loadSuppleImageBlob(file);
-    }
-
-    function clearSupplePhoto() {
-      document.getElementById('supple-master-photo-data').value = '';
-      const fCam = document.getElementById('supple-master-file-camera');
-      if (fCam) fCam.value = '';
-      const fGal = document.getElementById('supple-master-file-gallery');
-      if (fGal) fGal.value = '';
-      const pasteZone = document.getElementById('supple-paste-zone');
-      if (pasteZone) pasteZone.innerHTML = '';
-      setSupplePasteStatus('');
-      const preview = document.getElementById('supple-master-preview');
-      const placeholder = document.getElementById('supple-master-placeholder');
-      const clearBtn = document.getElementById('supple-btn-clear-photo');
-
-      if (preview) { preview.classList.add('hidden'); preview.src = ''; }
-      if (placeholder) { placeholder.classList.remove('hidden'); placeholder.innerHTML = '<span class="text-lg">🖼️</span>'; }
-      if (clearBtn) clearBtn.classList.add('hidden');
-      document.querySelectorAll('.supple-preset-btn').forEach(btn => btn.style.borderColor = 'transparent');
-    }
-
-    function openSuppleMasterModal() {
-      document.getElementById('supple-master-name').value = '';
-      document.getElementById('supple-master-barcode').value = '';
-      document.getElementById('supple-master-dose').value = '';
-      selectSuppleCategory('ビタミン');
-      clearSupplePhoto();
-      const pasteZone = document.getElementById('supple-paste-zone');
-      if (pasteZone) pasteZone.innerHTML = '';
-      setSupplePasteStatus('');
-      if (typeof setSuppleBarcodeLookupStatus === 'function') setSuppleBarcodeLookupStatus('');
-      const modal = document.getElementById('modal-supple-master');
-      if (modal) {
-        modal.classList.remove('hidden');
-        modal.classList.add('flex');
-        modal.style.setProperty('display', 'flex', 'important');
-      }
-      const scrollBody = document.getElementById('supple-master-scroll-body');
-      if (scrollBody) scrollBody.scrollTop = 0;
-      syncSuppleFabVisibility();
-    }
-
-    // バーコード比較用に記号・空白を除去して正規化
-    function normalizeSuppleBarcode(code) {
-      return String(code || '').replace(/[^\dA-Za-z]/g, '').trim();
-    }
-
-    // 登録済みマスタから同じバーコードを探す（なければ null）
-    function findSuppleMasterByBarcode(code) {
-      const target = normalizeSuppleBarcode(code);
-      if (!target) return null;
-      return suppleMasters.find(s => normalizeSuppleBarcode(s.barcode) === target) || null;
-    }
-
-    // バーコード入力欄のリアルタイム重複チェック
-    function checkSuppleMasterBarcodeDuplicate() {
-      const input = document.getElementById('supple-master-barcode');
-      if (!input) return null;
-      const val = input.value.trim();
-      const dup = findSuppleMasterByBarcode(val);
-      if (dup) {
-        if (typeof setSuppleBarcodeLookupStatus === 'function') {
-          setSuppleBarcodeLookupStatus('⚠️ このバーコードは「' + dup.name + '」で登録済みのため、登録できません', 'warn');
-        }
-        return dup;
-      }
-      const statusEl = document.getElementById('supple-barcode-lookup-status');
-      if (statusEl && (!val || statusEl.textContent.indexOf('登録済み') !== -1)) {
-        if (typeof setSuppleBarcodeLookupStatus === 'function') setSuppleBarcodeLookupStatus('');
-      }
-      return null;
-    }
-
-    function closeSuppleMasterModal() {
-      const modal = document.getElementById('modal-supple-master');
-      if (modal) {
-        modal.classList.add('hidden');
-        modal.classList.remove('flex');
-        modal.style.setProperty('display', 'none', 'important');
-      }
-      syncSuppleFabVisibility();
-    }
-
-    function submitSuppleMaster() {
-      const name = document.getElementById('supple-master-name').value.trim();
-      const barcode = document.getElementById('supple-master-barcode').value.trim();
-      const category = document.getElementById('supple-master-category').value;
-      const photo = document.getElementById('supple-master-photo-data').value || 'preset_capsule';
-      const dose = document.getElementById('supple-master-dose').value.trim();
-
-      if (!name) {
-        alert('サプリ名を入力してください');
-        return;
-      }
-
-      if (barcode) {
-        const exist = findSuppleMasterByBarcode(barcode);
-        if (exist) {
-          // 重複バーコードは登録不可
-          alert('バーコード「' + barcode + '」は既に「' + exist.name + '」に登録されているため、登録できません。');
-          if (typeof setSuppleBarcodeLookupStatus === 'function') {
-            setSuppleBarcodeLookupStatus('⚠️ このバーコードは「' + exist.name + '」で登録済みです', 'warn');
-          }
-          const input = document.getElementById('supple-master-barcode');
-          if (input) input.focus();
-          return;
-        }
-      }
-
-      const newM = {
-        id: 'supple_' + Date.now(),
-        name: name,
-        barcode: barcode,
-        category: category,
-        photo: photo,
-        dose: dose,
-        createdAt: new Date().toISOString()
-      };
-
-      suppleMasters.push(newM);
-      saveSuppleMasters(suppleMasters);
-
-      renderSuppleDropdownList();
-      selectSuppleForIntake(newM.id);
-      closeSuppleMasterModal();
-      renderSuppleSummary();
-    }
-
-    function playSuppleBeep() {
-      try {
-        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        const osc = audioCtx.createOscillator();
-        const gain = audioCtx.createGain();
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(1760, audioCtx.currentTime);
-        gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.12);
-        osc.connect(gain);
-        gain.connect(audioCtx.destination);
-        osc.start();
-        osc.stop(audioCtx.currentTime + 0.12);
-        if (navigator.vibrate) navigator.vibrate(80);
-      } catch (e) { }
-    }
-
-    async function openSuppleBarcodeScanner(target = 'intake') {
-      suppleCurrentScannerTarget = target;
-      const modal = document.getElementById('modal-supple-scanner');
-      const title = document.getElementById('supple-scanner-title');
-      const subtitle = document.getElementById('supple-scanner-subtitle');
-      document.getElementById('supple-scanner-manual-input').value = '';
-
-      if (target === 'master') {
-        title.textContent = 'サプリのバーコードを登録';
-        subtitle.textContent = 'パッケージのバーコードを枠に合わせてください';
-      } else {
-        title.textContent = 'バーコードでサプリを選択';
-        subtitle.textContent = '飲むサプリのバーコードをスキャンしてください';
-      }
-
-      modal.classList.remove('hidden');
-      modal.style.setProperty('display', 'flex', 'important');
-      syncSuppleFabVisibility();
-
-      try {
-        if (typeof Html5Qrcode === 'undefined' && typeof window.__ensureExternalScript === 'function') {
-          await window.__ensureExternalScript('https://unpkg.com/html5-qrcode', () => typeof Html5Qrcode !== 'undefined');
-        }
-        if (!suppleHtml5QrScanner && typeof Html5Qrcode !== 'undefined') {
-          suppleHtml5QrScanner = new Html5Qrcode("supple-barcode-reader");
-        }
-        if (suppleHtml5QrScanner) {
-          const config = {
-            fps: 15,
-            qrbox: { width: 250, height: 150 },
-            aspectRatio: 1.0,
-            formatsToSupport: [
-              Html5QrcodeSupportedFormats.EAN_13,
-              Html5QrcodeSupportedFormats.EAN_8,
-              Html5QrcodeSupportedFormats.UPC_A,
-              Html5QrcodeSupportedFormats.UPC_E,
-              Html5QrcodeSupportedFormats.CODE_128,
-              Html5QrcodeSupportedFormats.QR_CODE
-            ]
-          };
-          await suppleHtml5QrScanner.start(
-            { facingMode: "environment" },
-            config,
-            (decodedText) => onSuppleBarcodeScanned(decodedText),
-            () => { }
-          );
-        }
-      } catch (err) {
-        subtitle.textContent = 'カメラ未検出：下の入力欄から番号を入力できます';
-      }
-    }
-
-    async function closeSupplementBarcodeScanner() {
-      const modal = document.getElementById('modal-supple-scanner');
-      if (modal) {
-        modal.classList.add('hidden');
-        modal.classList.remove('flex');
-        modal.style.setProperty('display', 'none', 'important');
-      }
-      if (suppleHtml5QrScanner) {
-        try { await suppleHtml5QrScanner.stop(); } catch (e) { }
-      }
-      syncSuppleFabVisibility();
-    }
-
-    let suppleBarcodeLookupSeq = 0;
-
-    function setSuppleBarcodeLookupStatus(msg, type = 'info') {
-      const el = document.getElementById('supple-barcode-lookup-status');
-      if (!el) return;
-      if (!msg) {
-        el.classList.add('hidden');
-        el.textContent = '';
-        return;
-      }
-      el.textContent = msg;
-      el.classList.remove('hidden', 'text-cyan-300', 'text-emerald-300', 'text-amber-300', 'text-rose-400');
-      if (type === 'success') el.classList.add('text-emerald-300');
-      else if (type === 'warn') el.classList.add('text-amber-300');
-      else if (type === 'error') el.classList.add('text-rose-400');
-      else el.classList.add('text-cyan-300');
-    }
-
-    async function lookupSuppleNameFromOpenFoodFactsDirect(code) {
-      const candidates = [code];
-      if (code.length === 13 && code.startsWith('0')) candidates.push(code.slice(1));
-      for (const c of candidates) {
-        try {
-          const controller = new AbortController();
-          const timer = setTimeout(() => controller.abort(), 5000);
-          const resp = await fetch(
-            'https://world.openfoodfacts.org/api/v2/product/' + encodeURIComponent(c) + '.json?fields=product_name,product_name_ja,brands',
-            { signal: controller.signal }
-          );
-          clearTimeout(timer);
-          if (!resp.ok) continue;
-          const json = await resp.json();
-          if (json && json.status === 1 && json.product) {
-            const p = json.product;
-            const baseName = (p.product_name_ja || p.product_name || '').trim();
-            const brand = (p.brands || '').split(',')[0].trim();
-            let fullName = baseName;
-            if (brand && baseName && !baseName.toLowerCase().includes(brand.toLowerCase())) {
-              fullName = brand + ' ' + baseName;
-            }
-            const cleaned = (fullName || brand || '').replace(/\s+/g, ' ').trim();
-            if (cleaned) return cleaned.slice(0, 80);
-          }
-        } catch (_) { }
-      }
-      return '';
-    }
-
-    async function lookupSuppleNameByBarcode(barcode, opts = {}) {
-      const code = String(barcode || '').replace(/[^\dA-Za-z]/g, '').trim();
-      if (!code) {
-        if (opts.overwrite) setSuppleBarcodeLookupStatus('先にバーコード番号を入力してください', 'warn');
-        return '';
-      }
-      const dup = findSuppleMasterByBarcode(code);
-      if (dup) {
-        setSuppleBarcodeLookupStatus('⚠️ このバーコードは「' + dup.name + '」で登録済みのため、登録できません', 'warn');
-        return '';
-      }
-      const seq = ++suppleBarcodeLookupSeq;
-      setSuppleBarcodeLookupStatus('🔍 バーコードから商品名を検索中...', 'info');
-
-      let foundName = '';
-      try {
-        if (typeof callAPI === 'function') {
-          const res = await callAPI('lookupJanProduct', { barcode: code }, { silent: true });
-          if (res && res.success && res.name) {
-            foundName = String(res.name).trim();
-          }
-        }
-      } catch (_) { }
-
-      if (!foundName && seq === suppleBarcodeLookupSeq) {
-        foundName = await lookupSuppleNameFromOpenFoodFactsDirect(code);
-      }
-
-      if (seq !== suppleBarcodeLookupSeq) return '';
-
-      const currentCode = (document.getElementById('supple-master-barcode')?.value || '').replace(/[^\dA-Za-z]/g, '').trim();
-      if (currentCode && currentCode !== code) return '';
-
-      if (!foundName) {
-        setSuppleBarcodeLookupStatus('⚠️ 商品名が見つかりませんでした（手動で入力してください）', 'warn');
-        return '';
-      }
-
-      const nameEl = document.getElementById('supple-master-name');
-      if (nameEl) {
-        if (!nameEl.value.trim() || opts.overwrite) {
-          nameEl.value = foundName;
-          setSuppleBarcodeLookupStatus('✅ 商品名を自動入力しました: ' + foundName, 'success');
-        } else {
-          setSuppleBarcodeLookupStatus('ℹ️ 取得候補: ' + foundName, 'info');
-        }
-      }
-      return foundName;
-    }
-
-    function onSuppleBarcodeScanned(barcode) {
-      playSuppleBeep();
-      closeSupplementBarcodeScanner();
-
-      if (suppleCurrentScannerTarget === 'master') {
-        document.getElementById('supple-master-barcode').value = barcode;
-        const dup = findSuppleMasterByBarcode(barcode);
-        if (dup) {
-          setSuppleBarcodeLookupStatus('⚠️ このバーコードは「' + dup.name + '」で登録済みのため、登録できません', 'warn');
-        } else {
-          lookupSuppleNameByBarcode(barcode, { overwrite: false });
-        }
-      } else {
-        const matched = findSuppleMasterByBarcode(barcode);
-        if (matched) {
-          selectSuppleForIntake(matched.id);
-        } else {
-          if (confirm('バーコード「' + barcode + '」に一致するサプリは未登録です。新しくサプリを登録しますか？')) {
-            openSuppleMasterModal();
-            document.getElementById('supple-master-barcode').value = barcode;
-            lookupSuppleNameByBarcode(barcode, { overwrite: false });
-          }
-        }
-      }
-    }
-
-    function submitSuppleManualBarcode() {
-      const val = document.getElementById('supple-scanner-manual-input').value.trim();
-      if (!val) { alert('バーコード番号を入力してください'); return; }
-      onSuppleBarcodeScanned(val);
-    }
-
-    function openSuppleJanGoogleImageSearch() {
-      const code = (document.getElementById('supple-master-barcode').value || '').trim();
-      const name = (document.getElementById('supple-master-name').value || '').trim();
-      const query = code || name;
-      if (!query) {
-        alert('先にバーコード(JANコード)またはサプリ名を入力してください');
-        return;
-      }
-      const url = 'https://www.google.com/search?tbm=isch&q=' + encodeURIComponent(query);
-      window.open(url, '_blank', 'noopener,noreferrer');
-    }
-
-    function extractSuppleImageFromClipboardData(cd) {
-      if (!cd) return false;
-      if (cd.items) {
-        for (const item of cd.items) {
-          if (item.type && item.type.startsWith('image/')) {
-            const file = item.getAsFile();
-            if (file) {
-              loadSuppleImageBlob(file);
-              return true;
-            }
-          }
-        }
-      }
-      if (cd.files && cd.files.length > 0) {
-        for (const file of cd.files) {
-          if (file.type && file.type.startsWith('image/')) {
-            loadSuppleImageBlob(file);
-            return true;
-          }
-        }
-      }
-      const html = cd.getData ? cd.getData('text/html') : '';
-      if (html) {
-        const m = html.match(/<img[^>]+src=["']([^"']+)["']/i);
-        if (m && m[1]) {
-          loadSuppleImageSrc(m[1], true);
-          return true;
-        }
-      }
-      const text = (cd.getData ? cd.getData('text/plain') : '').trim();
-      if (text && (text.startsWith('data:image/') || /^https?:\/\/.+\.(png|jpe?g|webp|gif|bmp|avif)(\?.*)?$/i.test(text) || /^https?:\/\//i.test(text))) {
-        loadSuppleImageSrc(text, true);
-        return true;
-      }
-      return false;
-    }
-
-    function handleSuppleImagePaste(ev) {
-      const cd = ev.clipboardData || window.clipboardData;
-      const handled = extractSuppleImageFromClipboardData(cd);
-      if (handled) {
-        ev.preventDefault();
-        const pasteZone = document.getElementById('supple-paste-zone');
-        if (pasteZone) pasteZone.innerHTML = '';
-        return;
-      }
-      ev.preventDefault();
-      const pasteZone = document.getElementById('supple-paste-zone');
-      if (pasteZone) pasteZone.innerHTML = '';
-      setSupplePasteStatus('クリップボードに画像が見つかりませんでした。画像をコピーしてから貼り付けてください。', 'error');
-    }
-
-    function handleSupplePasteZoneInput(el) {
-      if (!el) return;
-      const img = el.querySelector('img');
-      if (img && img.src) {
-        loadSuppleImageSrc(img.src, true);
-      }
-      el.innerHTML = '';
-    }
-
-    async function pasteSuppleImageFromClipboard() {
-      if (!navigator.clipboard || typeof navigator.clipboard.read !== 'function') {
-        setSupplePasteStatus('このブラウザはボタン貼付に未対応です。Ctrl+V またはギャラリーをご利用ください。', 'info');
-        return;
-      }
-      try {
-        const items = await navigator.clipboard.read();
-        for (const item of items) {
-          const imgType = item.types.find(t => t.startsWith('image/'));
-          if (imgType) {
-            const blob = await item.getType(imgType);
-            loadSuppleImageBlob(blob);
-            return;
-          }
-        }
-        if (typeof navigator.clipboard.readText === 'function') {
-          const txt = (await navigator.clipboard.readText() || '').trim();
-          if (txt && (txt.startsWith('data:image/') || txt.startsWith('http://') || txt.startsWith('https://'))) {
-            loadSuppleImageSrc(txt, true);
-            return;
-          }
-        }
-        setSupplePasteStatus('クリップボードに画像がありません。画像検索で画像をコピーしてください。', 'error');
-      } catch (err) {
-        setSupplePasteStatus('クリップボードの読み取りが許可されませんでした。', 'error');
-      }
-    }
-
-    (function initSuppleModalPasteShortcut() {
-      const modal = document.getElementById('modal-supple-master');
-      if (!modal) return;
-      modal.addEventListener('paste', function (ev) {
-        if (ev.target && ev.target.id === 'supple-paste-zone') return;
-        const cd = ev.clipboardData || window.clipboardData;
-        if (!cd || !cd.items) return;
-        for (const item of cd.items) {
-          if (item.type && item.type.startsWith('image/')) {
-            ev.preventDefault();
-            const file = item.getAsFile();
-            if (file) loadSuppleImageBlob(file);
-            return;
-          }
-        }
-      });
-    })();
   </script>
+  <script src="./js/supplement.js"></script>
 </body>
 
 </html>

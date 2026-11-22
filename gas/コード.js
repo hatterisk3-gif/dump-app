@@ -13,11 +13,23 @@ const WRITE_ACTIONS = {
   moveDataRecord: true,
   moveDataRecords: true,
   purgeInboxExactDuplicates: true,
+  purgeSystemTrash: true,
   updateInbox: true,
   updateDataRecord: true,
   // 画像アップロードはシートを触らない。巨大POST＋Lockで他書き込みを塞がないよう WRITE 対象外
   batch: true
 };
+
+function isAuthorizedApiRequest_(params) {
+  try {
+    const expected = PropertiesService.getScriptProperties().getProperty('DUMP_API_TOKEN');
+    if (!expected) return true;
+    const actual = params && params.apiToken != null ? String(params.apiToken) : '';
+    return actual === String(expected);
+  } catch (e) {
+    return true;
+  }
+}
 
 function withScriptLock_(fn) {
   const lock = LockService.getScriptLock();
@@ -33,6 +45,10 @@ function doPost(e) {
   let result = {};
   try {
     const params = JSON.parse(e.postData.contents);
+    if (!isAuthorizedApiRequest_(params)) {
+      return ContentService.createTextOutput(JSON.stringify({ error: 'unauthorized' }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
     const run = function () {
       if (params.action === 'batch') {
         return runBatch(params.ops || []);
@@ -112,6 +128,8 @@ function dispatchAction(params) {
     return moveDataRecords(params.items || []);
   } else if (action === 'purgeInboxExactDuplicates') {
     return purgeInboxExactDuplicates();
+  } else if (action === 'purgeSystemTrash') {
+    return purgeSystemTrash();
   } else if (action === 'findExactContentsInData') {
     return findExactContentsInData(params.contents || []);
   } else if (action === 'uploadDumpImage') {
@@ -155,10 +173,68 @@ function runBatch(ops) {
 
 const CACHE_KEY_ORG = 'organizer_data_v1';
 const CACHE_KEY_STAMP = 'sync_stamp_v1';
+const CACHE_CHUNK_SIZE = 85000;
 const CACHE_TTL_SEC = 600; // 45秒 -> 600秒 (10分)。書き込み時は invalidateCache() で即座に破棄されるため安全かつ高速
 const CACHE_STAMP_TTL_SEC = 21600;
 const DATA_TRASH_FOLDER = '🗑️ ゴミ箱';
 const DATA_TRASH_FILE = '削除履歴';
+
+function putChunkedCache_(cache, baseKey, str, ttlSec) {
+  if (!cache || !baseKey || str == null) return;
+  try {
+    if (str.length <= CACHE_CHUNK_SIZE) {
+      cache.remove(baseKey + '__meta');
+      cache.put(baseKey, str, ttlSec);
+      return;
+    }
+    const count = Math.ceil(str.length / CACHE_CHUNK_SIZE);
+    if (count > 16) return;
+    const batch = {};
+    for (let i = 0; i < count; i++) {
+      batch[baseKey + '__' + i] = str.slice(i * CACHE_CHUNK_SIZE, (i + 1) * CACHE_CHUNK_SIZE);
+    }
+    batch[baseKey + '__meta'] = JSON.stringify({ count: count });
+    cache.putAll(batch, ttlSec);
+    cache.remove(baseKey);
+  } catch (e) {}
+}
+
+function getChunkedCache_(cache, baseKey) {
+  if (!cache || !baseKey) return null;
+  try {
+    const metaRaw = cache.get(baseKey + '__meta');
+    if (metaRaw) {
+      const meta = JSON.parse(metaRaw);
+      const count = parseInt(meta && meta.count, 10) || 0;
+      if (count > 0 && count <= 16) {
+        const keys = [];
+        for (let i = 0; i < count; i++) keys.push(baseKey + '__' + i);
+        const map = cache.getAll(keys);
+        const parts = [];
+        for (let i = 0; i < count; i++) {
+          const part = map[keys[i]];
+          if (part == null) return null;
+          parts.push(part);
+        }
+        return parts.join('');
+      }
+    }
+    return cache.get(baseKey);
+  } catch (e) {
+    return null;
+  }
+}
+
+function removeChunkedCache_(cache, baseKey) {
+  if (!cache || !baseKey) return;
+  try {
+    const keys = [baseKey, baseKey + '__meta'];
+    for (let i = 0; i < 16; i++) keys.push(baseKey + '__' + i);
+    cache.removeAll(keys);
+  } catch (e) {
+    try { cache.remove(baseKey); } catch (_) {}
+  }
+}
 
 /**
  * 高速な JST 日付フォーマット関数
@@ -192,7 +268,7 @@ function keepWarm() {
 function invalidateCache() {
   try {
     const cache = CacheService.getScriptCache();
-    cache.remove(CACHE_KEY_ORG);
+    removeChunkedCache_(cache, CACHE_KEY_ORG);
     cache.put(CACHE_KEY_STAMP, String(Date.now()), CACHE_STAMP_TTL_SEC);
   } catch (e) {}
 }
@@ -273,6 +349,23 @@ function cleanupDumpImageUpload_(folder, id, total) {
   }
 }
 
+function cleanupStaleUploadTemp_(folder) {
+  try {
+    const cutoff = Date.now() - 2 * 60 * 60 * 1000;
+    const files = folder.getFiles();
+    let count = 0;
+    while (files.hasNext() && count < 30) {
+      const f = files.next();
+      const name = String(f.getName() || '');
+      if (name.indexOf('__meta.json') === -1 && !name.endsWith('.part')) continue;
+      const updated = f.getLastUpdated();
+      if (updated && updated.getTime() < cutoff) {
+        try { f.setTrashed(true); count++; } catch (_) {}
+      }
+    }
+  } catch (e) {}
+}
+
 /**
  * ブラウザ→GAS Webアプリはリダイレクトがあり、大きい1本POSTだと本文が欠ける。
  * 分割は Drive 一時ファイルへ保存（Cache 追い出し対策）。
@@ -284,6 +377,7 @@ function uploadDumpImageBegin(uploadId, total, mimeType, fileName, length) {
   if (!(t > 0) || t > 64) return { success: false, error: 'bad_total' };
   try {
     const folder = getDumpImageUploadTempFolder();
+    cleanupStaleUploadTemp_(folder);
     const meta = JSON.stringify({
       total: t,
       mimeType: mimeType || 'image/jpeg',
@@ -383,10 +477,25 @@ function uploadDumpImageFinish(uploadId) {
 }
 
 /** コピー用: Drive 画像を base64 で返す（ブラウザ CORS を避ける） */
+function isFileInDumpImagesFolder_(file) {
+  try {
+    const targetFolderId = getDumpImagesFolder().getId();
+    const parents = file.getParents();
+    while (parents.hasNext()) {
+      if (parents.next().getId() === targetFolderId) return true;
+    }
+  } catch (e) {}
+  return false;
+}
+
 function getDumpImageById(fileId) {
   const id = String(fileId || '').replace(/[^A-Za-z0-9_-]/g, '');
   if (!id) return { success: false, error: 'no_id' };
   try {
+    const file = DriveApp.getFileById(id);
+    if (!isFileInDumpImagesFolder_(file)) {
+      return { success: false, error: 'forbidden' };
+    }
     try {
       const thumb = UrlFetchApp.fetch(
         'https://drive.google.com/thumbnail?id=' + id + '&sz=w1200',
@@ -406,7 +515,6 @@ function getDumpImageById(fileId) {
         }
       }
     } catch (e0) {}
-    const file = DriveApp.getFileById(id);
     const blob = file.getBlob();
     const bytes = blob.getBytes();
     if (!bytes || !bytes.length) return { success: false, error: 'empty' };
@@ -526,7 +634,7 @@ function getOrganizerData(fresh) {
   const cache = CacheService.getScriptCache();
   if (!fresh) {
     try {
-      const cached = cache.get(CACHE_KEY_ORG);
+      const cached = getChunkedCache_(cache, CACHE_KEY_ORG);
       if (cached) return JSON.parse(cached);
     } catch (e) {}
   }
@@ -567,7 +675,7 @@ function getOrganizerData(fresh) {
   };
 
   try {
-    cache.put(CACHE_KEY_ORG, JSON.stringify(result), CACHE_TTL_SEC);
+    putChunkedCache_(cache, CACHE_KEY_ORG, JSON.stringify(result), CACHE_TTL_SEC);
   } catch (e) {}
 
   return result;
@@ -749,6 +857,7 @@ function purgeInboxExactDuplicates() {
 
 function searchItems(keyword) {
   if (!keyword || !String(keyword).trim()) return [];
+  const kw = String(keyword).trim().toLowerCase();
   const dataSheet = getSheet('DATA');
   const rows = dataSheet.getDataRange().getValues();
   const results = [];
@@ -758,9 +867,9 @@ function searchItems(keyword) {
     if (isExcludedDataLocation(folder)) continue;
     if (file && String(file) === '削除履歴') continue;
     const content = rows[i][4];
-    if ((folder && String(folder).includes(keyword)) ||
-        (file && String(file).includes(keyword)) ||
-        (content && String(content).includes(keyword))) {
+    if ((folder && String(folder).toLowerCase().includes(kw)) ||
+        (file && String(file).toLowerCase().includes(kw)) ||
+        (content && String(content).toLowerCase().includes(kw))) {
       const rawTs = rows[i][1];
       results.push({
         id: rows[i][0],
@@ -782,13 +891,14 @@ function searchItems(keyword) {
 
 function searchData(keyword) {
   if (!keyword || !String(keyword).trim()) return [];
+  const kw = String(keyword).trim().toLowerCase();
   const results = [];
 
   const inboxSheet = getSheet('INBOX');
   const inboxRows = inboxSheet.getDataRange().getValues();
   for (let i = 1; i < inboxRows.length; i++) {
     const content = inboxRows[i][2];
-    if (content && String(content).includes(keyword)) {
+    if (content && String(content).toLowerCase().includes(kw)) {
       const ts = inboxRows[i][1];
       results.push({
         id: inboxRows[i][0],
@@ -811,9 +921,9 @@ function searchData(keyword) {
     if (isExcludedDataLocation(folder)) continue;
     if (file && String(file) === '削除履歴') continue;
     const content = rows[i][4];
-    if ((folder && String(folder).includes(keyword)) ||
-        (file && String(file).includes(keyword)) ||
-        (content && String(content).includes(keyword))) {
+    if ((folder && String(folder).toLowerCase().includes(kw)) ||
+        (file && String(file).toLowerCase().includes(kw)) ||
+        (content && String(content).toLowerCase().includes(kw))) {
       const rawTs = rows[i][1];
       results.push({
         id: rows[i][0],
@@ -845,9 +955,16 @@ function getConfigList() {
 
 function addConfigRecord(folder, file) {
   if (!folder || !String(folder).trim()) return false;
+  const folderValue = String(folder).trim();
   const fileValue = file == null ? '' : String(file).trim();
   const sheet = getSheet('CONFIG');
-  sheet.getRange(sheet.getLastRow() + 1, 1, 1, 2).setValues([[String(folder).trim(), fileValue]]);
+  const rows = sheet.getDataRange().getValues();
+  for (let i = 1; i < rows.length; i++) {
+    if (String(rows[i][0]) === folderValue && String(rows[i][1] == null ? '' : rows[i][1]) === fileValue) {
+      return true;
+    }
+  }
+  sheet.getRange(sheet.getLastRow() + 1, 1, 1, 2).setValues([[folderValue, fileValue]]);
   invalidateCache();
   return true;
 }
@@ -856,14 +973,28 @@ function deleteConfigRecord(folder, file) {
   const sheet = getSheet('CONFIG');
   const rows = sheet.getDataRange().getValues();
   const fileValue = file == null ? '' : file;
+  const keepRows = [];
   let changed = false;
-  for (let i = rows.length - 1; i >= 1; i--) {
+  for (let i = 1; i < rows.length; i++) {
     if (rows[i][0] === folder && rows[i][1] === fileValue) {
-      sheet.deleteRow(i + 1);
       changed = true;
+    } else {
+      keepRows.push([rows[i][0], rows[i][1]]);
     }
   }
-  if (changed) invalidateCache();
+  if (!changed) return true;
+  const lastRow = sheet.getLastRow();
+  if (lastRow > 1) {
+    sheet.getRange(2, 1, lastRow - 1, 2).clearContent();
+  }
+  if (keepRows.length > 0) {
+    sheet.getRange(2, 1, keepRows.length, 2).setValues(keepRows);
+  }
+  const excess = lastRow - (1 + keepRows.length);
+  if (excess > 0) {
+    sheet.deleteRows(2 + keepRows.length, excess);
+  }
+  invalidateCache();
   return true;
 }
 
@@ -879,40 +1010,46 @@ function updateConfigRecord(oldFolder, oldFile, newFolder, newFile) {
 
   const configSheet = getSheet('CONFIG');
   const configRows = configSheet.getDataRange().getValues();
-  let changed = false;
+  let configChanged = false;
+  let stopped = false;
+  const nextConfigRows = [];
 
   for (let i = 1; i < configRows.length; i++) {
-    const matchFolder = configRows[i][0] === oldFolder;
-    const matchFile = oldFileValue === ''
-      ? true
-      : configRows[i][1] === oldFileValue;
-    if (matchFolder && matchFile) {
-      const nextFile = oldFileValue === '' && newFileValue === ''
-        ? configRows[i][1]
-        : newFileValue;
-      configSheet.getRange(i + 1, 1, 1, 2).setValues([[newFolderValue, nextFile]]);
-      changed = true;
-      if (oldFileValue !== '') break;
+    const curFolder = configRows[i][0];
+    const curFile = configRows[i][1];
+    if (!stopped && curFolder === oldFolder && (oldFileValue === '' || curFile === oldFileValue)) {
+      const nextFile = oldFileValue === '' && newFileValue === '' ? curFile : newFileValue;
+      nextConfigRows.push([newFolderValue, nextFile]);
+      configChanged = true;
+      if (oldFileValue !== '') stopped = true;
+    } else {
+      nextConfigRows.push([curFolder, curFile]);
     }
+  }
+  if (configChanged && nextConfigRows.length > 0) {
+    configSheet.getRange(2, 1, nextConfigRows.length, 2).setValues(nextConfigRows);
   }
 
   const dataSheet = getSheet('DATA');
   const dataRows = dataSheet.getDataRange().getValues();
+  let dataChanged = false;
+  const colCD = [];
   for (let i = 1; i < dataRows.length; i++) {
-    const matchFolder = dataRows[i][2] === oldFolder;
-    const matchFile = oldFileValue === ''
-      ? true
-      : dataRows[i][3] === oldFileValue;
-    if (matchFolder && matchFile) {
-      const nextFile = oldFileValue === '' && newFileValue === ''
-        ? dataRows[i][3]
-        : newFileValue;
-      dataSheet.getRange(i + 1, 3, 1, 2).setValues([[newFolderValue, nextFile]]);
-      changed = true;
+    const curFolder = dataRows[i][2];
+    const curFile = dataRows[i][3];
+    if (curFolder === oldFolder && (oldFileValue === '' || curFile === oldFileValue)) {
+      const nextFile = oldFileValue === '' && newFileValue === '' ? curFile : newFileValue;
+      colCD.push([newFolderValue, nextFile]);
+      dataChanged = true;
+    } else {
+      colCD.push([curFolder, curFile]);
     }
   }
+  if (dataChanged && colCD.length > 0) {
+    dataSheet.getRange(2, 3, colCD.length, 2).setValues(colCD);
+  }
 
-  if (changed) invalidateCache();
+  if (configChanged || dataChanged) invalidateCache();
   return true;
 }
 
@@ -984,6 +1121,62 @@ function deleteDataRecords(ids) {
     }
   });
   return moveDataRecords(moves);
+}
+
+function isSystemSnapshotTrashRow_(folder, file, content) {
+  if (String(folder || '') !== DATA_TRASH_FOLDER || String(file || '') !== DATA_TRASH_FILE) {
+    return false;
+  }
+  const text = String(content == null ? '' : content).trim();
+  if (!text || text.charAt(0) !== '{' || text.charAt(text.length - 1) !== '}') return false;
+  try {
+    const obj = JSON.parse(text);
+    if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return false;
+    if ('content' in obj || 'folder' in obj || 'file' in obj) return false;
+    if (typeof obj.v !== 'number' || typeof obj.updatedAt !== 'string') return false;
+    return !!(
+      'library' in obj ||
+      'tasks' in obj ||
+      'favorites' in obj ||
+      'profiles' in obj ||
+      'startAt' in obj ||
+      'masters' in obj ||
+      'intakes' in obj ||
+      'routines' in obj
+    );
+  } catch (e) {
+    return false;
+  }
+}
+
+/** ゴミ箱内の古いシステム同期スナップショットJSONのみ物理削除（ユーザーメモは保護） */
+function purgeSystemTrash() {
+  const sheet = getSheet('DATA');
+  const rows = sheet.getDataRange().getValues();
+  if (rows.length <= 1) return { success: true, count: 0 };
+  const keepRows = [];
+  let purged = 0;
+  for (let i = 1; i < rows.length; i++) {
+    if (isSystemSnapshotTrashRow_(rows[i][2], rows[i][3], rows[i][4])) {
+      purged++;
+    } else {
+      keepRows.push([rows[i][0], rows[i][1], rows[i][2], rows[i][3], rows[i][4]]);
+    }
+  }
+  if (purged === 0) return { success: true, count: 0 };
+  const lastRow = sheet.getLastRow();
+  if (lastRow > 1) {
+    sheet.getRange(2, 1, lastRow - 1, 5).clearContent();
+  }
+  if (keepRows.length > 0) {
+    sheet.getRange(2, 1, keepRows.length, 5).setValues(keepRows);
+  }
+  const excess = lastRow - (1 + keepRows.length);
+  if (excess > 0) {
+    sheet.deleteRows(2 + keepRows.length, excess);
+  }
+  invalidateCache();
+  return { success: true, count: purged };
 }
 
 function addDataRecord(folder, file, content) {
@@ -1133,6 +1326,52 @@ function cleanJanProductName_(raw) {
   return s;
 }
 
+function findYahooProductName_(root) {
+  let visited = 0;
+  function isValidCandidate(s) {
+    const cleaned = cleanJanProductName_(s);
+    if (!cleaned || cleaned.length < 4) return false;
+    if (cleaned.indexOf('Yahoo') !== -1 || cleaned.indexOf('ショッピング') !== -1) return false;
+    return cleaned;
+  }
+  function scan(node, depth, insideProductList) {
+    if (!node || depth > 10 || visited > 1500) return '';
+    visited++;
+    if (Array.isArray(node)) {
+      for (let i = 0; i < node.length && i < 20; i++) {
+        const hit = scan(node[i], depth + 1, insideProductList);
+        if (hit) return hit;
+      }
+      return '';
+    }
+    if (typeof node !== 'object') return '';
+    if (insideProductList && (typeof node.name === 'string' || typeof node.title === 'string') && (node.price != null || node.janCode != null || node.code != null || node.url != null || node.image != null)) {
+      const cand = isValidCandidate(node.name || node.title);
+      if (cand) return cand;
+    }
+    const keys = Object.keys(node);
+    const priorityKeys = ['hits', 'items', 'products', 'searchResult', 'searchResults', 'props', 'pageProps'];
+    for (let i = 0; i < priorityKeys.length; i++) {
+      const pk = priorityKeys[i];
+      if (node[pk] != null) {
+        const markList = insideProductList || pk === 'hits' || pk === 'items' || pk === 'products';
+        const hit = scan(node[pk], depth + 1, markList);
+        if (hit) return hit;
+      }
+    }
+    for (let i = 0; i < keys.length; i++) {
+      const k = keys[i];
+      if (priorityKeys.indexOf(k) !== -1) continue;
+      if (typeof node[k] === 'object' && node[k] !== null) {
+        const hit = scan(node[k], depth + 1, insideProductList);
+        if (hit) return hit;
+      }
+    }
+    return '';
+  }
+  return scan(root, 0, false);
+}
+
 function lookupJanProduct(barcode) {
   const code = String(barcode || '').replace(/[^\dA-Za-z]/g, '').trim();
   if (!code) return { success: false, name: '', source: '' };
@@ -1191,6 +1430,10 @@ function lookupJanProduct(barcode) {
       const nextMatch = html.match(/<script id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/);
       if (nextMatch && nextMatch[1]) {
         const data = JSON.parse(nextMatch[1]);
+        const structuredName = findYahooProductName_(data);
+        if (structuredName) {
+          return { success: true, name: structuredName, source: 'yahoo_shopping' };
+        }
         const str = JSON.stringify(data);
         const nameMatch = str.match(/"name":"([^"]{4,120})"/);
         if (nameMatch && nameMatch[1]) {

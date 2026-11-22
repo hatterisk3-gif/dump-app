@@ -1,4 +1,4 @@
-const CACHE_NAME = 'dump-app-v448';
+const CACHE_NAME = 'dump-app-v449';
 const PENDING_WRITES_CACHE = 'dump-pending-writes-v1';
 const PENDING_WRITES_CACHE_URL = './__pending_inbox_writes.json';
 /** activate 時に残す直前ビルド数（更新直後のネット失敗でも旧 index で開ける） */
@@ -13,7 +13,8 @@ const NAV_NETWORK_TIMEOUT_MS = 2500;
 const ASSETS = [
   './manifest.json',
   './iztro.min.js',
-  './splash-dark.png'
+  './splash-dark.png',
+  './js/supplement.js'
 ];
 
 // レイアウト用 CDN（オペーク応答も cache.put できるよう専用扱い）
@@ -104,8 +105,7 @@ async function putIndexInCache(res) {
     const clean = await cleanResponse(res);
     if (!clean || !clean.ok) return;
     const cache = await caches.open(CACHE_NAME);
-    await cache.put(APP_SHELL_PATH, clean.clone()).catch(() => {});
-    await cache.put('./index.html', clean).catch(() => {});
+    await cache.put(APP_SHELL_PATH, clean).catch(() => {});
   } catch (_) {}
 }
 
@@ -172,8 +172,7 @@ self.addEventListener('install', (e) => {
     let indexOk = false;
     try {
       const shell = await cleanResponse(await networkFirstAsset(APP_SHELL_PATH));
-      await cache.put(APP_SHELL_PATH, shell.clone());
-      await cache.put('./index.html', shell);
+      await cache.put(APP_SHELL_PATH, shell);
       indexOk = true;
     } catch (_) {}
     for (const path of ASSETS) {
@@ -189,8 +188,7 @@ self.addEventListener('install', (e) => {
       try {
         const old = await findNewestCachedIndex();
         if (old) {
-          await cache.put(APP_SHELL_PATH, old.clone());
-          await cache.put('./index.html', old);
+          await cache.put(APP_SHELL_PATH, old);
           indexOk = true;
         }
       } catch (_) {}
@@ -234,15 +232,21 @@ function dumpContentKey(text) {
     .toLowerCase();
 }
 
-async function postGas(gasUrl, payload) {
-  const body = JSON.stringify(payload);
+async function postGas(gasUrl, payload, apiToken) {
+  const bodyObj = apiToken ? Object.assign({}, payload, { apiToken: apiToken }) : payload;
+  const body = JSON.stringify(bodyObj);
   if (body.length > 60000) return false;
-  await fetch(gasUrl, {
+  const res = await fetch(gasUrl, {
     method: 'POST',
-    body,
+    body: body,
     keepalive: true,
     headers: { 'Content-Type': 'text/plain;charset=UTF-8' }
   });
+  if (!res || !res.ok) return false;
+  try {
+    const json = await res.json();
+    if (json && (json.error || json.success === false)) return false;
+  } catch (_) {}
   return true;
 }
 
@@ -260,8 +264,10 @@ async function flushPendingWritesFromCache() {
     const data = await res.json();
     if (!data || !data.gasUrl || !Array.isArray(data.writes) || !data.writes.length) return;
 
+    const apiToken = data.apiToken || '';
     const seen = new Set();
     const contents = [];
+    const dumpJobIds = new Set();
     const replaceJobs = [];
     data.writes.forEach((job) => {
       if (!job || job.keepaliveSent) return;
@@ -270,26 +276,39 @@ async function flushPendingWritesFromCache() {
         return;
       }
       if (job.type !== 'dump_add') return;
+      let addedAny = false;
       (job.addedChunks || []).forEach((c) => {
         const raw = String(c || '').trim();
         if (!raw) return;
+        addedAny = true;
         const key = dumpContentKey(raw);
         if (!key || seen.has(key)) return;
         seen.add(key);
         contents.push(raw);
       });
+      if (addedAny && job.id != null) dumpJobIds.add(String(job.id));
     });
 
+    const sentJobIds = new Set();
     const tasks = [];
     if (contents.length) {
-      tasks.push(postGas(data.gasUrl, { action: 'addManyInbox', contents }));
+      tasks.push(
+        postGas(data.gasUrl, { action: 'addManyInbox', contents: contents }, apiToken)
+          .then((ok) => {
+            if (ok) {
+              dumpJobIds.forEach((id) => sentJobIds.add(id));
+            }
+          })
+          .catch(() => false)
+      );
     }
     replaceJobs.slice(0, 3).forEach((job) => {
       const newContent = String(job.newContent || '').trim();
       if (!newContent) return;
+      const subTasks = [];
       if (job.dumpId) {
         const action = job.dumpIsInbox === false ? 'updateDataRecord' : 'updateInbox';
-        tasks.push(postGas(data.gasUrl, { action, id: String(job.dumpId), content: newContent }));
+        subTasks.push(postGas(data.gasUrl, { action: action, id: String(job.dumpId), content: newContent }, apiToken));
       }
       if (job.historyId && !String(job.historyId).startsWith('local-')) {
         const payload = JSON.stringify({
@@ -298,15 +317,40 @@ async function flushPendingWritesFromCache() {
           file: job.destFile || '未整理',
           updatedAt: new Date().toISOString()
         });
-        tasks.push(postGas(data.gasUrl, {
+        subTasks.push(postGas(data.gasUrl, {
           action: 'updateDataRecord',
           id: String(job.historyId),
           content: payload
-        }));
+        }, apiToken));
+      }
+      if (subTasks.length) {
+        tasks.push(
+          Promise.all(subTasks)
+            .then((oks) => {
+              if (oks.length && oks.every(Boolean) && job.id != null) {
+                sentJobIds.add(String(job.id));
+              }
+            })
+            .catch(() => false)
+        );
       }
     });
     if (!tasks.length) return;
     await Promise.all(tasks);
+
+    if (sentJobIds.size > 0) {
+      const remaining = data.writes.filter((job) => job && job.id != null && !sentJobIds.has(String(job.id)));
+      const updated = Object.assign({}, data, {
+        updatedAt: Date.now(),
+        writes: remaining
+      });
+      await cache.put(
+        PENDING_WRITES_CACHE_URL,
+        new Response(JSON.stringify(updated), {
+          headers: { 'Content-Type': 'application/json' }
+        })
+      );
+    }
   } catch (err) {
     console.warn('SW flush pending writes failed', err);
   }
@@ -348,6 +392,32 @@ async function handleNavigate(request) {
     ? findNewestCachedIndex()
     : caches.match(request).then((r) => cleanResponse(r)))
     .catch(() => null);
+
+  // 現行キャッシュが揃っていれば、軽量な version.json (16B) だけ確認して 3.35MB 再DL を抑止
+  if (shell) {
+    try {
+      const host = self.location && self.location.hostname;
+      if (host !== 'localhost' && host !== '127.0.0.1') {
+        const currentCache = await caches.open(CACHE_NAME);
+        const currentShell = await cleanResponse(await currentCache.match(APP_SHELL_PATH));
+        if (currentShell && currentShell.ok) {
+          const verUrl = new URL('./version.json?ts=' + Date.now(), self.registration.scope).href;
+          const verRes = await Promise.race([
+            fetch(verUrl, { cache: 'no-store' }).catch(() => null),
+            new Promise((resolve) => setTimeout(() => resolve(null), 1500))
+          ]);
+          if (verRes && verRes.ok) {
+            const verJson = await verRes.json().catch(() => null);
+            const curNum = parseBuildNum(CACHE_NAME);
+            const remoteNum = verJson ? parseBuildNum(verJson.build) : 0;
+            if (curNum > 0 && remoteNum === curNum) {
+              return currentShell;
+            }
+          }
+        }
+      }
+    } catch (_) {}
+  }
 
   // 本体は ./ を直接取得し、/index.html → / の 308 を SW 内で踏まない
   const netP = (shell ? fetch(appShellUrl(), { cache: 'no-store' }) : fetch(request))

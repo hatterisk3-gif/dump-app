@@ -15,4 +15,4 @@ description: 変更内容の差分分析・要約コミットを行い、GitHub�
    - `git push`
    - `clasp deploy -i AKfycbxP-ENobvgAGiVgXKgzLmKBLZn4_6KzZXwXXZAbDBqmSdLxiJOCf5whFrUv5ikUo5evvQ`
    ※ フロントエンド用ファイル（HTML/CSS等）が `.claspignore` 対象の場合、`clasp push` 時に「Script is already up to date.」と表示されることがありますが、正常な動作です。
-4. すべてのコマンドが成功したら、「🚀 
+4. すべてのコマンドが成功したら、「🚀 AIによる要約コミットとGitHub・GASへのデプロイが完了しました！」と報告してください。

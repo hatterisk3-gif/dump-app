@@ -1,4 +1,4 @@
-# DUMP DNS Helper - Cloudflare Family DNS (1.1.1.3 / 1.0.0.3)
+﻿# DUMP DNS Helper - Cloudflare Family DNS (1.1.1.3 / 1.0.0.3)
 # Usage:
 #   DumpDnsHelper.ps1 lock
 #   DumpDnsHelper.ps1 unlock
@@ -189,29 +189,39 @@ function Restore-Dns {
     return
   }
   $backup = Get-Content -LiteralPath $BackupFile -Raw -Encoding UTF8 | ConvertFrom-Json
+  $failCount = 0
   foreach ($item in @($backup.adapters)) {
     try {
       $servers = @($item.ServerAddresses)
       $servers6 = @($item.ServerAddresses6)
+      # 先に IPv4/IPv6 とも DHCP に戻し、元の環境が IPv4 固定 + IPv6 DHCP でも Family IPv6 が残らないようにする
+      Set-DnsClientServerAddress -InterfaceIndex $item.InterfaceIndex -ResetServerAddresses
       if ($servers.Count -eq 0) {
-        Set-DnsClientServerAddress -InterfaceIndex $item.InterfaceIndex -ResetServerAddresses
         Write-Host ("UNLOCK {0} -> DHCP" -f $item.InterfaceAlias)
       } else {
         Set-DnsClientServerAddress -InterfaceIndex $item.InterfaceIndex -ServerAddresses $servers
-        if ($servers6 -and $servers6.Count -gt 0 -and -not (Test-IsFamilyDns $servers6)) {
-          try {
-            Set-DnsClientServerAddress -InterfaceIndex $item.InterfaceIndex -ServerAddresses $servers6
-          } catch {}
-        }
         Write-Host ("UNLOCK {0} -> {1}" -f $item.InterfaceAlias, ($servers -join ', '))
       }
+      if ($servers6 -and $servers6.Count -gt 0 -and -not (Test-IsFamilyDns $servers6)) {
+        try {
+          Set-DnsClientServerAddress -InterfaceIndex $item.InterfaceIndex -ServerAddresses $servers6
+        } catch {}
+      }
     } catch {
+      $failCount++
       Write-Host ("FAIL  {0}: {1}" -f $item.InterfaceAlias, $_.Exception.Message)
     }
   }
+  if ($failCount -eq 0) {
+    Remove-Item -LiteralPath $BackupFile -Force -ErrorAction SilentlyContinue
+  }
   try { ipconfig /flushdns | Out-Null } catch {}
   Write-Host ''
-  Write-Host 'DNS restored from backup.'
+  if ($failCount -eq 0) {
+    Write-Host 'DNS restored from backup.'
+  } else {
+    Write-Host "WARNING: $failCount adapter(s) failed to restore; backup retained."
+  }
 }
 
 function Show-Status {

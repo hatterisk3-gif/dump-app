@@ -393,7 +393,7 @@ async function handleNavigate(request) {
     : caches.match(request).then((r) => cleanResponse(r)))
     .catch(() => null);
 
-  // 現行キャッシュが揃っていれば、軽量な version.json (16B) だけ確認して 3.35MB 再DL を抑止
+  // 現行キャッシュが揃っていれば即座（0ms）に返し、裏で version.json を確認して必要時のみキャッシュ更新
   if (shell) {
     try {
       const host = self.location && self.location.hostname;
@@ -401,19 +401,21 @@ async function handleNavigate(request) {
         const currentCache = await caches.open(CACHE_NAME);
         const currentShell = await cleanResponse(await currentCache.match(APP_SHELL_PATH));
         if (currentShell && currentShell.ok) {
-          const verUrl = new URL('./version.json?ts=' + Date.now(), self.registration.scope).href;
-          const verRes = await Promise.race([
-            fetch(verUrl, { cache: 'no-store' }).catch(() => null),
-            new Promise((resolve) => setTimeout(() => resolve(null), 1500))
-          ]);
-          if (verRes && verRes.ok) {
-            const verJson = await verRes.json().catch(() => null);
-            const curNum = parseBuildNum(CACHE_NAME);
-            const remoteNum = verJson ? parseBuildNum(verJson.build) : 0;
-            if (curNum > 0 && remoteNum === curNum) {
-              return currentShell;
-            }
-          }
+          (async () => {
+            try {
+              const verUrl = new URL('./version.json?ts=' + Date.now(), self.registration.scope).href;
+              const verRes = await fetch(verUrl, { cache: 'no-store' }).catch(() => null);
+              if (verRes && verRes.ok) {
+                const verJson = await verRes.json().catch(() => null);
+                const curNum = parseBuildNum(CACHE_NAME);
+                const remoteNum = verJson ? parseBuildNum(verJson.build) : 0;
+                if (curNum > 0 && remoteNum === curNum) return;
+              }
+              const fresh = await fetch(appShellUrl(), { cache: 'no-store' }).catch(() => null);
+              if (fresh && fresh.ok) await putIndexInCache(fresh);
+            } catch (_) {}
+          })();
+          return currentShell;
         }
       }
     } catch (_) {}
@@ -459,6 +461,12 @@ async function handleCdn(request) {
   try {
     const cache = await caches.open(CACHE_NAME);
     const cached = await cache.match(request);
+    if (cached) {
+      fetch(request).then((res) => {
+        if (res) cache.put(request, res.clone()).catch(() => {});
+      }).catch(() => {});
+      return cached;
+    }
     try {
       const res = await fetch(request);
       if (res) {
@@ -474,6 +482,20 @@ async function handleCdn(request) {
 
 async function handleAsset(request) {
   const fallback = new Response('', { status: 504, statusText: 'Offline' });
+  const host = self.location && self.location.hostname;
+  const isLocalDev = host === 'localhost' || host === '127.0.0.1';
+  if (!isLocalDev && request.method === 'GET') {
+    try {
+      const currentCache = await caches.open(CACHE_NAME);
+      const cachedCurrent = await currentCache.match(request);
+      if (cachedCurrent) {
+        fetch(request, { cache: 'no-store' }).then((net) => {
+          if (net && net.ok) currentCache.put(request, net.clone()).catch(() => {});
+        }).catch(() => {});
+        return cachedCurrent;
+      }
+    } catch (_) {}
+  }
   try {
     const net = await fetch(request, { cache: 'no-store' });
     if (net && net.ok && request.method === 'GET') {

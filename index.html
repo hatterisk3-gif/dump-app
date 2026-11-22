@@ -25127,8 +25127,8 @@
       profileBirthSyncing = true;
       setProfileBirthSyncStatus('同期中…');
       try {
-        await ensureProfileBirthSyncStore();
         const snapshots = await fetchCloudProfileBirthSnapshots();
+        if (snapshots.length) profileBirthStoreReady = true;
         const cloud = snapshots[0] || null;
         const localUpdatedAt = new Date(localStorage.getItem(PROFILE_BIRTH_UPDATED_AT_KEY) || 0).getTime();
         const localProfiles = loadProfileBirthList();
@@ -38533,9 +38533,6 @@
 
     let fortuneHubInitializedOnce = false;
     function initFortuneHub() {
-      if (typeof iztro === 'undefined' && typeof window.__ensureExternalScript === 'function') {
-        window.__ensureExternalScript('./iztro.min.js', () => typeof iztro !== 'undefined');
-      }
       closeFortuneFeature({ silent: true });
       // 起動時は基本的に名前空白にしておく（前の設定をキャッシュしない）
       if (!fortuneHubInitializedOnce) {
@@ -41073,11 +41070,14 @@
       }
     }
 
+    let abstinenceSlipsStoreReady = false;
     async function ensureAbstinenceSlipsStore() {
+      if (abstinenceSlipsStoreReady) return;
       await callAPI('addConfigRecord', {
         folder: ABSTINENCE_SLIPS_FOLDER,
         file: ABSTINENCE_SLIPS_FILE
       }, { silent: true });
+      abstinenceSlipsStoreReady = true;
     }
 
     let abstinenceTimerStoreReady = false;
@@ -41161,8 +41161,8 @@
       if (abstinenceTimerSyncing) return false;
       abstinenceTimerSyncing = true;
       try {
-        await ensureAbstinenceTimerStore();
         const cloud = await fetchCloudAbstinenceTimer();
+        if (cloud) abstinenceTimerStoreReady = true;
         if (!cloud) return false;
         const localUpdatedAt = new Date(
           localStorage.getItem(ABSTINENCE_TIMER_SYNCED_AT_KEY) || 0
@@ -41283,10 +41283,10 @@
       abstinenceSlipsSyncing = true;
       setAbstinenceSlipSyncHint('同期中…');
       try {
-        await ensureAbstinenceSlipsStore();
         let cloud = [];
         try {
           cloud = (await fetchCloudAbstinenceSlips()) || [];
+          if (cloud.length) abstinenceSlipsStoreReady = true;
         } catch (e) {
           cloud = [];
         }
@@ -43665,7 +43665,10 @@
         );
       }
       updateColorThemeUI(t);
-      if (typeof renderSuppleChart === 'function' && document.getElementById('suppleIntakeChart')) {
+      const supModeEl = document.getElementById('supplement-mode');
+      const supActive = !!(supModeEl && supModeEl.classList.contains('active'));
+      const hasChart = typeof suppleChartInstance !== 'undefined' && !!suppleChartInstance;
+      if ((supActive || hasChart) && typeof renderSuppleChart === 'function' && document.getElementById('suppleIntakeChart')) {
         try { renderSuppleChart(); } catch (_) { }
       }
     }
@@ -63151,8 +63154,8 @@
       favoritesSyncing = true;
       try {
         const beforeSig = favoritesSignature(getFavorites(), readFavoriteTombstones());
-        await ensureFavoritesStore();
         const cloud = await fetchCloudFavoritesSnapshot();
+        if (cloud) favoritesStoreReady = true;
         const local = getFavorites();
         const localRemoved = readFavoriteTombstones();
         if (favoritesSignature(local, localRemoved) !== beforeSig) {
@@ -65518,7 +65521,7 @@
         .catch((err) => console.warn('SW register failed', err));
     }
   </script>
-  <script src="./js/supplement.js"></script>
+  <script src="./js/supplement.js" defer></script>
 </body>
 
 </html>

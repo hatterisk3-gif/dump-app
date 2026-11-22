@@ -153,7 +153,6 @@ function loadSuppleMasters() {
       if (Array.isArray(list)) return list.map(normalizeSuppleMaster).filter((m) => m && m.name);
     }
   } catch (e) { }
-  saveSuppleMasters(SUPPLE_DEFAULT_MASTERS, { touch: false, queueCloud: false });
   return SUPPLE_DEFAULT_MASTERS.map(normalizeSuppleMaster);
 }
 

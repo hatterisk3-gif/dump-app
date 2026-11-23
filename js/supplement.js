@@ -685,17 +685,16 @@ function renderSuppleMasterList() {
 
 function renderSuppleRoutines() {
   const container = document.getElementById('supple-routines-list');
-  if (!container) return;
-  if (!suppleRoutines.length) {
-    container.innerHTML = '<p class="text-[11px] text-slate-400 font-medium">よく飲む組み合わせを「＋ 選んで作成」→「⭐ この選択をセット保存」で登録できます</p>';
-    return;
-  }
-  container.innerHTML = suppleRoutines.map((r) => {
-    const names = (r.items || []).map((it) => {
-      const m = suppleMasters.find((x) => x.id === it.suppleId);
-      return m ? m.name + (it.qty > 1 ? '×' + it.qty : '') : '';
-    }).filter(Boolean).join(' / ');
-    return `
+  if (container) {
+    if (!suppleRoutines.length) {
+      container.innerHTML = '<p class="text-[11px] text-slate-400 font-medium">よく飲む組み合わせを「＋ 選んで作成」→「⭐ この選択をセット保存」で登録できます</p>';
+    } else {
+      container.innerHTML = suppleRoutines.map((r) => {
+        const names = (r.items || []).map((it) => {
+          const m = suppleMasters.find((x) => x.id === it.suppleId);
+          return m ? m.name + (it.qty > 1 ? '×' + it.qty : '') : '';
+        }).filter(Boolean).join(' / ');
+        return `
       <div class="inline-flex items-center gap-1 rounded-2xl bg-slate-900/85 border border-cyan-800/60 pl-3 pr-1.5 py-1.5 max-w-full">
         <button type="button" onclick="runSuppleRoutine('${escapeHtml(r.id)}')" class="text-left min-w-0 active:scale-95 transition">
           <span class="block text-xs font-extrabold text-cyan-100">⚡ ${escapeHtml(r.name)} <span class="text-[10px] text-emerald-300 font-bold">(${escapeHtml(r.timing || '随時')})</span></span>
@@ -706,7 +705,60 @@ function renderSuppleRoutines() {
           title="セットを削除" aria-label="セットを削除">✕</button>
       </div>
     `;
+      }).join('');
+    }
+  }
+  renderSuppleIntakeRoutines();
+}
+
+function renderSuppleIntakeRoutines() {
+  const wrap = document.getElementById('supple-intake-routines-wrap');
+  const listEl = document.getElementById('supple-intake-routines-list');
+  if (!wrap || !listEl) return;
+  if (!suppleRoutines.length) {
+    wrap.classList.add('hidden');
+    listEl.innerHTML = '';
+    return;
+  }
+  wrap.classList.remove('hidden');
+  listEl.innerHTML = suppleRoutines.map((r) => {
+    const validCount = (r.items || []).filter((it) => suppleMasters.some((m) => m.id === it.suppleId)).length;
+    const names = (r.items || []).map((it) => {
+      const m = suppleMasters.find((x) => x.id === it.suppleId);
+      return m ? m.name + (it.qty > 1 ? '×' + it.qty : '') : '';
+    }).filter(Boolean).join(' / ');
+    return `
+      <div class="inline-flex items-center gap-1 rounded-xl bg-amber-950/45 border border-amber-600/50 pl-3 pr-1.5 py-1.5 max-w-full">
+        <button type="button" onclick="applySuppleRoutineToIntakePicker('${escapeHtml(r.id)}')"
+          class="text-left min-w-0 text-amber-100 hover:text-white transition active:scale-95">
+          <span class="block text-xs font-extrabold">⚡ ${escapeHtml(r.name)} <span class="text-[10px] text-emerald-300 font-bold">(${escapeHtml(r.timing || '随時')}${validCount ? '・' + validCount + '種' : ''})</span></span>
+          ${names ? `<span class="block text-[9px] text-amber-200/75 truncate max-w-[200px]">${escapeHtml(names)}</span>` : ''}
+        </button>
+        <button type="button" onclick="deleteSuppleRoutine('${escapeHtml(r.id)}', event)"
+          class="w-6 h-6 rounded-lg text-amber-300/70 hover:text-rose-400 hover:bg-slate-800/80 text-[11px] shrink-0"
+          title="セットを削除" aria-label="セットを削除">✕</button>
+      </div>
+    `;
   }).join('');
+}
+
+function applySuppleRoutineToIntakePicker(routineId) {
+  const r = suppleRoutines.find((item) => item.id === routineId);
+  if (!r) return;
+  const validItems = (r.items || []).filter((it) => suppleMasters.some((m) => m.id === it.suppleId));
+  if (!validItems.length) {
+    alert('このセットに含まれるサプリが見つかりませんでした');
+    return;
+  }
+  suppleIntakePicks = validItems.map((it) => ({
+    id: it.suppleId,
+    qty: Math.max(1, Math.min(99, parseInt(it.qty, 10) || 1))
+  }));
+  const timingEl = document.getElementById('supple-input-timing');
+  if (timingEl && r.timing && Array.from(timingEl.options).some((o) => o.value === r.timing)) {
+    timingEl.value = r.timing;
+  }
+  renderSuppleDropdownList();
 }
 
 function saveCurrentSuppleRoutine() {
@@ -739,6 +791,15 @@ function runSuppleRoutine(routineId) {
   const validItems = (r.items || []).filter((it) => suppleMasters.some((m) => m.id === it.suppleId));
   if (!validItems.length) {
     alert('このセットに含まれるサプリが見つかりませんでした');
+    return;
+  }
+  const itemLines = validItems.map((it) => {
+    const m = suppleMasters.find((x) => x.id === it.suppleId);
+    const qty = Math.max(1, parseInt(it.qty, 10) || 1);
+    return '・' + (m ? m.name : '不明') + ' × ' + qty;
+  }).join('\n');
+  const timingLabel = r.timing || '随時';
+  if (!confirm('クイックセット「' + r.name + '」（' + timingLabel + '）を記録しますか？\n\n' + itemLines)) {
     return;
   }
   const today = getSuppleTodayStr(0);
@@ -893,10 +954,8 @@ function intakeQtyOf(item) {
 }
 
 function setSuppleSubmitLabel(label) {
-  ['supple-btn-submit-intake', 'supple-btn-submit-intake-inline'].forEach((id) => {
-    const el = document.getElementById(id);
-    if (el) el.textContent = label;
-  });
+  const el = document.getElementById('supple-btn-submit-intake');
+  if (el) el.textContent = label;
 }
 
 function openSuppleIntakeModal() {
@@ -912,6 +971,7 @@ function openSuppleIntakeModal() {
   if (noteEl) noteEl.value = '';
 
   suppleIntakePicks = [];
+  renderSuppleIntakeRoutines();
   renderSuppleDropdownList();
   const modal = document.getElementById('modal-supple-intake');
   if (modal) {
@@ -944,6 +1004,7 @@ function openSuppleEditModal(intakeId, ev) {
   if (noteEl) noteEl.value = item.note || '';
 
   suppleIntakePicks = [{ id: item.suppleId, qty: intakeQtyOf(item) }];
+  renderSuppleIntakeRoutines();
   renderSuppleDropdownList();
 
   const modal = document.getElementById('modal-supple-intake');

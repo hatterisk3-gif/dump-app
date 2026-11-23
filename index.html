@@ -1902,9 +1902,18 @@
       touch-action: manipulation;
     }
 
-    #check-blocks-list.is-block-dragging {
-      touch-action: none;
-      overflow: hidden;
+    #check-blocks-list.is-block-dragging,
+    #check-blocks-list.is-block-dragging .check-block-card {
+      touch-action: none !important;
+      overflow: hidden !important;
+      overscroll-behavior: none !important;
+    }
+
+    html.is-block-lane-drag,
+    body.is-block-lane-drag {
+      overflow: hidden !important;
+      touch-action: none !important;
+      overscroll-behavior: none !important;
     }
 
     .check-block-card.is-dragging-block {
@@ -2740,6 +2749,14 @@
     .pause-animations::before,
     .pause-animations::after {
       animation-play-state: paused !important;
+    }
+
+    .pause-animations #fortune-mode *,
+    .pause-animations #boot-splash-preview-overlay,
+    .pause-animations #boot-splash-preview-overlay *,
+    .pause-animations #boot-splash-preview-overlay *::before,
+    .pause-animations #boot-splash-preview-overlay *::after {
+      animation-play-state: running !important;
     }
 
     /* CAPTURE中: 背面装飾がオーバーレイ越しに見えるのを防ぐ（Android visualViewport 対策含む） */
@@ -16550,6 +16567,15 @@
             class="w-full px-4 py-2.5 rounded-2xl bg-black/40 border border-cyan-800/60 text-white text-sm font-semibold focus:outline-hidden focus:border-cyan-400 transition-all" />
         </div>
 
+        <!-- 1.5. セットから選択（登録済みクイックセットがある場合のみ表示） -->
+        <div id="supple-intake-routines-wrap" class="hidden">
+          <div class="flex items-center justify-between gap-2 mb-1.5">
+            <label class="text-xs font-bold text-amber-200">⚡ セットから選択</label>
+            <span class="text-[10px] text-slate-400 font-bold">タップで一括選択</span>
+          </div>
+          <div id="supple-intake-routines-list" class="flex flex-wrap gap-1.5"></div>
+        </div>
+
         <!-- 2. サプリ選択（複数・個数・削除） -->
         <div>
           <div class="flex items-center justify-between gap-2 mb-1.5">
@@ -16582,13 +16608,9 @@
           </div>
         </div>
 
-        <div class="flex flex-col sm:flex-row gap-2">
-          <button type="button" id="supple-btn-submit-intake-inline" onclick="submitSuppleIntake()"
-            class="flex-1 py-3 px-4 rounded-2xl bg-emerald-600 text-white text-sm font-extrabold shadow-lg shadow-emerald-500/25 active:scale-[0.99] transition-all">
-            ✓ 登録する
-          </button>
+        <div>
           <button type="button" id="supple-btn-save-routine" onclick="saveCurrentSuppleRoutine()"
-            class="py-3 px-4 rounded-2xl bg-amber-950/60 border border-amber-600/50 text-amber-200 hover:bg-amber-900/60 text-xs sm:text-sm font-extrabold active:scale-[0.99] transition-all whitespace-nowrap">
+            class="w-full py-3 px-4 rounded-2xl bg-amber-950/60 border border-amber-600/50 text-amber-200 hover:bg-amber-900/60 text-xs sm:text-sm font-extrabold active:scale-[0.99] transition-all whitespace-nowrap">
             ⭐ この選択をセット保存
           </button>
         </div>
@@ -38533,6 +38555,7 @@
 
     let fortuneHubInitializedOnce = false;
     function initFortuneHub() {
+      document.documentElement.classList.remove('pause-animations');
       closeFortuneFeature({ silent: true });
       // 起動時は基本的に名前空白にしておく（前の設定をキャッシュしない）
       if (!fortuneHubInitializedOnce) {
@@ -53485,7 +53508,7 @@
     function closeCaptureOverlay(opts) {
       opts = opts || {};
       const inputMode = document.getElementById('input-mode');
-      if (inputMode && inputMode.classList.contains('active')) {
+      if (!opts.force && inputMode && inputMode.classList.contains('active')) {
         updateSkipInputTopUI(true);
         return;
       }
@@ -54952,6 +54975,30 @@
       });
     }
 
+    let checkBlockScrollLockBound = false;
+    function ensureCheckBlockScrollLockListeners() {
+      if (checkBlockScrollLockBound) return;
+      checkBlockScrollLockBound = true;
+      window.addEventListener('touchmove', (ev) => {
+        if (!checkBlockDrag || !checkBlockDrag.started) return;
+        if (ev.cancelable) ev.preventDefault();
+        const t = ev.touches && ev.touches[0];
+        if (t) {
+          checkBlockDrag.lastX = t.clientX;
+          checkBlockDrag.lastY = t.clientY;
+          moveCheckBlockDrag({
+            clientX: t.clientX,
+            clientY: t.clientY,
+            preventDefault: () => {}
+          });
+        }
+      }, { capture: true, passive: false });
+      window.addEventListener('wheel', (ev) => {
+        if (!checkBlockDrag || !checkBlockDrag.started) return;
+        if (ev.cancelable) ev.preventDefault();
+      }, { capture: true, passive: false });
+    }
+
     function cancelCheckBlockDrag() {
       if (!checkBlockDrag) return;
       const drag = checkBlockDrag;
@@ -54961,9 +55008,13 @@
         drag.card.classList.remove('is-dragging-block');
         drag.card.style.touchAction = '';
       }
+      document.documentElement.classList.remove('is-block-lane-drag');
       document.body.classList.remove('is-block-lane-drag');
       const list = document.getElementById('check-blocks-list');
-      if (list) list.classList.remove('is-block-dragging');
+      if (list) {
+        list.classList.remove('is-block-dragging');
+        if (drag.onListScroll) list.removeEventListener('scroll', drag.onListScroll);
+      }
       if (drag.ghost && drag.ghost.parentNode) drag.ghost.parentNode.removeChild(drag.ghost);
       paintBlockDragTarget('');
     }
@@ -54983,6 +55034,7 @@
 
     function startCheckBlockDrag(e) {
       if (!checkBlockDrag || checkBlockDrag.started) return;
+      ensureCheckBlockScrollLockListeners();
       const drag = checkBlockDrag;
       drag.started = true;
       if (drag.timer) {
@@ -54996,7 +55048,17 @@
         try { drag.card.setPointerCapture(e.pointerId); } catch (_) { }
       }
       const list = document.getElementById('check-blocks-list');
-      if (list) list.classList.add('is-block-dragging');
+      if (list) {
+        drag.lockedScrollTop = list.scrollTop;
+        drag.onListScroll = () => {
+          if (checkBlockDrag === drag && drag.started && list.scrollTop !== drag.lockedScrollTop) {
+            list.scrollTop = drag.lockedScrollTop;
+          }
+        };
+        list.addEventListener('scroll', drag.onListScroll, { passive: true });
+        list.classList.add('is-block-dragging');
+      }
+      document.documentElement.classList.add('is-block-lane-drag');
       document.body.classList.add('is-block-lane-drag');
       const ghost = document.createElement('div');
       ghost.className = 'blocks-drag-ghost';
@@ -55023,6 +55085,7 @@
     }
 
     function bindCheckBlockDrag(card, entry) {
+      ensureCheckBlockScrollLockListeners();
       card.addEventListener('pointerdown', (e) => {
         if (e.pointerType === 'mouse' && e.button !== 0) return;
         if (checkBlockDrag) cancelCheckBlockDrag();

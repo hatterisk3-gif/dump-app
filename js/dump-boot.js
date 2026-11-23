@@ -64,6 +64,46 @@
     }
     // ⚠️【必須設定】ここに発行したGASのウェブアプリURLを貼り付けてください
     const GAS_API_URL = "https://script.google.com/macros/s/AKfycbxP-ENobvgAGiVgXKgzLmKBLZn4_6KzZXwXXZAbDBqmSdLxiJOCf5whFrUv5ikUo5evvQ/exec";
+    const SUPABASE_URL = "https://nxtrrqkxcmkfjblbwleo.supabase.co";
+    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im54dHJycWt4Y21rZmpibGJ3bGVvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTU0NjEwMjAsImV4cCI6MjExMTAzNzAyMH0.Az8EYMaf1_3-AYqe7kf-lXU4UFswpcokD_J8kzL489o";
+    const SUPABASE_RPC_URL = `${SUPABASE_URL}/rest/v1/rpc/dump_api`;
+    const GAS_ONLY_ACTIONS = new Set([
+      'uploadDumpImage',
+      'uploadDumpImageBegin',
+      'uploadDumpImageChunk',
+      'uploadDumpImageFinish',
+      'getDumpImageById',
+      'syncGanttCalendarEvent',
+      'deleteGanttCalendarEvent',
+      'syncAllGanttToCalendar',
+      'lookupJanProduct'
+    ]);
+    const SUPABASE_SWEEP_TABLES_BY_ACTION = {
+      moveInboxItem: ['inbox'],
+      moveInboxItems: ['inbox'],
+      purgeInboxExactDuplicates: ['inbox'],
+      deleteConfigRecord: ['config_records'],
+      updateConfigRecord: ['config_records'],
+      purgeSystemTrash: ['data_records'],
+      batch: ['inbox', 'config_records']
+    };
+
+    function sweepSupabaseDeletedRows(action) {
+      if (!SUPABASE_URL || !SUPABASE_ANON_KEY) return;
+      const tables = SUPABASE_SWEEP_TABLES_BY_ACTION[action];
+      if (!Array.isArray(tables) || !tables.length) return;
+      tables.forEach((table) => {
+        fetch(`${SUPABASE_URL}/rest/v1/${table}?is_deleted=eq.true`, {
+          method: 'DELETE',
+          keepalive: true,
+          headers: {
+            'apikey': SUPABASE_ANON_KEY,
+            'Authorization': 'Bearer ' + SUPABASE_ANON_KEY,
+            'Prefer': 'return=minimal'
+          }
+        }).catch(() => { });
+      });
+    }
     function isApiFailure(res) {
       return !res || res.error || res.success === false;
     }
@@ -115,7 +155,11 @@
         }, timeoutMs);
       }
       try {
-        const body = JSON.stringify({ action, ...data });
+        const useGas = GAS_ONLY_ACTIONS.has(action) || !SUPABASE_URL || !SUPABASE_ANON_KEY;
+        const targetUrl = useGas ? GAS_API_URL : SUPABASE_RPC_URL;
+        const body = useGas
+          ? JSON.stringify({ action, ...data })
+          : JSON.stringify({ payload: { action, ...data } });
         const useKeepalive = options.keepalive === true
           || (options.keepalive !== false
             && KEEPALIVE_WRITE_ACTIONS.has(action)
@@ -124,12 +168,18 @@
           method: 'POST',
           body,
           keepalive: !!useKeepalive,
-          headers: { 'Content-Type': 'text/plain;charset=UTF-8' }
+          headers: useGas
+            ? { 'Content-Type': 'text/plain;charset=UTF-8' }
+            : {
+                'Content-Type': 'application/json',
+                'apikey': SUPABASE_ANON_KEY,
+                'Authorization': 'Bearer ' + SUPABASE_ANON_KEY
+              }
         };
         if (controller) {
           fetchOpts.signal = controller.signal;
         }
-        const response = await fetch(GAS_API_URL, fetchOpts);
+        const response = await fetch(targetUrl, fetchOpts);
         if (timer) { clearTimeout(timer); timer = null; }
         const text = await response.text();
         let json;
@@ -140,8 +190,17 @@
           if (!options.silent) alert('通信エラーが発生しました');
           return { error: true, message: 'invalid_json', status: response.status };
         }
+        if (!useGas && (!response.ok || (json && json.code && json.message && !json.error))) {
+          const msg = (json && json.message) ? String(json.message) : ('http_' + response.status);
+          console.error('Supabase RPC error:', response.status, json);
+          if (!options.silent) alert('通信エラーが発生しました');
+          return { error: true, message: msg, status: response.status };
+        }
         if (json && json.config && json.config['__SYSTEM__']) {
           delete json.config['__SYSTEM__'];
+        }
+        if (!useGas && !isApiFailure(json)) {
+          sweepSupabaseDeletedRows(action);
         }
         return json;
       } catch (error) {
@@ -1465,7 +1524,7 @@
     }
 
     async function mirrorPendingWritesForServiceWorker() {
-      if (!('caches' in window) || !GAS_API_URL) return;
+      if (!('caches' in window) || (!GAS_API_URL && !SUPABASE_RPC_URL)) return;
       try {
         const writes = getPendingInboxWrites().filter((j) => {
           if (!j) return false;
@@ -1476,6 +1535,8 @@
         const cache = await caches.open(PENDING_WRITES_CACHE);
         const payload = {
           gasUrl: GAS_API_URL,
+          supabaseRpcUrl: SUPABASE_RPC_URL,
+          supabaseAnonKey: SUPABASE_ANON_KEY,
           updatedAt: Date.now(),
           writes: writes.map((j) => {
             if (j.type === 'history_replace') {
@@ -2361,8 +2422,27 @@
     }
 
     function dispatchKeepalivePost(bodyObj) {
-      if (!GAS_API_URL || !bodyObj) return false;
+      if (!bodyObj) return false;
       try {
+        const obj = typeof bodyObj === 'string' ? JSON.parse(bodyObj) : bodyObj;
+        const action = obj && obj.action ? String(obj.action) : '';
+        const useSupabase = !!(SUPABASE_RPC_URL && SUPABASE_ANON_KEY && !GAS_ONLY_ACTIONS.has(action));
+        if (useSupabase) {
+          const sbBody = JSON.stringify({ payload: obj });
+          if (sbBody.length > KEEPALIVE_BODY_MAX) return false;
+          fetch(SUPABASE_RPC_URL, {
+            method: 'POST',
+            body: sbBody,
+            keepalive: true,
+            headers: {
+              'Content-Type': 'application/json',
+              'apikey': SUPABASE_ANON_KEY,
+              'Authorization': 'Bearer ' + SUPABASE_ANON_KEY
+            }
+          }).catch(() => { });
+          return true;
+        }
+        if (!GAS_API_URL) return false;
         const body = typeof bodyObj === 'string' ? bodyObj : JSON.stringify(bodyObj);
         if (body.length > KEEPALIVE_BODY_MAX) return false;
         let dispatched = false;
@@ -2388,7 +2468,7 @@
     }
 
     function tryKeepaliveHistoryReplaceJobs() {
-      if (!GAS_API_URL) return 0;
+      if (!GAS_API_URL && !SUPABASE_RPC_URL) return 0;
       const writes = getPendingInboxWrites().filter((job) => {
         if (!job || job.type !== 'history_replace') return false;
         if (pendingWriteRunningIds.has(job.id)) return false;
@@ -2441,7 +2521,7 @@
     }
 
     function tryKeepalivePendingInboxWrite() {
-      if (!GAS_API_URL) return 0;
+      if (!GAS_API_URL && !SUPABASE_RPC_URL) return 0;
       let sent = tryKeepaliveHistoryReplaceJobs();
       const writes = getPendingInboxWrites();
       if (!writes.length) {

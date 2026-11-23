@@ -1,4 +1,4 @@
-const CACHE_NAME = 'dump-app-v452';
+const CACHE_NAME = 'dump-app-v453';
 const PENDING_WRITES_CACHE = 'dump-pending-writes-v1';
 const PENDING_WRITES_CACHE_URL = './__pending_inbox_writes.json';
 /** activate 時に残す直前ビルド数（更新直後のネット失敗でも旧 index で開ける） */
@@ -234,14 +234,24 @@ function dumpContentKey(text) {
     .toLowerCase();
 }
 
-async function postGas(gasUrl, payload) {
-  const body = JSON.stringify(payload);
+async function postGas(gasUrl, payload, supabaseRpcUrl, supabaseAnonKey) {
+  const useSupabase = !!(supabaseRpcUrl && supabaseAnonKey);
+  const url = useSupabase ? supabaseRpcUrl : gasUrl;
+  if (!url) return false;
+  const body = JSON.stringify(useSupabase ? { payload: payload } : payload);
   if (body.length > 60000) return false;
-  const res = await fetch(gasUrl, {
+  const headers = useSupabase
+    ? {
+        'Content-Type': 'application/json',
+        'apikey': supabaseAnonKey,
+        'Authorization': 'Bearer ' + supabaseAnonKey
+      }
+    : { 'Content-Type': 'text/plain;charset=UTF-8' };
+  const res = await fetch(url, {
     method: 'POST',
     body: body,
     keepalive: true,
-    headers: { 'Content-Type': 'text/plain;charset=UTF-8' }
+    headers: headers
   });
   if (!res || !res.ok) return false;
   try {
@@ -263,7 +273,7 @@ async function flushPendingWritesFromCache() {
     const res = await cache.match(PENDING_WRITES_CACHE_URL);
     if (!res) return;
     const data = await res.json();
-    if (!data || !data.gasUrl || !Array.isArray(data.writes) || !data.writes.length) return;
+    if (!data || (!data.gasUrl && !data.supabaseRpcUrl) || !Array.isArray(data.writes) || !data.writes.length) return;
 
     const seen = new Set();
     const contents = [];
@@ -293,7 +303,7 @@ async function flushPendingWritesFromCache() {
     const tasks = [];
     if (contents.length) {
       tasks.push(
-        postGas(data.gasUrl, { action: 'addManyInbox', contents: contents })
+        postGas(data.gasUrl, { action: 'addManyInbox', contents: contents }, data.supabaseRpcUrl, data.supabaseAnonKey)
           .then((ok) => {
             if (ok) {
               dumpJobIds.forEach((id) => sentJobIds.add(id));
@@ -308,7 +318,7 @@ async function flushPendingWritesFromCache() {
       const subTasks = [];
       if (job.dumpId) {
         const action = job.dumpIsInbox === false ? 'updateDataRecord' : 'updateInbox';
-        subTasks.push(postGas(data.gasUrl, { action: action, id: String(job.dumpId), content: newContent }));
+        subTasks.push(postGas(data.gasUrl, { action: action, id: String(job.dumpId), content: newContent }, data.supabaseRpcUrl, data.supabaseAnonKey));
       }
       if (job.historyId && !String(job.historyId).startsWith('local-')) {
         const payload = JSON.stringify({
@@ -321,7 +331,7 @@ async function flushPendingWritesFromCache() {
           action: 'updateDataRecord',
           id: String(job.historyId),
           content: payload
-        }));
+        }, data.supabaseRpcUrl, data.supabaseAnonKey));
       }
       if (subTasks.length) {
         tasks.push(
@@ -519,7 +529,7 @@ async function handleAsset(request) {
 self.addEventListener('fetch', (e) => {
   const request = e.request;
   if (!request || request.method === 'POST') return;
-  if (String(request.url || '').includes('script.google.com')) return;
+  if (String(request.url || '').includes('script.google.com') || String(request.url || '').includes('.supabase.co')) return;
 
   const url = String(request.url || '');
 

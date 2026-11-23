@@ -1,4 +1,4 @@
-const CACHE_NAME = 'dump-app-v453';
+const CACHE_NAME = 'dump-app-v454';
 const PENDING_WRITES_CACHE = 'dump-pending-writes-v1';
 const PENDING_WRITES_CACHE_URL = './__pending_inbox_writes.json';
 /** activate 時に残す直前ビルド数（更新直後のネット失敗でも旧 index で開ける） */
@@ -529,7 +529,7 @@ async function handleAsset(request) {
 self.addEventListener('fetch', (e) => {
   const request = e.request;
   if (!request || request.method === 'POST') return;
-  if (String(request.url || '').includes('script.google.com') || String(request.url || '').includes('.supabase.co')) return;
+  if (String(request.url || '').includes('script.google.com') || String(request.url || '').includes('.supabase.co') || String(request.url || '').includes('dump-media.hatterisk3.workers.dev')) return;
 
   const url = String(request.url || '');
 

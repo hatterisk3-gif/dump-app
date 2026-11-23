@@ -34855,7 +34855,7 @@
     // GAS Webアプリはリダイレクトがあり、大きすぎる単発POSTは失敗時は分割へフォールバック
     const DUMP_IMAGE_SINGLE_SHOT_MAX = 90000;
     const DUMP_IMAGE_CHUNK_CHARS = 40000; // 分割数削減とGASリダイレクト耐性のバランス
-    const DUMP_IMAGE_TOKEN_RE = /📷\s*(https:\/\/drive\.google\.com\/(?:uc\?export=view&id=|thumbnail\?id=|file\/d\/)[A-Za-z0-9_-]+[^\s]*)/g;
+    const DUMP_IMAGE_TOKEN_RE = /📷\s*(https:\/\/(?:drive\.google\.com\/(?:uc\?export=view&id=|thumbnail\?id=|file\/d\/)[A-Za-z0-9_-]+[^\s]*|dump-media\.hatterisk3\.workers\.dev\/img\/[A-Za-z0-9._/-]+[^\s]*))/g;
     const DUMP_IMAGE_PLACEHOLDER_RE = /📷‹(dimg-[A-Za-z0-9-]+)›/g;
     let dumpComposeImages = [];
     const localPendingImagesMap = new Map();
@@ -35026,8 +35026,9 @@
         return;
       }
       const hasDrive = /📷\s*https:\/\/drive\.google\.com\//.test(raw);
+      const hasR2 = /📷\s*https:\/\/dump-media\.hatterisk3\.workers\.dev\/img\//.test(raw);
       const hasPlaceholder = /📷‹(dimg-[A-Za-z0-9-]+)›/.test(raw);
-      if (!hasDrive && !hasPlaceholder) {
+      if (!hasDrive && !hasR2 && !hasPlaceholder) {
         el.textContent = raw;
         return;
       }
@@ -35046,6 +35047,20 @@
             return '<div class="dump-content-image-wrap">'
               + '<a class="dump-content-image-link" href="' + open + '" target="_blank" rel="noopener noreferrer" title="写真を開く">'
               + '<img class="dump-content-image" src="' + thumb + '" alt="" data-drive-id="' + id + '" loading="lazy" decoding="async">'
+              + '</a>'
+              + '<button type="button" class="dump-content-image-copy-btn input-tab-history-icon-btn" data-image-url="' + url + '" title="この写真をコピー" aria-label="この写真をコピー">📋</button>'
+              + '</div>';
+          }
+        );
+      }
+      if (hasR2) {
+        html = html.replace(
+          /📷\s*(https:\/\/dump-media\.hatterisk3\.workers\.dev\/img\/[A-Za-z0-9._/-]+)/g,
+          (full, urlEscaped) => {
+            const url = String(urlEscaped || '').replace(/&amp;/g, '&');
+            return '<div class="dump-content-image-wrap">'
+              + '<a class="dump-content-image-link" href="' + url + '" target="_blank" rel="noopener noreferrer" title="写真を開く">'
+              + '<img class="dump-content-image" src="' + url + '" alt="" data-r2-url="' + url + '" loading="lazy" decoding="async">'
               + '</a>'
               + '<button type="button" class="dump-content-image-copy-btn input-tab-history-icon-btn" data-image-url="' + url + '" title="この写真をコピー" aria-label="この写真をコピー">📋</button>'
               + '</div>';
@@ -35094,11 +35109,13 @@
         img.addEventListener('error', function onImgErr() {
           img.removeEventListener('error', onImgErr);
           const id = img.getAttribute('data-drive-id') || '';
-          const fallback = document.createElement(id ? 'a' : 'span');
+          const r2Url = img.getAttribute('data-r2-url') || '';
+          const href = id ? driveImageOpenUrl(id) : r2Url;
+          const fallback = document.createElement(href ? 'a' : 'span');
           fallback.className = 'dump-content-image-fallback';
           fallback.textContent = '📷 写真を開く';
-          if (id && fallback.tagName === 'A') {
-            fallback.href = driveImageOpenUrl(id);
+          if (href && fallback.tagName === 'A') {
+            fallback.href = href;
             fallback.target = '_blank';
             fallback.rel = 'noopener noreferrer';
           }
@@ -35406,8 +35423,8 @@
         }
       };
 
-      // ごく小さい画像だけ単発（リダイレクトでも足りるサイズ）
-      if (raw.length <= DUMP_IMAGE_SINGLE_SHOT_MAX) {
+      // R2 Worker は大容量でも単発POSTで保存可能（失敗時のみGAS分割へフォールバック）
+      {
         setStatus('');
         const res = await callDumpImageApi('uploadDumpImage', {
           data: raw,
@@ -45133,6 +45150,14 @@
     }
 
     async function fetchDumpImageBlobByUrl(url) {
+      const rawUrl = String(url || '');
+      if (rawUrl.startsWith('https://dump-media.hatterisk3.workers.dev/img/')) {
+        try {
+          const r = await fetch(rawUrl, { mode: 'cors' });
+          if (r && r.ok) return await r.blob();
+        } catch (_) { }
+        return null;
+      }
       const id = typeof extractDriveFileIdFromUrl === 'function' ? extractDriveFileIdFromUrl(url) : '';
       if (!id) return null;
       const res = await callAPI('getDumpImageById', { id }, { silent: true });
@@ -45187,6 +45212,12 @@
       while ((m = re.exec(String(html || ''))) && out.length < DUMP_COMPOSE_IMAGE_MAX) {
         const src = String(m[1] || '');
         if (!src || /^data:/i.test(src)) continue;
+        if (/^https:\/\/dump-media\.hatterisk3\.workers\.dev\/img\//i.test(src)) {
+          if (seen.has(src)) continue;
+          seen.add(src);
+          out.push(src);
+          continue;
+        }
         const id = typeof extractDriveFileIdFromUrl === 'function'
           ? extractDriveFileIdFromUrl(src)
           : '';
@@ -45499,7 +45530,9 @@
           imgBtn.type = 'button';
           imgBtn.style.cssText = 'display:flex;align-items:center;gap:10px;width:100%;margin:0 0 8px;padding:6px 12px;min-height:48px;border-radius:12px;font-weight:800;font-size:13px;border:1px solid rgba(34,211,238,0.55);background:rgba(8,47,73,0.9);color:#ecfeff;cursor:pointer;text-align:left;';
           const fileId = typeof extractDriveFileIdFromUrl === 'function' ? extractDriveFileIdFromUrl(u) : '';
-          const thumbSrc = fileId && typeof driveImageThumbUrl === 'function' ? driveImageThumbUrl(fileId) : '';
+          const thumbSrc = fileId && typeof driveImageThumbUrl === 'function'
+            ? driveImageThumbUrl(fileId)
+            : (/^https:\/\/dump-media\.hatterisk3\.workers\.dev\/img\//i.test(String(u || '')) ? String(u) : '');
           if (thumbSrc) {
             const thumbImg = document.createElement('img');
             thumbImg.src = thumbSrc;

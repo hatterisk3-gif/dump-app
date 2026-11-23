@@ -64,11 +64,11 @@
     }
     // ⚠️【必須設定】ここに発行したGASのウェブアプリURLを貼り付けてください
     const GAS_API_URL = "https://script.google.com/macros/s/AKfycbxP-ENobvgAGiVgXKgzLmKBLZn4_6KzZXwXXZAbDBqmSdLxiJOCf5whFrUv5ikUo5evvQ/exec";
+    const R2_MEDIA_WORKER_URL = "https://dump-media.hatterisk3.workers.dev";
     const SUPABASE_URL = "https://nxtrrqkxcmkfjblbwleo.supabase.co";
     const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im54dHJycWt4Y21rZmpibGJ3bGVvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTU0NjEwMjAsImV4cCI6MjExMTAzNzAyMH0.Az8EYMaf1_3-AYqe7kf-lXU4UFswpcokD_J8kzL489o";
     const SUPABASE_RPC_URL = `${SUPABASE_URL}/rest/v1/rpc/dump_api`;
     const GAS_ONLY_ACTIONS = new Set([
-      'uploadDumpImage',
       'uploadDumpImageBegin',
       'uploadDumpImageChunk',
       'uploadDumpImageFinish',
@@ -155,9 +155,12 @@
         }, timeoutMs);
       }
       try {
-        const useGas = GAS_ONLY_ACTIONS.has(action) || !SUPABASE_URL || !SUPABASE_ANON_KEY;
-        const targetUrl = useGas ? GAS_API_URL : SUPABASE_RPC_URL;
-        const body = useGas
+        const useR2 = action === 'uploadDumpImage' && !!R2_MEDIA_WORKER_URL;
+        const useGas = !useR2 && (GAS_ONLY_ACTIONS.has(action) || !SUPABASE_URL || !SUPABASE_ANON_KEY);
+        const targetUrl = useR2
+          ? `${R2_MEDIA_WORKER_URL}/upload`
+          : (useGas ? GAS_API_URL : SUPABASE_RPC_URL);
+        const body = (useR2 || useGas)
           ? JSON.stringify({ action, ...data })
           : JSON.stringify({ payload: { action, ...data } });
         const useKeepalive = options.keepalive === true
@@ -168,13 +171,15 @@
           method: 'POST',
           body,
           keepalive: !!useKeepalive,
-          headers: useGas
-            ? { 'Content-Type': 'text/plain;charset=UTF-8' }
-            : {
-                'Content-Type': 'application/json',
-                'apikey': SUPABASE_ANON_KEY,
-                'Authorization': 'Bearer ' + SUPABASE_ANON_KEY
-              }
+          headers: useR2
+            ? { 'Content-Type': 'application/json' }
+            : (useGas
+                ? { 'Content-Type': 'text/plain;charset=UTF-8' }
+                : {
+                    'Content-Type': 'application/json',
+                    'apikey': SUPABASE_ANON_KEY,
+                    'Authorization': 'Bearer ' + SUPABASE_ANON_KEY
+                  })
         };
         if (controller) {
           fetchOpts.signal = controller.signal;
@@ -190,7 +195,7 @@
           if (!options.silent) alert('通信エラーが発生しました');
           return { error: true, message: 'invalid_json', status: response.status };
         }
-        if (!useGas && (!response.ok || (json && json.code && json.message && !json.error))) {
+        if (!useR2 && !useGas && (!response.ok || (json && json.code && json.message && !json.error))) {
           const msg = (json && json.message) ? String(json.message) : ('http_' + response.status);
           console.error('Supabase RPC error:', response.status, json);
           if (!options.silent) alert('通信エラーが発生しました');
@@ -199,7 +204,7 @@
         if (json && json.config && json.config['__SYSTEM__']) {
           delete json.config['__SYSTEM__'];
         }
-        if (!useGas && !isApiFailure(json)) {
+        if (!useR2 && !useGas && !isApiFailure(json)) {
           sweepSupabaseDeletedRows(action);
         }
         return json;

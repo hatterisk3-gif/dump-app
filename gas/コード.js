@@ -1,3 +1,11 @@
+/**
+ * 【重要：移行済み構成メモ】
+ * - メインDB (INBOX / DATA / CONFIG): Supabase (nxtrrqkxcmkfjblbwleo / supabase/schema.sql -> public.dump_api) へ移行済み。
+ * - 画像アップロード (uploadDumpImage): Cloudflare R2 Worker (dump-media / cloudflare/dump-media-worker.js) へ移行済み。
+ * - 本ファイル (GAS) は現在、Googleカレンダー連携 (syncGanttCalendarEvent / deleteGanttCalendarEvent / syncAllGanttToCalendar)、
+ *   JANコード検索 (lookupJanProduct)、および旧画像取得・分割アップロードフォールバック (getDumpImageById / uploadDumpImageBegin/Chunk/Finish) のみに使用されています。
+ *   ※ DB仕様や通常の画像保存を変更する場合は、このファイルではなく supabase/schema.sql・cloudflare/dump-media-worker.js・js/dump-boot.js を編集してください。
+ */
 const WRITE_ACTIONS = {
   addInbox: true,
   addManyInbox: true,

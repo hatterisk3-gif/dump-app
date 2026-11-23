@@ -1,0 +1,12 @@
+# DUMP App Cursor Rules
+
+1. メインDB（INBOX / DATA / CONFIG）は Supabase (`nxtrrqkxcmkfjblbwleo`) の `supabase/schema.sql` (`public.dump_api`) へ移行済み。DB仕様を変更する場合は `gas/コード.js` ではなく `supabase/schema.sql` と `js/dump-boot.js` を編集すること。
+2. 画像アップロード・配信は Cloudflare R2 (`dump-app-media`) + Worker `dump-media` (`cloudflare/dump-media-worker.js`) へ移行済み。画像APIを変更する場合は `cloudflare/dump-media-worker.js` / `cloudflare/wrangler.jsonc` と `js/dump-boot.js` / `js/app.js` を編集すること。
+3. `gas/コード.js` は Googleカレンダー連携・JANコード検索・旧Driveフォールバック専用。
+4. JSファイルを変更したら必ず構文チェックを実行すること：
+   `node --check js/dump-boot.js && node --check js/app.js && node --check js/supplement.js && node --check service-worker.js && node --check cloudflare/dump-media-worker.js`
+5. フロントエンド（`index.html`, `supplement.html`, `js/*.js`, `service-worker.js`）を変更したら、必ず以下の3箇所のビルド番号 (`vNNN`) を同一番号へ更新すること：
+   - `version.json` (`{"build":"vNNN"}`)
+   - `index.html` (`window.__DUMP_BUILD__ = 'vNNN';`)
+   - `service-worker.js` (`const CACHE_NAME = 'dump-app-vNNN';`)
+6. デプロイ時は `.cursor/commands/deploy.md`（または `.agents/workflows/deploy.md`）の手順に従い、変更のあった領域のみデプロイして最後に `git push` すること。

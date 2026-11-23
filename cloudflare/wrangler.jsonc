@@ -1,0 +1,12 @@
+{
+  "name": "dump-media",
+  "main": "dump-media-worker.js",
+  "compatibility_date": "2026-07-01",
+  "workers_dev": true,
+  "r2_buckets": [
+    {
+      "binding": "MEDIA_BUCKET",
+      "bucket_name": "dump-app-media"
+    }
+  ]
+}

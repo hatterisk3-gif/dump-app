@@ -1,0 +1,33 @@
+---
+description: DUMP app architecture, file map, build version sync, and deployment rules for Cursor
+globs:
+alwaysApply: true
+---
+
+# DUMP App 開発・編集ルール
+
+## 現在のシステム構成
+- **フロントエンド (Cloudflare Pages)**: `index.html`, `supplement.html`, `js/dump-boot.js`, `js/app.js`, `js/supplement.js`, `service-worker.js`, `manifest.json`, `version.json`
+  - `git push`（`main` ブランチ）で `dump-app.pages.dev` へ自動デプロイされます。
+- **メインデータベース (Supabase)**: プロジェクト ID `nxtrrqkxcmkfjblbwleo`（`https://nxtrrqkxcmkfjblbwleo.supabase.co`）
+  - スキーマ・RPC正本: `supabase/schema.sql`（`public.dump_api(payload jsonb)`）
+  - テーブル: `public.inbox`, `public.data_records`, `public.config_records`, `public.sync_meta`
+- **画像ストレージ (Cloudflare R2 + Worker)**: バケット `dump-app-media` / Worker `dump-media`（`https://dump-media.hatterisk3.workers.dev`）
+  - Worker正本・設定: `cloudflare/dump-media-worker.js`, `cloudflare/wrangler.jsonc`
+- **補助バックエンド (GAS)**: `gas/コード.js`
+  - **DBと通常の画像アップロードには使用されていません。**
+  - Googleカレンダー連携（`syncGanttCalendarEvent` 等）、JANコード検索（`lookupJanProduct`）、旧Drive画像の読み出しフォールバック（`getDumpImageById`）のみを担当します。
+
+## 編集時の必須チェック
+1. **編集先の誤りに注意**: DB処理の変更は `supabase/schema.sql` と `js/dump-boot.js`、画像処理の変更は `cloudflare/dump-media-worker.js` と `js/app.js` / `js/dump-boot.js` を編集してください（`gas/コード.js` のDB関数を変更しても反映されません）。
+2. **JS構文チェック**: JSファイルを編集した後は必ず次を実行してエラー0件を確認してください：
+   `node --check js/dump-boot.js` / `node --check js/app.js` / `node --check js/supplement.js` / `node --check service-worker.js` / `node --check cloudflare/dump-media-worker.js`
+3. **ビルド番号（`vNNN`）の3点同期**: フロントエンド資産を変更したら、必ず以下の3箇所を同じ次番号へ更新してください：
+   - `version.json` (`{"build":"vNNN"}`)
+   - `index.html` (`window.__DUMP_BUILD__ = 'vNNN';`)
+   - `service-worker.js` (`const CACHE_NAME = 'dump-app-vNNN';`)
+4. **デプロイコマンド**:
+   - Cloudflare R2 Worker (`cloudflare/` 変更時のみ): `npx wrangler deploy --config cloudflare/wrangler.jsonc`
+   - Supabase (`supabase/schema.sql` 変更時のみ): `npx supabase db query --linked -f supabase/schema.sql`（または Supabase MCP）
+   - GAS (`gas/` 変更時のみ): `clasp push` ＆ `clasp deploy -i AKfycbxP-ENobvgAGiVgXKgzLmKBLZn4_6KzZXwXXZAbDBqmSdLxiJOCf5whFrUv5ikUo5evvQ`
+   - フロントエンド: `git add .` → `git commit` → `git push`

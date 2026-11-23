@@ -89,13 +89,14 @@
     }
   </style>
   <script>
-    window.__DUMP_BUILD__ = 'v449';
+    window.__DUMP_BUILD__ = 'v451';
     // かつてここで「既知の最新ビルドより古い＝巻き戻り」と判定し、キャッシュ全消し＋SW登録解除を
     // していたが、その直後はオフライン用の控えが無く、ネットワークが不調だと起動不能になった。
     // 判定値(dump_known_good_build)は下がらない一方通行のため、一度ずれると毎回自己破壊を繰り返す。
     // 巻き戻り検知そのものを廃止し、更新は SW の標準フロー（install→skipWaiting→1回リロード）に任せる。
     (function () {
       try { localStorage.removeItem('dump_known_good_build'); } catch (e) { }
+      try { localStorage.removeItem('dump_api_token'); } catch (e) { }
     })();
     // ?nosw=1 で開いたときは壊れた Service Worker を外してから通常URLへ
     (function () {
@@ -7268,14 +7269,6 @@
     }
     // ⚠️【必須設定】ここに発行したGASのウェブアプリURLを貼り付けてください
     const GAS_API_URL = "https://script.google.com/macros/s/AKfycbxP-ENobvgAGiVgXKgzLmKBLZn4_6KzZXwXXZAbDBqmSdLxiJOCf5whFrUv5ikUo5evvQ/exec";
-    const DUMP_API_TOKEN_KEY = 'dump_api_token';
-    function getDumpApiToken() {
-      try {
-        return String(localStorage.getItem(DUMP_API_TOKEN_KEY) || '').trim();
-      } catch (_) {
-        return '';
-      }
-    }
     function isApiFailure(res) {
       return !res || res.error || res.success === false;
     }
@@ -7327,9 +7320,7 @@
         }, timeoutMs);
       }
       try {
-        const apiToken = getDumpApiToken();
-        const reqPayload = apiToken ? { action, ...data, apiToken } : { action, ...data };
-        const body = JSON.stringify(reqPayload);
+        const body = JSON.stringify({ action, ...data });
         const useKeepalive = options.keepalive === true
           || (options.keepalive !== false
             && KEEPALIVE_WRITE_ACTIONS.has(action)
@@ -8684,10 +8675,8 @@
           return false;
         });
         const cache = await caches.open(PENDING_WRITES_CACHE);
-        const apiToken = typeof getDumpApiToken === 'function' ? getDumpApiToken() : '';
         const payload = {
           gasUrl: GAS_API_URL,
-          apiToken,
           updatedAt: Date.now(),
           writes: writes.map((j) => {
             if (j.type === 'history_replace') {
@@ -11140,12 +11129,6 @@
           class="flex-1 w-full min-h-0 m-0 p-4 bg-transparent text-cyan-50 font-mono text-base leading-relaxed resize-none focus:outline-none placeholder-cyan-800"></textarea>
         <div class="px-4 py-3 border-t border-cyan-900/50 shrink-0 space-y-2">
           <p id="check-blocks-expand-status" class="text-center text-xs font-bold text-cyan-400/80 min-h-[1rem]"></p>
-          <div class="grid grid-cols-2 gap-2">
-            <button type="button" onclick="sendCheckBlockExpandToGantt()"
-              class="h-10 rounded-xl bg-emerald-950/40 text-emerald-200 border border-emerald-700/50 hover:bg-emerald-900/50 font-extrabold text-xs transition active:scale-95">📅 ガントへ</button>
-            <button type="button" onclick="sendCheckBlockExpandToTree()"
-              class="h-10 rounded-xl bg-indigo-950/40 text-indigo-200 border border-indigo-700/50 hover:bg-indigo-900/50 font-extrabold text-xs transition active:scale-95">🌳 ツリーへ</button>
-          </div>
           <button type="button" id="check-blocks-expand-save" onclick="saveCheckBlockExpand()"
             class="w-full h-14 rounded-xl bg-gradient-to-r from-cyan-600 to-indigo-700 hover:from-cyan-500 hover:to-indigo-600 text-white font-extrabold text-base border border-cyan-500/30 shadow-[0_0_15px_rgba(34,211,238,0.2)] transition active:scale-[0.98]">保存する</button>
         </div>
@@ -12115,7 +12098,7 @@
           class="bg-black/40 border-2 border-cyan-800/50 rounded-2xl p-5 shadow-[inset_0_0_10px_rgba(0,0,0,0.5)]">
           <h3 class="text-base font-extrabold text-cyan-300">📦 全データ バックアップ / 復元（JSON）</h3>
           <p class="text-xs text-cyan-100/70 font-bold leading-relaxed">
-            設定・プロファイル・サプリ・ガント・ツリー等のローカル保存データを1つの JSON ファイルに書き出したり、読み込んで復元したりできます（GAS API トークンは含まれません）。
+            設定・プロファイル・サプリ・ガント・ツリー等のローカル保存データを1つの JSON ファイルに書き出したり、読み込んで復元したりできます。
           </p>
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
             <button type="button" onclick="exportAllDumpDataJson()"
@@ -12141,24 +12124,6 @@
               class="h-10 px-4 rounded-xl bg-amber-950/70 hover:bg-amber-900/70 border border-amber-600/50 text-amber-100 text-xs font-extrabold transition active:scale-95">🧹 システム履歴を整理する</button>
             <span id="purge-system-trash-status" class="text-[11px] font-bold text-slate-400"></span>
           </div>
-        </div>
-
-        <div id="settings-card-api-token"
-          class="bg-black/40 border-2 border-cyan-800/50 rounded-2xl p-5 shadow-[inset_0_0_10px_rgba(0,0,0,0.5)]">
-          <h3 class="text-base font-extrabold text-cyan-300">🔐 GAS API トークン（任意セキュリティ）</h3>
-          <p class="text-xs text-cyan-100/70 font-bold leading-relaxed">
-            GAS スクリプトプロパティに <code>DUMP_API_TOKEN</code> を設定している場合のみ、同じトークンを入力して保存してください（この端末のブラウザにのみ保存されます）。
-          </p>
-          <div class="flex flex-wrap items-center gap-2 pt-1">
-            <input type="password" id="setting-gas-api-token" autocomplete="off"
-              placeholder="未設定（任意）"
-              class="flex-1 min-w-[160px] h-10 px-3 rounded-xl bg-black/50 border border-cyan-800/60 text-cyan-50 text-xs font-mono font-bold focus:outline-none focus:border-cyan-400">
-            <button type="button" onclick="saveDumpApiToken()"
-              class="h-10 px-3.5 rounded-xl bg-cyan-800/80 hover:bg-cyan-700 border border-cyan-500/50 text-cyan-50 text-xs font-extrabold transition active:scale-95">保存</button>
-            <button type="button" onclick="clearDumpApiToken()"
-              class="h-10 px-3 rounded-xl bg-slate-800/80 hover:bg-slate-700 border border-slate-600/60 text-slate-200 text-xs font-extrabold transition active:scale-95">消去</button>
-          </div>
-          <p id="gas-api-token-status" class="text-[11px] font-bold text-slate-400">状態: 未設定</p>
         </div>
 
         <div id="abstinence-settings-card"
@@ -39087,7 +39052,6 @@
       if (directDestEl) directDestEl.checked = isDirectDestinationEnabled();
       toggleDirectDestinationUI();
       if (typeof updateBootSplashSettingsUI === 'function') updateBootSplashSettingsUI();
-      if (typeof syncDumpApiTokenUI === 'function') syncDumpApiTokenUI();
       if (typeof syncZiweiLateRatSelect === 'function') syncZiweiLateRatSelect();
 
       initAbstinenceHub();
@@ -39247,7 +39211,7 @@
 
     function isDumpBackupLocalKey(key) {
       const k = String(key || '');
-      if (!k || k === DUMP_API_TOKEN_KEY) return false;
+      if (!k || k === 'dump_api_token') return false;
       return DUMP_BACKUP_KEY_PREFIXES.some((prefix) => k.startsWith(prefix));
     }
 
@@ -39377,33 +39341,6 @@
       } finally {
         if (btn) btn.disabled = false;
       }
-    }
-
-    function syncDumpApiTokenUI() {
-      const input = document.getElementById('setting-gas-api-token');
-      const statusEl = document.getElementById('gas-api-token-status');
-      const tok = typeof getDumpApiToken === 'function' ? getDumpApiToken() : '';
-      if (input) input.value = tok;
-      if (statusEl) {
-        statusEl.textContent = tok ? '状態: 設定済み（この端末に保存中）' : '状態: 未設定';
-        statusEl.className = tok ? 'text-[11px] font-bold text-emerald-400' : 'text-[11px] font-bold text-slate-400';
-      }
-    }
-
-    function saveDumpApiToken() {
-      const input = document.getElementById('setting-gas-api-token');
-      const val = String((input && input.value) || '').trim();
-      if (!val) {
-        clearDumpApiToken();
-        return;
-      }
-      try { localStorage.setItem(DUMP_API_TOKEN_KEY, val); } catch (_) { }
-      syncDumpApiTokenUI();
-    }
-
-    function clearDumpApiToken() {
-      try { localStorage.removeItem(DUMP_API_TOKEN_KEY); } catch (_) { }
-      syncDumpApiTokenUI();
     }
 
     // ==========================================
@@ -59244,22 +59181,6 @@
         closeReviewDetail();
         return !overlay || overlay.classList.contains('hidden');
       });
-    }
-
-    function sendCheckBlockExpandToGantt() {
-      const editor = document.getElementById('check-blocks-editor');
-      const statusEl = document.getElementById('check-blocks-expand-status');
-      const raw = editor ? editor.value : '';
-      sendTextToGanttQuick(raw, {
-        statusEl,
-        closeOverlayFn: () => closeCheckBlockExpand()
-      });
-    }
-
-    function sendCheckBlockExpandToTree() {
-      const editor = document.getElementById('check-blocks-editor');
-      const raw = editor ? editor.value : '';
-      sendTextToTreeQuick(raw, () => closeCheckBlockExpand());
     }
 
     async function saveEditReviewItem() {

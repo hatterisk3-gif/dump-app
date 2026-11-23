@@ -1,4 +1,4 @@
-const CACHE_NAME = 'dump-app-v449';
+const CACHE_NAME = 'dump-app-v451';
 const PENDING_WRITES_CACHE = 'dump-pending-writes-v1';
 const PENDING_WRITES_CACHE_URL = './__pending_inbox_writes.json';
 /** activate 時に残す直前ビルド数（更新直後のネット失敗でも旧 index で開ける） */
@@ -232,9 +232,8 @@ function dumpContentKey(text) {
     .toLowerCase();
 }
 
-async function postGas(gasUrl, payload, apiToken) {
-  const bodyObj = apiToken ? Object.assign({}, payload, { apiToken: apiToken }) : payload;
-  const body = JSON.stringify(bodyObj);
+async function postGas(gasUrl, payload) {
+  const body = JSON.stringify(payload);
   if (body.length > 60000) return false;
   const res = await fetch(gasUrl, {
     method: 'POST',
@@ -264,7 +263,6 @@ async function flushPendingWritesFromCache() {
     const data = await res.json();
     if (!data || !data.gasUrl || !Array.isArray(data.writes) || !data.writes.length) return;
 
-    const apiToken = data.apiToken || '';
     const seen = new Set();
     const contents = [];
     const dumpJobIds = new Set();
@@ -293,7 +291,7 @@ async function flushPendingWritesFromCache() {
     const tasks = [];
     if (contents.length) {
       tasks.push(
-        postGas(data.gasUrl, { action: 'addManyInbox', contents: contents }, apiToken)
+        postGas(data.gasUrl, { action: 'addManyInbox', contents: contents })
           .then((ok) => {
             if (ok) {
               dumpJobIds.forEach((id) => sentJobIds.add(id));
@@ -308,7 +306,7 @@ async function flushPendingWritesFromCache() {
       const subTasks = [];
       if (job.dumpId) {
         const action = job.dumpIsInbox === false ? 'updateDataRecord' : 'updateInbox';
-        subTasks.push(postGas(data.gasUrl, { action: action, id: String(job.dumpId), content: newContent }, apiToken));
+        subTasks.push(postGas(data.gasUrl, { action: action, id: String(job.dumpId), content: newContent }));
       }
       if (job.historyId && !String(job.historyId).startsWith('local-')) {
         const payload = JSON.stringify({
@@ -321,7 +319,7 @@ async function flushPendingWritesFromCache() {
           action: 'updateDataRecord',
           id: String(job.historyId),
           content: payload
-        }, apiToken));
+        }));
       }
       if (subTasks.length) {
         tasks.push(

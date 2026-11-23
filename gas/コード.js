@@ -20,17 +20,6 @@ const WRITE_ACTIONS = {
   batch: true
 };
 
-function isAuthorizedApiRequest_(params) {
-  try {
-    const expected = PropertiesService.getScriptProperties().getProperty('DUMP_API_TOKEN');
-    if (!expected) return true;
-    const actual = params && params.apiToken != null ? String(params.apiToken) : '';
-    return actual === String(expected);
-  } catch (e) {
-    return true;
-  }
-}
-
 function withScriptLock_(fn) {
   const lock = LockService.getScriptLock();
   lock.waitLock(30000);
@@ -45,10 +34,6 @@ function doPost(e) {
   let result = {};
   try {
     const params = JSON.parse(e.postData.contents);
-    if (!isAuthorizedApiRequest_(params)) {
-      return ContentService.createTextOutput(JSON.stringify({ error: 'unauthorized' }))
-        .setMimeType(ContentService.MimeType.JSON);
-    }
     const run = function () {
       if (params.action === 'batch') {
         return runBatch(params.ops || []);

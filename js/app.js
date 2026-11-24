@@ -97,6 +97,10 @@
       }
       refreshSubmitInboxAvailability();
       if (typeof syncInputTabHistoryLock === 'function') syncInputTabHistoryLock();
+      const ta = document.getElementById('input-content');
+      if (ta && !String(ta.value || '').trim() && !(typeof dumpComposeImages !== 'undefined' && dumpComposeImages.length)) {
+        if (typeof clearLiveInputDraft === 'function') clearLiveInputDraft({ immediateCloud: true });
+      }
     }
 
     async function resetDirectDestUiForNewInput() {
@@ -492,6 +496,8 @@
             skipHistoryPaint: true
           });
           toggleDirectDestinationUI();
+          if (typeof restoreLiveInputDraftSync === 'function') restoreLiveInputDraftSync();
+          if (typeof bindInputContentHistoryLock === 'function') bindInputContentHistoryLock();
           if (typeof bindInputContentEditorKeys === 'function') bindInputContentEditorKeys();
           if (typeof bindDumpComposeImageUi === 'function') bindDumpComposeImageUi();
         } catch (err) {
@@ -33186,7 +33192,15 @@
       if (!ta || ta.dataset.compWatch === '1') return;
       ta.dataset.compWatch = '1';
       ta.addEventListener('compositionstart', () => { inputContentComposing = true; });
-      ta.addEventListener('compositionend', () => { inputContentComposing = false; });
+      ta.addEventListener('compositionend', () => {
+        inputContentComposing = false;
+        if (!pendingInputHistoryReplace && typeof applyDeferredCloudLiveInputDraft === 'function') {
+          if (applyDeferredCloudLiveInputDraft()) return;
+        }
+        if (!pendingInputHistoryReplace && typeof onLiveInputDraftChanged === 'function') {
+          onLiveInputDraftChanged({ reason: 'compositionend' });
+        }
+      });
     }
 
     async function commitInputCompositionAsync() {
@@ -33221,13 +33235,19 @@
       const token = ++inboxInputClearToken;
       const dumped = String(dumpedRaw || '');
       const dumpedTrim = dumped.trim();
+      if (typeof activateLiveDraftSubmitEchoGuard === 'function') {
+        activateLiveDraftSubmitEchoGuard(dumpedRaw);
+      }
+      if (!pendingInputHistoryReplace && typeof clearLiveInputDraft === 'function') {
+        clearLiveInputDraft({ immediateCloud: true });
+      }
 
       const forceEmpty = () => {
         if (token !== inboxInputClearToken) return;
         if (ta.value !== '') ta.value = '';
         try { ta.setSelectionRange(0, 0); } catch (_) { }
         if (typeof clearDumpComposeImages === 'function' && dumpComposeImages && dumpComposeImages.length) {
-          clearDumpComposeImages();
+          clearDumpComposeImages({ skipDraftSync: true });
         }
       };
 
@@ -33638,7 +33658,7 @@
         imagesToUpload.forEach((img) => {
           localPendingImagesMap.set(img.id, img);
         });
-        clearDumpComposeImages({ keepBlobs: true });
+        clearDumpComposeImages({ keepBlobs: true, skipDraftSync: true });
       }
 
       const built = hasImages
@@ -35233,6 +35253,9 @@
       }
       dumpComposeImages = [];
       paintDumpComposeImages();
+      if (!opts.skipDraftSync && !pendingInputHistoryReplace && typeof onLiveInputDraftChanged === 'function') {
+        onLiveInputDraftChanged({ reason: 'clear_images' });
+      }
     }
 
     function removeDumpComposeImage(id) {
@@ -35244,10 +35267,13 @@
       }
       dumpComposeImages.splice(idx, 1);
       paintDumpComposeImages();
+      if (!pendingInputHistoryReplace && typeof onLiveInputDraftChanged === 'function') {
+        onLiveInputDraftChanged({ reason: 'remove_image' });
+      }
     }
 
     function hydrateDumpComposeFromContent(content) {
-      clearDumpComposeImages();
+      clearDumpComposeImages({ skipDraftSync: true });
       const src = String(content || '');
       listDumpImageUrls(src).forEach((url) => {
         dumpComposeImages.push({
@@ -35377,6 +35403,12 @@
         }
       }
       paintDumpComposeImages();
+      if (!pendingInputHistoryReplace && typeof onLiveInputDraftChanged === 'function') {
+        onLiveInputDraftChanged({ reason: 'add_images' });
+      }
+      if (!pendingInputHistoryReplace && typeof preuploadLiveDraftComposeImages === 'function') {
+        void preuploadLiveDraftComposeImages();
+      }
       const ta = document.getElementById('input-content');
       if (ta) {
         try { ta.focus({ preventScroll: true }); } catch (_) {
@@ -35772,7 +35804,7 @@
         imagesToUpload.forEach((img) => {
           localPendingImagesMap.set(img.id, img);
         });
-        clearDumpComposeImages({ keepBlobs: true });
+        clearDumpComposeImages({ keepBlobs: true, skipDraftSync: true });
       }
 
       const rawContent = hasImages
@@ -35999,10 +36031,14 @@
           }
           paintInputTabHistory(getLocalInputHistory());
           if (isInboxDest && netNewCount > 0) bumpBadgeOptimistic(-netNewCount);
+          if (typeof resetLiveDraftSubmitEchoGuard === 'function') resetLiveDraftSubmitEchoGuard();
           if (!textarea.value.trim()) {
             textarea.value = rawContent;
           } else {
             textarea.value = rawContent + '\n\n' + textarea.value;
+          }
+          if (!pendingInputHistoryReplace && typeof onLiveInputDraftChanged === 'function') {
+            onLiveInputDraftChanged({ immediateCloud: true, reason: 'submit_rollback' });
           }
           const reason = err && err.message === 'write'
             ? 'サーバーへの保存に失敗しました'
@@ -36307,8 +36343,15 @@
       if (!opts.skipHistoryPaint && typeof purgeCorruptLocalInputHistory === 'function') purgeCorruptLocalInputHistory();
       ensureSubmitInboxReady({ force: true, reason: 'open_capture' });
       setInputHistoryReplaceHint(!!pendingInputHistoryReplace);
+      if (typeof restoreLiveInputDraftSync === 'function') restoreLiveInputDraftSync();
       bindInputContentHistoryLock();
       bindInputContentEditorKeys();
+      if (typeof restoreLiveInputDraftFromCacheStorage === 'function') {
+        void restoreLiveInputDraftFromCacheStorage();
+      }
+      if (!opts.skipHistoryCloudSync && typeof syncLiveInputDraftWithCloud === 'function') {
+        runInBackground(() => syncLiveInputDraftWithCloud({ reason: 'open_capture' }));
+      }
       if (!opts.skipHistoryPaint) {
         try {
           renderInputTabHistory({ skipCloudSync: !!opts.skipHistoryCloudSync });
@@ -36404,13 +36447,979 @@
       }, 100);
     }
 
+    const LIVE_INPUT_DRAFT_STORAGE_KEY = 'dump_live_input_draft_v1';
+    const LIVE_INPUT_DRAFT_CLOUD_ID_KEY = 'dump_live_input_draft_cloud_id_v1';
+    const LIVE_INPUT_DRAFT_INSTANCE_KEY = 'dump_live_input_draft_instance_v1';
+    const LIVE_INPUT_DRAFT_CLOUD_FOLDER = '__SYSTEM__';
+    const LIVE_INPUT_DRAFT_CLOUD_FILE = 'input_draft_sync';
+    const LIVE_INPUT_DRAFT_SUPERSEDED_FILE = 'input_draft_superseded';
+    const LIVE_INPUT_DRAFT_CACHE_NAME = 'dump-input-draft-v1';
+    const LIVE_INPUT_DRAFT_CACHE_URL = './__live_input_draft.json';
+    const LIVE_INPUT_DRAFT_DEBOUNCE_MS = 650;
+    const LIVE_INPUT_DRAFT_MAX_WAIT_MS = 2500;
+
+    let liveDraftMemoryInstanceId = '';
+    let liveDraftCloudTimer = null;
+    let liveDraftMaxWaitTimer = null;
+    let liveDraftStoreReady = false;
+    let liveDraftCloudPushing = false;
+    let liveDraftCloudPushQueued = false;
+    let liveDraftCloudSyncing = false;
+    let liveDraftCloudSyncQueued = false;
+    let liveDraftMutationVersion = 0;
+    let liveDraftCacheSeq = 0;
+    let liveDraftLastSeenCloudMs = 0;
+    let liveDraftRestoredSyncOnce = false;
+    let liveDraftRestoredCacheOnce = false;
+    let liveDraftUserTouchedBeforeRestore = false;
+    let liveDraftImageUploadRunning = false;
+    let liveDraftDeferredCloudApply = null;
+    let liveDraftSubmitEchoUntil = 0;
+    let liveDraftSubmitEchoRaw = '';
+    let liveDraftLastKeepaliveSig = '';
+    let liveDraftLastKeepaliveAt = 0;
+
+    function getLiveInputDraftInstanceId() {
+      try {
+        const existing = localStorage.getItem(LIVE_INPUT_DRAFT_INSTANCE_KEY);
+        if (existing) return existing;
+        const created = 'inst-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8);
+        localStorage.setItem(LIVE_INPUT_DRAFT_INSTANCE_KEY, created);
+        return created;
+      } catch (_) {
+        if (!liveDraftMemoryInstanceId) {
+          liveDraftMemoryInstanceId = 'inst-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8);
+        }
+        return liveDraftMemoryInstanceId;
+      }
+    }
+
+    function getCachedLiveInputDraftCloudId() {
+      try {
+        const id = localStorage.getItem(LIVE_INPUT_DRAFT_CLOUD_ID_KEY);
+        return id ? String(id) : '';
+      } catch (_) {
+        return '';
+      }
+    }
+
+    function cacheLiveInputDraftCloudId(id) {
+      try {
+        if (id) localStorage.setItem(LIVE_INPUT_DRAFT_CLOUD_ID_KEY, String(id));
+        else localStorage.removeItem(LIVE_INPUT_DRAFT_CLOUD_ID_KEY);
+      } catch (_) { }
+    }
+
+    function normalizeLiveDraftRemoteUrls(urls) {
+      const out = [];
+      const seen = new Set();
+      (Array.isArray(urls) ? urls : []).forEach((u) => {
+        const s = String(u || '').trim();
+        if (!s || seen.has(s)) return;
+        seen.add(s);
+        out.push(s);
+      });
+      return out;
+    }
+
+    function liveDraftContentSignature(draftText, remoteUrls) {
+      return String(draftText || '') + '\u0000' + normalizeLiveDraftRemoteUrls(remoteUrls).join('\u0001');
+    }
+
+    function nextLiveDraftTimestampMs(prevLocalMs) {
+      const prev = Number(prevLocalMs) || 0;
+      const seen = Number(liveDraftLastSeenCloudMs) || 0;
+      return Math.max(Date.now(), prev + 1, seen + 1);
+    }
+
+    function readLocalLiveInputDraft() {
+      try {
+        const raw = localStorage.getItem(LIVE_INPUT_DRAFT_STORAGE_KEY);
+        if (!raw) return null;
+        const p = JSON.parse(raw);
+        if (!p || typeof p !== 'object') return null;
+        const updatedAtMs = Number(p.updatedAtMs);
+        if (!Number.isFinite(updatedAtMs) || updatedAtMs < 0) return null;
+        return {
+          v: 1,
+          draftText: p.draftText != null ? String(p.draftText) : '',
+          remoteUrls: normalizeLiveDraftRemoteUrls(p.remoteUrls),
+          localImageCount: Math.max(0, Number(p.localImageCount) || 0),
+          updatedAtMs,
+          updatedAt: p.updatedAt ? String(p.updatedAt) : new Date(updatedAtMs).toISOString(),
+          instanceId: p.instanceId ? String(p.instanceId) : getLiveInputDraftInstanceId(),
+          dirty: !!p.dirty
+        };
+      } catch (_) {
+        return null;
+      }
+    }
+
+    function writeLocalLiveInputDraft(draft) {
+      if (!draft || typeof draft !== 'object') return;
+      const updatedAtMs = Number(draft.updatedAtMs) || Date.now();
+      const payload = {
+        v: 1,
+        draftText: String(draft.draftText || ''),
+        remoteUrls: normalizeLiveDraftRemoteUrls(draft.remoteUrls),
+        localImageCount: Math.max(0, Number(draft.localImageCount) || 0),
+        updatedAtMs,
+        updatedAt: draft.updatedAt ? String(draft.updatedAt) : new Date(updatedAtMs).toISOString(),
+        instanceId: draft.instanceId ? String(draft.instanceId) : getLiveInputDraftInstanceId(),
+        dirty: !!draft.dirty
+      };
+      try {
+        localStorage.setItem(LIVE_INPUT_DRAFT_STORAGE_KEY, JSON.stringify(payload));
+      } catch (e) {
+        console.warn('writeLocalLiveInputDraft failed', e);
+      }
+    }
+
+    function activateLiveDraftSubmitEchoGuard(dumpedRaw) {
+      liveDraftSubmitEchoRaw = String(dumpedRaw || '');
+      liveDraftSubmitEchoUntil = Date.now() + 700;
+    }
+
+    function resetLiveDraftSubmitEchoGuard() {
+      liveDraftSubmitEchoRaw = '';
+      liveDraftSubmitEchoUntil = 0;
+    }
+
+    function liveDraftMatchesSubmitEcho(value) {
+      if (!liveDraftSubmitEchoUntil || Date.now() > liveDraftSubmitEchoUntil) {
+        resetLiveDraftSubmitEchoGuard();
+        return false;
+      }
+      const dumped = String(liveDraftSubmitEchoRaw || '');
+      const dumpedTrim = dumped.trim();
+      if (!dumpedTrim) return false;
+      const v = String(value || '');
+      const vt = v.trim();
+      if (!vt) return false;
+      if (v === dumped || vt === dumpedTrim) return true;
+      if (typeof dumpContentEquals === 'function' && dumpContentEquals(v, dumped)) return true;
+      const minEcho = Math.min(8, dumpedTrim.length);
+      if (vt.length >= minEcho && (dumpedTrim.startsWith(vt) || dumped.startsWith(v))) return true;
+      if (vt.length >= Math.ceil(dumpedTrim.length * 0.6)
+        && (dumped.includes(v) || dumpedTrim.includes(vt))) return true;
+      resetLiveDraftSubmitEchoGuard();
+      return false;
+    }
+
+    function collectLiveComposeDraftImagesSnapshot() {
+      const list = Array.isArray(typeof dumpComposeImages !== 'undefined' ? dumpComposeImages : null)
+        ? dumpComposeImages
+        : [];
+      const remoteUrls = [];
+      const seenUrls = new Set();
+      const compactPendingImages = [];
+      let localImageCount = 0;
+      list.forEach((img) => {
+        if (!img) return;
+        const rUrl = img.remoteUrl ? String(img.remoteUrl).trim() : '';
+        if (rUrl && !seenUrls.has(rUrl)) {
+          seenUrls.add(rUrl);
+          remoteUrls.push(rUrl);
+        }
+        if (!rUrl) localImageCount += 1;
+        compactPendingImages.push({
+          id: String(img.id || makeDumpComposeImageId()),
+          dataUrl: !rUrl && img.dataUrl ? String(img.dataUrl) : '',
+          remoteUrl: rUrl,
+          fileName: img.fileName || 'dump.jpg',
+          mimeType: img.mimeType || 'image/jpeg'
+        });
+      });
+      return { remoteUrls, compactPendingImages, localImageCount };
+    }
+
+    function buildLiveDraftCloudPayload(draft) {
+      const updatedAtMs = Number(draft && draft.updatedAtMs) || Date.now();
+      return JSON.stringify({
+        v: 1,
+        updatedAt: (draft && draft.updatedAt) ? String(draft.updatedAt) : new Date(updatedAtMs).toISOString(),
+        updatedAtMs,
+        instanceId: (draft && draft.instanceId) ? String(draft.instanceId) : getLiveInputDraftInstanceId(),
+        draftText: String((draft && draft.draftText) || ''),
+        remoteUrls: normalizeLiveDraftRemoteUrls(draft && draft.remoteUrls)
+      });
+    }
+
+    async function mirrorLiveInputDraftToCacheStorage(draft, pendingImagesSnapshot) {
+      if (typeof caches === 'undefined' || !draft) return;
+      const seq = ++liveDraftCacheSeq;
+      try {
+        const snap = Array.isArray(pendingImagesSnapshot)
+          ? pendingImagesSnapshot
+          : collectLiveComposeDraftImagesSnapshot().compactPendingImages;
+        const cache = await caches.open(LIVE_INPUT_DRAFT_CACHE_NAME);
+        if (seq !== liveDraftCacheSeq) return;
+        const payload = {
+          v: 1,
+          draftText: String(draft.draftText || ''),
+          remoteUrls: normalizeLiveDraftRemoteUrls(draft.remoteUrls),
+          pendingImages: snap,
+          updatedAtMs: Number(draft.updatedAtMs) || Date.now(),
+          updatedAt: draft.updatedAt || new Date().toISOString(),
+          instanceId: draft.instanceId || getLiveInputDraftInstanceId(),
+          dirty: !!draft.dirty,
+          cloudId: getCachedLiveInputDraftCloudId(),
+          gasUrl: typeof GAS_API_URL === 'string' ? GAS_API_URL : '',
+          supabaseRpcUrl: typeof SUPABASE_RPC_URL === 'string' ? SUPABASE_RPC_URL : '',
+          supabaseAnonKey: typeof SUPABASE_ANON_KEY === 'string' ? SUPABASE_ANON_KEY : ''
+        };
+        await cache.put(
+          LIVE_INPUT_DRAFT_CACHE_URL,
+          new Response(JSON.stringify(payload), {
+            headers: { 'Content-Type': 'application/json' }
+          })
+        );
+        if (seq === liveDraftCacheSeq && draft.dirty && 'serviceWorker' in navigator) {
+          navigator.serviceWorker.ready.then((reg) => {
+            if (reg && reg.sync && typeof reg.sync.register === 'function') {
+              return reg.sync.register('dump-live-input-draft').catch(() => { });
+            }
+          }).catch(() => { });
+        }
+      } catch (e) {
+        console.warn('mirrorLiveInputDraftToCacheStorage failed', e);
+      }
+    }
+
+    function applyLiveInputDraftToUi(draft, opts) {
+      opts = opts || {};
+      if (!draft) return false;
+      if (pendingInputHistoryReplace || inputContentComposing) {
+        liveDraftDeferredCloudApply = draft;
+        return false;
+      }
+      const ta = document.getElementById('input-content');
+      if (!ta) return false;
+      const nextText = String(draft.draftText || '');
+      const nextRemoteUrls = normalizeLiveDraftRemoteUrls(draft.remoteUrls);
+      const changedText = ta.value !== nextText;
+      if (changedText) {
+        ta.value = nextText;
+      }
+      if (typeof dumpComposeImages !== 'undefined' && Array.isArray(dumpComposeImages)) {
+        const curRemoteUrls = dumpComposeImages.map((x) => (x && x.remoteUrl) || '').filter(Boolean);
+        const curLocalImages = dumpComposeImages.filter((x) => x && !x.remoteUrl);
+        const remoteDiff = nextRemoteUrls.join('\n') !== curRemoteUrls.join('\n');
+        const shouldClearAll = opts.allowClearImages && nextRemoteUrls.length === 0 && nextText === '';
+        if (shouldClearAll && dumpComposeImages.length > 0) {
+          clearDumpComposeImages({ skipDraftSync: true });
+        } else if (opts.replaceAllImages || remoteDiff) {
+          const preservedLocals = opts.replaceAllImages ? [] : curLocalImages.slice();
+          if (opts.replaceAllImages) {
+            dumpComposeImages.forEach((img) => {
+              if (img && img.blobUrl && String(img.blobUrl).indexOf('blob:') === 0) {
+                try { URL.revokeObjectURL(img.blobUrl); } catch (_) { }
+              }
+            });
+          }
+          const restoredRemotes = nextRemoteUrls.map((url) => ({
+            id: makeDumpComposeImageId(),
+            blobUrl: url,
+            remoteUrl: url,
+            fileName: 'photo.jpg',
+            mimeType: 'image/jpeg'
+          }));
+          dumpComposeImages = restoredRemotes.concat(preservedLocals).slice(0, DUMP_COMPOSE_IMAGE_MAX);
+          if (typeof paintDumpComposeImages === 'function') paintDumpComposeImages();
+        }
+      }
+      if (typeof ensureTextUndo === 'function') {
+        const store = ensureTextUndo(ta);
+        if (store) {
+          store.last = ta.value;
+          if (typeof updateTextUndoButtons === 'function') updateTextUndoButtons(ta);
+        }
+      }
+      if (typeof syncInputTabHistoryLockNow === 'function') syncInputTabHistoryLockNow();
+      if (typeof refreshSubmitInboxAvailability === 'function') refreshSubmitInboxAvailability();
+      liveDraftDeferredCloudApply = null;
+      return true;
+    }
+
+    function applyDeferredCloudLiveInputDraft() {
+      if (!liveDraftDeferredCloudApply) return false;
+      const pending = liveDraftDeferredCloudApply;
+      if (pendingInputHistoryReplace || inputContentComposing) return false;
+      const local = readLocalLiveInputDraft();
+      if (local && local.dirty && local.updatedAtMs > Number(pending.updatedAtMs || 0)) {
+        liveDraftDeferredCloudApply = null;
+        return false;
+      }
+      const next = {
+        v: 1,
+        draftText: String(pending.draftText || ''),
+        remoteUrls: normalizeLiveDraftRemoteUrls(pending.remoteUrls),
+        localImageCount: 0,
+        updatedAtMs: Number(pending.updatedAtMs) || Date.now(),
+        updatedAt: pending.updatedAt || new Date().toISOString(),
+        instanceId: pending.instanceId || getLiveInputDraftInstanceId(),
+        dirty: false
+      };
+      if (applyLiveInputDraftToUi(next, { allowClearImages: true })) {
+        writeLocalLiveInputDraft(next);
+        void mirrorLiveInputDraftToCacheStorage(next);
+        return true;
+      }
+      return false;
+    }
+
+    function restoreLiveInputDraftSync() {
+      if (liveDraftRestoredSyncOnce) return false;
+      if (pendingInputHistoryReplace || liveDraftUserTouchedBeforeRestore) return false;
+      const ta = document.getElementById('input-content');
+      if (!ta) return false;
+      liveDraftRestoredSyncOnce = true;
+      if (ta.value !== '' || (typeof dumpComposeImages !== 'undefined' && dumpComposeImages.length > 0)) {
+        return false;
+      }
+      const local = readLocalLiveInputDraft();
+      if (!local || (!local.draftText && !(local.remoteUrls && local.remoteUrls.length))) {
+        return false;
+      }
+      return applyLiveInputDraftToUi(local, { replaceAllImages: true });
+    }
+
+    async function restoreLiveInputDraftFromCacheStorage() {
+      if (liveDraftRestoredCacheOnce || typeof caches === 'undefined') return false;
+      liveDraftRestoredCacheOnce = true;
+      try {
+        const cache = await caches.open(LIVE_INPUT_DRAFT_CACHE_NAME);
+        const res = await cache.match(LIVE_INPUT_DRAFT_CACHE_URL);
+        if (!res) return false;
+        const cached = await res.json().catch(() => null);
+        if (!cached || typeof cached !== 'object') return false;
+        if (cached.cloudId && !getCachedLiveInputDraftCloudId()) {
+          cacheLiveInputDraftCloudId(String(cached.cloudId));
+        }
+        const cachedUpdatedMs = Number(cached.updatedAtMs) || 0;
+        const local = readLocalLiveInputDraft();
+        let restoredAny = false;
+        if (!local && !pendingInputHistoryReplace && !liveDraftUserTouchedBeforeRestore) {
+          const ta = document.getElementById('input-content');
+          if (ta && ta.value === '' && (!Array.isArray(dumpComposeImages) || dumpComposeImages.length === 0)) {
+            const hasContent = !!(String(cached.draftText || '') || (Array.isArray(cached.remoteUrls) && cached.remoteUrls.length));
+            if (hasContent) {
+              const recovered = {
+                v: 1,
+                draftText: String(cached.draftText || ''),
+                remoteUrls: normalizeLiveDraftRemoteUrls(cached.remoteUrls),
+                localImageCount: 0,
+                updatedAtMs: cachedUpdatedMs || Date.now(),
+                updatedAt: cached.updatedAt || new Date().toISOString(),
+                instanceId: cached.instanceId || getLiveInputDraftInstanceId(),
+                dirty: cached.dirty !== false
+              };
+              writeLocalLiveInputDraft(recovered);
+              if (applyLiveInputDraftToUi(recovered, { replaceAllImages: true })) {
+                restoredAny = true;
+              }
+            }
+          }
+        }
+        const pendingImgs = Array.isArray(cached.pendingImages) ? cached.pendingImages : [];
+        const localImgsToRestore = pendingImgs.filter((p) => p && !p.remoteUrl && p.dataUrl);
+        if (localImgsToRestore.length && !pendingInputHistoryReplace
+          && (!local || cachedUpdatedMs >= Number(local.updatedAtMs || 0))) {
+          const existingIds = new Set((dumpComposeImages || []).map((x) => x && x.id).filter(Boolean));
+          let added = 0;
+          localImgsToRestore.forEach((p) => {
+            if (dumpComposeImages.length >= DUMP_COMPOSE_IMAGE_MAX) return;
+            if (p.id && existingIds.has(String(p.id))) return;
+            dumpComposeImages.push({
+              id: p.id ? String(p.id) : makeDumpComposeImageId(),
+              blobUrl: String(p.dataUrl),
+              dataUrl: String(p.dataUrl),
+              remoteUrl: '',
+              fileName: p.fileName || 'dump.jpg',
+              mimeType: p.mimeType || 'image/jpeg'
+            });
+            added += 1;
+          });
+          if (added > 0) {
+            if (typeof paintDumpComposeImages === 'function') paintDumpComposeImages();
+            if (typeof syncInputTabHistoryLockNow === 'function') syncInputTabHistoryLockNow();
+            restoredAny = true;
+            void preuploadLiveDraftComposeImages();
+          }
+        }
+        if (restoredAny && local && local.dirty) {
+          scheduleLiveInputDraftCloudSync({ immediate: false });
+        }
+        return restoredAny;
+      } catch (e) {
+        console.warn('restoreLiveInputDraftFromCacheStorage failed', e);
+        return false;
+      }
+    }
+
+    async function preuploadLiveDraftComposeImages() {
+      if (liveDraftImageUploadRunning || pendingInputHistoryReplace) return false;
+      if (typeof navigator !== 'undefined' && navigator.onLine === false) return false;
+      const snapshot = Array.isArray(dumpComposeImages)
+        ? dumpComposeImages.filter((img) => img && !img.remoteUrl && img.dataUrl)
+        : [];
+      if (!snapshot.length) return false;
+      liveDraftImageUploadRunning = true;
+      let uploadedCount = 0;
+      try {
+        for (let i = 0; i < snapshot.length; i++) {
+          const img = snapshot[i];
+          if (pendingInputHistoryReplace) break;
+          if (!Array.isArray(dumpComposeImages) || !dumpComposeImages.includes(img)) continue;
+          if (img.remoteUrl || !img.dataUrl) continue;
+          try {
+            const m = String(img.dataUrl).match(/^data:([^;]+);base64,(.+)$/i);
+            const mimeType = (m && m[1]) || img.mimeType || 'image/jpeg';
+            const b64 = m ? m[2] : String(img.dataUrl || '');
+            const url = await uploadDumpImagePayload(b64, mimeType, null, i + 1, snapshot.length);
+            if (url && Array.isArray(dumpComposeImages) && dumpComposeImages.includes(img)) {
+              img.remoteUrl = url;
+              uploadedCount += 1;
+            }
+          } catch (_) {
+            // 失敗しても次回オンライン／送信時に再送されるためサイレント維持
+          }
+        }
+      } finally {
+        liveDraftImageUploadRunning = false;
+      }
+      if (uploadedCount > 0 && !pendingInputHistoryReplace) {
+        onLiveInputDraftChanged({ immediateCloud: true, reason: 'image_preupload' });
+      }
+      return uploadedCount > 0;
+    }
+
+    function clearLiveInputDraftTimers() {
+      if (liveDraftCloudTimer) {
+        clearTimeout(liveDraftCloudTimer);
+        liveDraftCloudTimer = null;
+      }
+      if (liveDraftMaxWaitTimer) {
+        clearTimeout(liveDraftMaxWaitTimer);
+        liveDraftMaxWaitTimer = null;
+      }
+    }
+
+    function scheduleLiveInputDraftCloudSync(opts) {
+      opts = opts || {};
+      if (liveDraftCloudTimer) {
+        clearTimeout(liveDraftCloudTimer);
+        liveDraftCloudTimer = null;
+      }
+      if (opts.immediate) {
+        if (liveDraftMaxWaitTimer) {
+          clearTimeout(liveDraftMaxWaitTimer);
+          liveDraftMaxWaitTimer = null;
+        }
+        liveDraftCloudTimer = setTimeout(() => {
+          liveDraftCloudTimer = null;
+          void pushLiveInputDraftToCloud();
+        }, 20);
+        return;
+      }
+      liveDraftCloudTimer = setTimeout(() => {
+        liveDraftCloudTimer = null;
+        if (liveDraftMaxWaitTimer) {
+          clearTimeout(liveDraftMaxWaitTimer);
+          liveDraftMaxWaitTimer = null;
+        }
+        void pushLiveInputDraftToCloud();
+      }, LIVE_INPUT_DRAFT_DEBOUNCE_MS);
+      if (!liveDraftMaxWaitTimer) {
+        liveDraftMaxWaitTimer = setTimeout(() => {
+          liveDraftMaxWaitTimer = null;
+          if (liveDraftCloudTimer) {
+            clearTimeout(liveDraftCloudTimer);
+            liveDraftCloudTimer = null;
+          }
+          void pushLiveInputDraftToCloud();
+        }, LIVE_INPUT_DRAFT_MAX_WAIT_MS);
+      }
+    }
+
+    function onLiveInputDraftChanged(opts) {
+      opts = opts || {};
+      if (pendingInputHistoryReplace) return false;
+      const ta = document.getElementById('input-content');
+      if (!ta) return false;
+      const rawText = String(ta.value || '');
+      if (liveDraftMatchesSubmitEcho(rawText)) return false;
+      liveDraftUserTouchedBeforeRestore = true;
+      liveDraftDeferredCloudApply = null;
+
+      const { remoteUrls, compactPendingImages, localImageCount } = collectLiveComposeDraftImagesSnapshot();
+      const prev = readLocalLiveInputDraft();
+      const nextSig = liveDraftContentSignature(rawText, remoteUrls);
+      const prevSig = prev ? liveDraftContentSignature(prev.draftText, prev.remoteUrls) : '';
+
+      if (!prev && !rawText && !remoteUrls.length && localImageCount === 0) {
+        return false;
+      }
+      if (!opts.force && prev && nextSig === prevSig && Number(prev.localImageCount || 0) === localImageCount) {
+        if (!opts.skipCloudSchedule && opts.immediateCloud && prev.dirty) {
+          scheduleLiveInputDraftCloudSync({ immediate: true });
+        }
+        return false;
+      }
+
+      liveDraftMutationVersion += 1;
+      const updatedAtMs = nextLiveDraftTimestampMs(prev && prev.updatedAtMs);
+      const next = {
+        v: 1,
+        draftText: rawText,
+        remoteUrls,
+        localImageCount,
+        updatedAtMs,
+        updatedAt: new Date(updatedAtMs).toISOString(),
+        instanceId: getLiveInputDraftInstanceId(),
+        dirty: true
+      };
+      writeLocalLiveInputDraft(next);
+      void mirrorLiveInputDraftToCacheStorage(next, compactPendingImages);
+      if (!opts.skipCloudSchedule) {
+        scheduleLiveInputDraftCloudSync({ immediate: !!opts.immediateCloud });
+      }
+      return true;
+    }
+
+    function clearLiveInputDraft(opts) {
+      opts = opts || {};
+      const prev = readLocalLiveInputDraft();
+      const cloudId = getCachedLiveInputDraftCloudId();
+      if (!prev && !cloudId) {
+        liveDraftDeferredCloudApply = null;
+        return false;
+      }
+      if (prev && prev.draftText === '' && !(prev.remoteUrls && prev.remoteUrls.length)
+        && !prev.localImageCount && !prev.dirty) {
+        liveDraftDeferredCloudApply = null;
+        return false;
+      }
+      liveDraftUserTouchedBeforeRestore = true;
+      liveDraftDeferredCloudApply = null;
+      liveDraftMutationVersion += 1;
+      const updatedAtMs = nextLiveDraftTimestampMs(prev && prev.updatedAtMs);
+      const next = {
+        v: 1,
+        draftText: '',
+        remoteUrls: [],
+        localImageCount: 0,
+        updatedAtMs,
+        updatedAt: new Date(updatedAtMs).toISOString(),
+        instanceId: getLiveInputDraftInstanceId(),
+        dirty: true
+      };
+      writeLocalLiveInputDraft(next);
+      void mirrorLiveInputDraftToCacheStorage(next, []);
+      if (!opts.skipCloudSchedule) {
+        scheduleLiveInputDraftCloudSync({ immediate: opts.immediateCloud !== false });
+      }
+      return true;
+    }
+
+    async function ensureLiveInputDraftStore() {
+      if (liveDraftStoreReady) return;
+      await callAPI('addConfigRecord', {
+        folder: LIVE_INPUT_DRAFT_CLOUD_FOLDER,
+        file: LIVE_INPUT_DRAFT_CLOUD_FILE
+      }, { silent: true });
+      liveDraftStoreReady = true;
+    }
+
+    function parseLiveInputDraftSnapshot(row) {
+      if (!row || row.content == null) return null;
+      try {
+        const p = JSON.parse(row.content);
+        if (!p || typeof p !== 'object') return null;
+        let updatedAtMs = Number(p.updatedAtMs);
+        if (!Number.isFinite(updatedAtMs) && p.updatedAt) {
+          updatedAtMs = new Date(p.updatedAt).getTime();
+        }
+        if (!Number.isFinite(updatedAtMs)) updatedAtMs = 0;
+        return {
+          cloudId: row.id != null ? String(row.id) : '',
+          draftText: p.draftText != null ? String(p.draftText) : '',
+          remoteUrls: normalizeLiveDraftRemoteUrls(p.remoteUrls),
+          updatedAtMs,
+          updatedAt: p.updatedAt ? String(p.updatedAt) : new Date(updatedAtMs || Date.now()).toISOString(),
+          instanceId: p.instanceId ? String(p.instanceId) : ''
+        };
+      } catch (_) {
+        return null;
+      }
+    }
+
+    function retireExtraLiveInputDraftRecords(extraIds) {
+      const ids = (Array.isArray(extraIds) ? extraIds : [])
+        .map((id) => String(id || ''))
+        .filter(Boolean);
+      if (!ids.length) return;
+      // ゴミ箱肥大化を避けるため、__SYSTEM__ 内の別ファイルへ退避して無効化
+      callAPI('moveDataRecords', {
+        items: ids.map((id) => ({
+          id,
+          folder: LIVE_INPUT_DRAFT_CLOUD_FOLDER,
+          file: LIVE_INPUT_DRAFT_SUPERSEDED_FILE
+        }))
+      }, { silent: true }).catch(() => { });
+    }
+
+    async function fetchCloudLiveInputDraftSnapshot() {
+      const items = await callAPI('getFolderFileItems', {
+        folder: LIVE_INPUT_DRAFT_CLOUD_FOLDER,
+        file: LIVE_INPUT_DRAFT_CLOUD_FILE
+      }, { silent: true });
+      if (!Array.isArray(items) || !items.length) return null;
+      const parsed = items
+        .map(parseLiveInputDraftSnapshot)
+        .filter(Boolean)
+        .sort((a, b) => b.updatedAtMs - a.updatedAtMs);
+      if (!parsed.length) return null;
+      const primary = parsed[0];
+      const extraIds = parsed.slice(1).map((x) => x.cloudId).filter((id) => id && id !== primary.cloudId);
+      if (primary.cloudId) cacheLiveInputDraftCloudId(primary.cloudId);
+      liveDraftStoreReady = true;
+      liveDraftLastSeenCloudMs = Math.max(liveDraftLastSeenCloudMs, Number(primary.updatedAtMs) || 0);
+      if (extraIds.length) retireExtraLiveInputDraftRecords(extraIds);
+      return { ...primary, extraIds };
+    }
+
+    function mergeConflictingLiveDrafts(local, cloud) {
+      const myInstanceId = getLiveInputDraftInstanceId();
+      const cloudText = String((cloud && cloud.draftText) || '');
+      const localText = String((local && local.draftText) || '');
+      const cloudUrls = normalizeLiveDraftRemoteUrls(cloud && cloud.remoteUrls);
+      const localUrls = normalizeLiveDraftRemoteUrls(local && local.remoteUrls);
+      const mergedUrls = normalizeLiveDraftRemoteUrls(cloudUrls.concat(localUrls));
+      let mergedText = localText;
+      const ct = cloudText.trim();
+      const lt = localText.trim();
+      if (ct && lt && ct !== lt) {
+        if (lt.includes(ct)) mergedText = localText;
+        else if (ct.includes(lt)) mergedText = cloudText;
+        else mergedText = cloudText + '\n\n' + localText;
+      } else if (ct && !lt) {
+        mergedText = cloudText;
+      }
+      const updatedAtMs = nextLiveDraftTimestampMs(Math.max(Number(local && local.updatedAtMs) || 0, Number(cloud && cloud.updatedAtMs) || 0));
+      return {
+        v: 1,
+        draftText: mergedText,
+        remoteUrls: mergedUrls,
+        localImageCount: Math.max(0, Number(local && local.localImageCount) || 0),
+        updatedAtMs,
+        updatedAt: new Date(updatedAtMs).toISOString(),
+        instanceId: myInstanceId,
+        dirty: true
+      };
+    }
+
+    function markLocalLiveInputDraftCleanIfUnchanged(targetUpdatedAtMs, targetSig) {
+      const cur = readLocalLiveInputDraft();
+      if (!cur) return;
+      const curSig = liveDraftContentSignature(cur.draftText, cur.remoteUrls);
+      if (cur.updatedAtMs === targetUpdatedAtMs && curSig === targetSig && cur.dirty) {
+        cur.dirty = false;
+        writeLocalLiveInputDraft(cur);
+        void mirrorLiveInputDraftToCacheStorage(cur);
+      }
+    }
+
+    async function pushLiveInputDraftToCloud() {
+      if (typeof navigator !== 'undefined' && navigator.onLine === false) return false;
+      if (liveDraftCloudPushing) {
+        liveDraftCloudPushQueued = true;
+        return false;
+      }
+      liveDraftCloudPushing = true;
+      try {
+        const localSnapshot = readLocalLiveInputDraft();
+        if (!localSnapshot || !localSnapshot.dirty) return true;
+        const startVersion = liveDraftMutationVersion;
+        let toWrite = localSnapshot;
+        await ensureLiveInputDraftStore();
+
+        let cloudId = getCachedLiveInputDraftCloudId();
+        if (!cloudId) {
+          const cloud = await fetchCloudLiveInputDraftSnapshot();
+          if (cloud && cloud.cloudId) {
+            cloudId = cloud.cloudId;
+            const myId = getLiveInputDraftInstanceId();
+            const cloudSig = liveDraftContentSignature(cloud.draftText, cloud.remoteUrls);
+            const localSig = liveDraftContentSignature(localSnapshot.draftText, localSnapshot.remoteUrls);
+            if (cloud.updatedAtMs > localSnapshot.updatedAtMs
+              && cloud.instanceId !== myId
+              && cloudSig !== localSig
+              && String(cloud.draftText || '').trim()
+              && String(localSnapshot.draftText || '').trim()) {
+              toWrite = mergeConflictingLiveDrafts(localSnapshot, cloud);
+              if (liveDraftMutationVersion === startVersion) {
+                writeLocalLiveInputDraft(toWrite);
+                void mirrorLiveInputDraftToCacheStorage(toWrite);
+                applyLiveInputDraftToUi(toWrite);
+              }
+            }
+          }
+        }
+
+        const content = buildLiveDraftCloudPayload(toWrite);
+        if (cloudId) {
+          const upd = await callAPI('updateDataRecord', {
+            id: cloudId,
+            folder: LIVE_INPUT_DRAFT_CLOUD_FOLDER,
+            file: LIVE_INPUT_DRAFT_CLOUD_FILE,
+            content
+          }, { silent: true });
+          if (upd && upd.success && !upd.error) {
+            const sig = liveDraftContentSignature(toWrite.draftText, toWrite.remoteUrls);
+            markLocalLiveInputDraftCleanIfUnchanged(toWrite.updatedAtMs, sig);
+            return true;
+          }
+          if (!upd || upd.error !== 'not_found') {
+            return false;
+          }
+          cacheLiveInputDraftCloudId('');
+          cloudId = '';
+        }
+
+        const hasBody = !!(String(toWrite.draftText || '').trim() || (toWrite.remoteUrls && toWrite.remoteUrls.length));
+        if (!hasBody) {
+          const sig = liveDraftContentSignature(toWrite.draftText, toWrite.remoteUrls);
+          markLocalLiveInputDraftCleanIfUnchanged(toWrite.updatedAtMs, sig);
+          return true;
+        }
+        const addRes = await callAPI('addDataRecord', {
+          folder: LIVE_INPUT_DRAFT_CLOUD_FOLDER,
+          file: LIVE_INPUT_DRAFT_CLOUD_FILE,
+          content
+        }, { silent: true });
+        if (addRes && addRes.success && addRes.id) {
+          cacheLiveInputDraftCloudId(String(addRes.id));
+          const sig = liveDraftContentSignature(toWrite.draftText, toWrite.remoteUrls);
+          markLocalLiveInputDraftCleanIfUnchanged(toWrite.updatedAtMs, sig);
+          return true;
+        }
+        return false;
+      } catch (e) {
+        console.warn('pushLiveInputDraftToCloud failed', e);
+        return false;
+      } finally {
+        liveDraftCloudPushing = false;
+        if (liveDraftCloudPushQueued) {
+          liveDraftCloudPushQueued = false;
+          const latest = readLocalLiveInputDraft();
+          if (latest && latest.dirty) {
+            scheduleLiveInputDraftCloudSync({ immediate: true });
+          }
+        }
+      }
+    }
+
+    async function syncLiveInputDraftWithCloud(options) {
+      options = options || {};
+      if (typeof navigator !== 'undefined' && navigator.onLine === false) return false;
+      if (liveDraftCloudSyncing) {
+        liveDraftCloudSyncQueued = true;
+        return false;
+      }
+      liveDraftCloudSyncing = true;
+      try {
+        const startVersion = liveDraftMutationVersion;
+        const cloud = await fetchCloudLiveInputDraftSnapshot();
+        if (liveDraftMutationVersion !== startVersion) {
+          const cur = readLocalLiveInputDraft();
+          if (cur && cur.dirty) scheduleLiveInputDraftCloudSync({ immediate: true });
+          return false;
+        }
+
+        const local = readLocalLiveInputDraft();
+        if (!cloud) {
+          if (local && (local.dirty || local.draftText || (local.remoteUrls && local.remoteUrls.length))) {
+            if (!local.dirty) {
+              local.dirty = true;
+              writeLocalLiveInputDraft(local);
+            }
+            await pushLiveInputDraftToCloud();
+          }
+          return true;
+        }
+
+        const myId = getLiveInputDraftInstanceId();
+        const cloudSig = liveDraftContentSignature(cloud.draftText, cloud.remoteUrls);
+        const localSig = local ? liveDraftContentSignature(local.draftText, local.remoteUrls) : '';
+
+        if (local && local.updatedAtMs === cloud.updatedAtMs && localSig === cloudSig) {
+          if (local.dirty) {
+            local.dirty = false;
+            writeLocalLiveInputDraft(local);
+            void mirrorLiveInputDraftToCacheStorage(local);
+          }
+          return true;
+        }
+
+        const shouldPullCloud = !local || (!local.dirty && (
+          cloud.updatedAtMs > local.updatedAtMs
+          || (cloud.updatedAtMs === local.updatedAtMs && cloudSig !== localSig)
+        ));
+
+        if (shouldPullCloud) {
+          if (liveDraftMatchesSubmitEcho(cloud.draftText)) {
+            return true;
+          }
+          const appliedRecord = {
+            v: 1,
+            draftText: String(cloud.draftText || ''),
+            remoteUrls: normalizeLiveDraftRemoteUrls(cloud.remoteUrls),
+            localImageCount: 0,
+            updatedAtMs: cloud.updatedAtMs,
+            updatedAt: cloud.updatedAt,
+            instanceId: cloud.instanceId || myId,
+            dirty: false
+          };
+          const ta = document.getElementById('input-content');
+          const curUiText = ta ? String(ta.value || '') : '';
+          const curUiUrls = (typeof dumpComposeImages !== 'undefined' && Array.isArray(dumpComposeImages))
+            ? dumpComposeImages.map((x) => (x && x.remoteUrl) || '').filter(Boolean)
+            : [];
+          const uiSig = liveDraftContentSignature(curUiText, curUiUrls);
+          if (pendingInputHistoryReplace || inputContentComposing) {
+            liveDraftDeferredCloudApply = appliedRecord;
+            return true;
+          }
+          writeLocalLiveInputDraft(appliedRecord);
+          void mirrorLiveInputDraftToCacheStorage(appliedRecord);
+          if (uiSig !== cloudSig || !local) {
+            applyLiveInputDraftToUi(appliedRecord, { allowClearImages: true });
+          }
+          return true;
+        }
+
+        if (local && local.dirty) {
+          const remoteNewerFromOther = cloud.updatedAtMs > local.updatedAtMs
+            && cloud.instanceId !== myId
+            && cloudSig !== localSig;
+          if (remoteNewerFromOther) {
+            const ct = String(cloud.draftText || '').trim();
+            const lt = String(local.draftText || '').trim();
+            if (ct && lt && !liveDraftMatchesSubmitEcho(cloud.draftText)) {
+              const merged = mergeConflictingLiveDrafts(local, cloud);
+              if (!pendingInputHistoryReplace && !inputContentComposing) {
+                writeLocalLiveInputDraft(merged);
+                void mirrorLiveInputDraftToCacheStorage(merged);
+                applyLiveInputDraftToUi(merged);
+              }
+              await pushLiveInputDraftToCloud();
+              return true;
+            }
+            if (!lt && !(local.remoteUrls && local.remoteUrls.length) && !local.localImageCount
+              && (ct || (cloud.remoteUrls && cloud.remoteUrls.length))
+              && !liveDraftMatchesSubmitEcho(cloud.draftText)) {
+              const nextFromCloud = {
+                v: 1,
+                draftText: String(cloud.draftText || ''),
+                remoteUrls: normalizeLiveDraftRemoteUrls(cloud.remoteUrls),
+                localImageCount: 0,
+                updatedAtMs: cloud.updatedAtMs,
+                updatedAt: cloud.updatedAt,
+                instanceId: cloud.instanceId || myId,
+                dirty: false
+              };
+              if (!pendingInputHistoryReplace && !inputContentComposing) {
+                writeLocalLiveInputDraft(nextFromCloud);
+                void mirrorLiveInputDraftToCacheStorage(nextFromCloud);
+                applyLiveInputDraftToUi(nextFromCloud, { allowClearImages: true });
+              } else {
+                liveDraftDeferredCloudApply = nextFromCloud;
+              }
+              return true;
+            }
+          }
+          await pushLiveInputDraftToCloud();
+        }
+        return true;
+      } catch (e) {
+        console.warn('syncLiveInputDraftWithCloud failed', e);
+        return false;
+      } finally {
+        liveDraftCloudSyncing = false;
+        if (liveDraftCloudSyncQueued) {
+          liveDraftCloudSyncQueued = false;
+          runInBackground(() => syncLiveInputDraftWithCloud({ reason: 'queued' }));
+        }
+      }
+    }
+
+    function flushLiveInputDraftOnLeave() {
+      try {
+        if (!pendingInputHistoryReplace) {
+          onLiveInputDraftChanged({ skipCloudSchedule: true, reason: 'leave' });
+        }
+        const local = readLocalLiveInputDraft();
+        if (!local || !local.dirty) return false;
+        if (typeof navigator !== 'undefined' && navigator.onLine === false) return false;
+        const sig = String(local.updatedAtMs) + '|' + liveDraftContentSignature(local.draftText, local.remoteUrls);
+        if (sig === liveDraftLastKeepaliveSig && (Date.now() - liveDraftLastKeepaliveAt) < 2500) {
+          return false;
+        }
+        const content = buildLiveDraftCloudPayload(local);
+        const cloudId = getCachedLiveInputDraftCloudId();
+        if (typeof dispatchKeepalivePost !== 'function') return false;
+        let dispatched = false;
+        if (cloudId) {
+          dispatched = dispatchKeepalivePost({
+            action: 'updateDataRecord',
+            id: cloudId,
+            folder: LIVE_INPUT_DRAFT_CLOUD_FOLDER,
+            file: LIVE_INPUT_DRAFT_CLOUD_FILE,
+            content
+          });
+        } else if (String(local.draftText || '').trim() || (local.remoteUrls && local.remoteUrls.length)) {
+          dispatched = dispatchKeepalivePost({
+            action: 'addDataRecord',
+            folder: LIVE_INPUT_DRAFT_CLOUD_FOLDER,
+            file: LIVE_INPUT_DRAFT_CLOUD_FILE,
+            content
+          });
+        }
+        if (dispatched) {
+          liveDraftLastKeepaliveSig = sig;
+          liveDraftLastKeepaliveAt = Date.now();
+        }
+        return dispatched;
+      } catch (e) {
+        console.warn('flushLiveInputDraftOnLeave failed', e);
+        return false;
+      }
+    }
+
+    window.onLiveInputDraftChanged = onLiveInputDraftChanged;
+    window.clearLiveInputDraft = clearLiveInputDraft;
+    window.flushLiveInputDraftOnLeave = flushLiveInputDraftOnLeave;
+    window.syncLiveInputDraftWithCloud = syncLiveInputDraftWithCloud;
+    window.preuploadLiveDraftComposeImages = preuploadLiveDraftComposeImages;
+
     function bindInputContentHistoryLock() {
       const ta = document.getElementById('input-content');
       if (!ta || ta.dataset.historyLockBound === '1') return;
       ta.dataset.historyLockBound = '1';
+      restoreLiveInputDraftSync();
       if (typeof bindInputContentCompositionWatch === 'function') bindInputContentCompositionWatch();
-      ta.addEventListener('input', syncInputTabHistoryLock);
-      ta.addEventListener('change', syncInputTabHistoryLock);
+      const handleDraftSync = (reason) => {
+        syncInputTabHistoryLock();
+        onLiveInputDraftChanged({ reason });
+      };
+      ta.addEventListener('input', () => handleDraftSync('input'));
+      ta.addEventListener('change', () => handleDraftSync('change'));
+      ta.addEventListener('blur', () => {
+        if (!pendingInputHistoryReplace && !inputContentComposing) {
+          onLiveInputDraftChanged({ immediateCloud: true, reason: 'blur' });
+        }
+      });
       if (typeof ensureTextUndo === 'function') ensureTextUndo(ta);
     }
 
@@ -38750,7 +39759,8 @@
       setInputHistoryReplaceHint(false);
       const textarea = document.getElementById('input-content');
       if (textarea && opts.clearTextarea) textarea.value = '';
-      if (opts.clearTextarea && typeof clearDumpComposeImages === 'function') clearDumpComposeImages();
+      if (opts.clearTextarea && typeof clearDumpComposeImages === 'function') clearDumpComposeImages({ skipDraftSync: true });
+      if (opts.clearTextarea && typeof clearLiveInputDraft === 'function') clearLiveInputDraft({ immediateCloud: true });
       if (typeof syncInputTabHistoryLock === 'function') syncInputTabHistoryLock();
       if (opts.focus && textarea) textarea.focus();
     }
@@ -38790,6 +39800,13 @@
       }
       inputHistoryReplaceBackup = '';
       setInputHistoryReplaceHint(false);
+      if (typeof onLiveInputDraftChanged === 'function') {
+        if (textarea && (String(textarea.value || '').trim() || (dumpComposeImages && dumpComposeImages.length))) {
+          onLiveInputDraftChanged({ immediateCloud: true, reason: 'cancel_history_replace' });
+        } else if (typeof clearLiveInputDraft === 'function') {
+          clearLiveInputDraft({ immediateCloud: true });
+        }
+      }
       paintInputTabHistory(typeof getLocalInputHistory === 'function' ? getLocalInputHistory() : []);
       const status = document.getElementById('input-status');
       if (status) {
@@ -38811,7 +39828,10 @@
       }
       const prevInput = textarea.value;
       textarea.value = '';
-      if (typeof clearDumpComposeImages === 'function') clearDumpComposeImages();
+      if (typeof clearDumpComposeImages === 'function') clearDumpComposeImages({ skipDraftSync: true });
+      if (!pendingInputHistoryReplace && typeof clearLiveInputDraft === 'function') {
+        clearLiveInputDraft({ immediateCloud: true });
+      }
       if (typeof textUndoRemember === 'function') textUndoRemember(textarea, prevInput);
       if (typeof syncInputTabHistoryLock === 'function') syncInputTabHistoryLock();
       paintInputTabHistory(typeof getLocalInputHistory === 'function' ? getLocalInputHistory() : []);
@@ -48295,8 +49315,12 @@
         }
         localStorage.setItem('setting_direct_destination_enabled', 'false');
       } catch (_) { }
+      if (typeof restoreLiveInputDraftSync === 'function') restoreLiveInputDraftSync();
       bindInputContentHistoryLock();
       if (typeof bindDumpComposeImageUi === 'function') bindDumpComposeImageUi();
+      if (typeof restoreLiveInputDraftFromCacheStorage === 'function') {
+        void restoreLiveInputDraftFromCacheStorage();
+      }
       syncInputTabHistoryLock();
 
       const afterSplash = typeof window.__afterBootSplash === 'function'
@@ -48334,7 +49358,7 @@
       });
     });
 
-    const APP_BUILD = 'v452';
+    const APP_BUILD = window.__DUMP_BUILD__ || 'v455';
     function renderAppBuildTag() {
       ['app-build-tag', 'app-build-tag-settings'].forEach((id) => {
         const el = document.getElementById(id);

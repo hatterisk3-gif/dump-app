@@ -1063,6 +1063,9 @@
         }
         const tab = getActiveTabId();
         const fastTasks = [syncOrganizerQuick({ fresh: force || isManual })];
+        if (typeof syncLiveInputDraftWithCloud === 'function') {
+          fastTasks.push(syncLiveInputDraftWithCloud({ reason: options.reason || 'sync' }).catch(() => false));
+        }
         if (typeof syncInputTabHistoryFromCloud === 'function') {
           // 編集の取りこぼしを減らすため、表示中／手動以外でも履歴は短間隔で強制取得
           const forceHistory = force || isManual || !light
@@ -1304,6 +1307,9 @@
       document.addEventListener('visibilitychange', () => {
         if (document.visibilityState === 'visible') {
           requestCrossDeviceSync({ force: true, reason: 'visible' });
+          if (typeof syncLiveInputDraftWithCloud === 'function') {
+            syncLiveInputDraftWithCloud({ reason: 'visible' }).catch(() => { });
+          }
           if (typeof resumePendingInboxWrites === 'function') resumePendingInboxWrites({ silent: false });
           startCrossDevicePoll();
           if (typeof startTreeLibraryPoll === 'function') startTreeLibraryPoll();
@@ -1343,11 +1349,17 @@
         if (ev && ev.persisted) {
           if (typeof window.__dismissBootSplash === 'function') window.__dismissBootSplash(true);
           requestCrossDeviceSync({ force: true, reason: 'pageshow' });
+          if (typeof syncLiveInputDraftWithCloud === 'function') {
+            syncLiveInputDraftWithCloud({ reason: 'pageshow' }).catch(() => { });
+          }
           if (typeof resumePendingInboxWrites === 'function') resumePendingInboxWrites({ silent: false });
         }
       });
       window.addEventListener('online', () => {
         requestCrossDeviceSync({ force: true, reason: 'online' });
+        if (typeof syncLiveInputDraftWithCloud === 'function') {
+          syncLiveInputDraftWithCloud({ reason: 'online' }).catch(() => { });
+        }
         if (typeof resumePendingInboxWrites === 'function') resumePendingInboxWrites({ silent: false });
         if (typeof syncTreeLibrary === 'function') syncTreeLibrary({ render: false }).catch(() => { });
         if (typeof syncGanttLibrary === 'function') syncGanttLibrary({ render: false }).catch(() => { });
@@ -1359,9 +1371,14 @@
         if (typeof publishGanttLibrary === 'function') publishGanttLibrary().catch(() => { });
         if (typeof publishFavorites === 'function') publishFavorites().catch(() => { });
       });
-      // Page Lifecycle: フリーズ前にも送出
+      // Page Lifecycle: フリーズ／閉じる直前にも送出
       window.addEventListener('freeze', () => {
         flushPendingWritesOnLeave();
+      });
+      window.addEventListener('beforeunload', () => {
+        if (typeof flushLiveInputDraftOnLeave === 'function') {
+          try { flushLiveInputDraftOnLeave(); } catch (_) { }
+        }
       });
       startCrossDevicePoll();
       if (typeof startTreeLibraryPoll === 'function') startTreeLibraryPoll();
@@ -2578,6 +2595,9 @@
     }
 
     function flushPendingWritesOnLeave() {
+      if (typeof flushLiveInputDraftOnLeave === 'function') {
+        try { flushLiveInputDraftOnLeave(); } catch (_) { }
+      }
       tryKeepalivePendingInboxWrite();
       try { mirrorPendingWritesForServiceWorker(); } catch (_) { }
       schedulePendingWriteBackgroundSync();
@@ -2868,6 +2888,9 @@
         else textarea.value = textToRestore;
         textarea.focus();
         if (typeof syncInputTabHistoryLock === 'function') syncInputTabHistoryLock();
+        if (!pendingInputHistoryReplace && typeof onLiveInputDraftChanged === 'function') {
+          onLiveInputDraftChanged({ immediateCloud: true, reason: 'undo_add_restore' });
+        }
       }
       if (gaugeKept) return;
       const status = document.getElementById('input-status');

@@ -1,6 +1,8 @@
-const CACHE_NAME = 'dump-app-v454';
+const CACHE_NAME = 'dump-app-v455';
 const PENDING_WRITES_CACHE = 'dump-pending-writes-v1';
 const PENDING_WRITES_CACHE_URL = './__pending_inbox_writes.json';
+const LIVE_INPUT_DRAFT_CACHE = 'dump-input-draft-v1';
+const LIVE_INPUT_DRAFT_CACHE_URL = './__live_input_draft.json';
 /** activate 時に残す直前ビルド数（更新直後のネット失敗でも旧 index で開ける） */
 const KEEP_PREVIOUS_CACHES = 2;
 /**
@@ -212,7 +214,7 @@ self.addEventListener('activate', (e) => {
       const keys = await caches.keys();
       await Promise.all(
         keys.map((key) => {
-          if (key === CACHE_NAME || key === PENDING_WRITES_CACHE) return null;
+          if (key === CACHE_NAME || key === PENDING_WRITES_CACHE || key === LIVE_INPUT_DRAFT_CACHE) return null;
           if (String(key).indexOf('dump-app-') !== 0) return null;
           if (!hasIndex) return null;
           const keyNum = parseBuildNum(key);
@@ -366,9 +368,76 @@ async function flushPendingWritesFromCache() {
   }
 }
 
+async function flushLiveInputDraftFromCache() {
+  try {
+    const windowClients = await self.clients.matchAll({
+      type: 'window',
+      includeUncontrolled: true
+    });
+    if (windowClients.length > 0) return;
+
+    const cache = await caches.open(LIVE_INPUT_DRAFT_CACHE);
+    const res = await cache.match(LIVE_INPUT_DRAFT_CACHE_URL);
+    if (!res) return;
+    const data = await res.json();
+    if (!data || !data.dirty || (!data.gasUrl && !data.supabaseRpcUrl)) return;
+
+    const updatedAtMs = Number(data.updatedAtMs) || Date.now();
+    const content = JSON.stringify({
+      v: 1,
+      updatedAt: data.updatedAt || new Date(updatedAtMs).toISOString(),
+      updatedAtMs: updatedAtMs,
+      instanceId: data.instanceId ? String(data.instanceId) : '',
+      draftText: data.draftText != null ? String(data.draftText) : '',
+      remoteUrls: Array.isArray(data.remoteUrls) ? data.remoteUrls : []
+    });
+
+    let ok = false;
+    if (data.cloudId) {
+      ok = await postGas(
+        data.gasUrl,
+        {
+          action: 'updateDataRecord',
+          id: String(data.cloudId),
+          folder: '__SYSTEM__',
+          file: 'input_draft_sync',
+          content: content
+        },
+        data.supabaseRpcUrl,
+        data.supabaseAnonKey
+      );
+    } else if (String(data.draftText || '').trim() || (Array.isArray(data.remoteUrls) && data.remoteUrls.length)) {
+      ok = await postGas(
+        data.gasUrl,
+        {
+          action: 'addDataRecord',
+          folder: '__SYSTEM__',
+          file: 'input_draft_sync',
+          content: content
+        },
+        data.supabaseRpcUrl,
+        data.supabaseAnonKey
+      );
+    }
+    if (ok) {
+      const updated = Object.assign({}, data, { dirty: false });
+      await cache.put(
+        LIVE_INPUT_DRAFT_CACHE_URL,
+        new Response(JSON.stringify(updated), {
+          headers: { 'Content-Type': 'application/json' }
+        })
+      );
+    }
+  } catch (err) {
+    console.warn('SW flush live input draft failed', err);
+  }
+}
+
 self.addEventListener('sync', (e) => {
   if (e.tag === 'dump-pending-writes') {
-    e.waitUntil(flushPendingWritesFromCache());
+    e.waitUntil(Promise.all([flushPendingWritesFromCache(), flushLiveInputDraftFromCache()]));
+  } else if (e.tag === 'dump-live-input-draft') {
+    e.waitUntil(flushLiveInputDraftFromCache());
   }
 });
 
@@ -388,7 +457,7 @@ self.addEventListener('message', (e) => {
     return;
   }
   if (data.type === 'flush-pending-writes') {
-    e.waitUntil(flushPendingWritesFromCache());
+    e.waitUntil(Promise.all([flushPendingWritesFromCache(), flushLiveInputDraftFromCache()]));
   }
 });
 

@@ -4,6 +4,8 @@
 const SUPPLE_MASTERS_KEY = 'dump_supple_masters_v1';
 const SUPPLE_INTAKES_KEY = 'dump_supple_intakes_v1';
 const SUPPLE_ROUTINES_KEY = 'dump_supple_routines_v1';
+const SUPPLE_DISMISSED_AUTO_KEY = 'dump_supple_dismissed_auto_routines_v1';
+const SUPPLE_AUTO_ROUTINE_MAX = 4;
 const SUPPLE_UPDATED_AT_KEY = 'dump_supple_updated_at';
 const SUPPLE_DIRTY_KEY = 'dump_supple_dirty';
 const SUPPLE_CLOUD_FOLDER = '__SYSTEM__';
@@ -187,9 +189,34 @@ function saveSuppleRoutines(routines, opts = {}) {
   if (opts.touch !== false) touchSuppleUpdatedAt(opts.queueCloud !== false);
 }
 
+function loadSuppleDismissedAutoRoutines() {
+  try {
+    const d = localStorage.getItem(SUPPLE_DISMISSED_AUTO_KEY);
+    if (d) {
+      const list = JSON.parse(d);
+      if (Array.isArray(list)) {
+        return Array.from(new Set(list.map((s) => String(s || '').trim()).filter(Boolean)));
+      }
+    }
+  } catch (_) { }
+  return [];
+}
+
+function saveSuppleDismissedAutoRoutines(sigs, opts = {}) {
+  const clean = Array.from(new Set((Array.isArray(sigs) ? sigs : []).map((s) => String(s || '').trim()).filter(Boolean)));
+  suppleDismissedAutoRoutines = clean;
+  try {
+    localStorage.setItem(SUPPLE_DISMISSED_AUTO_KEY, JSON.stringify(clean));
+  } catch (e) {
+    handleSuppleStorageError(e);
+  }
+  if (opts.touch !== false) touchSuppleUpdatedAt(opts.queueCloud !== false);
+}
+
 var suppleMasters = loadSuppleMasters();
 var suppleIntakes = loadSuppleIntakes();
 var suppleRoutines = loadSuppleRoutines();
+var suppleDismissedAutoRoutines = loadSuppleDismissedAutoRoutines();
 var suppleIntakePicks = [];
 var suppleChartPeriod = 7;
 var suppleChartInstance = null;
@@ -220,6 +247,9 @@ function parseCloudSuppleSnapshot(row) {
       routines: Array.isArray(payload.routines)
         ? payload.routines.filter((r) => r && r.id && r.name && Array.isArray(r.items))
         : [],
+      dismissedAutoRoutines: Array.isArray(payload.dismissedAutoRoutines)
+        ? Array.from(new Set(payload.dismissedAutoRoutines.map((s) => String(s || '').trim()).filter(Boolean)))
+        : [],
       updatedAt,
       updatedAtIso: new Date(updatedAt).toISOString()
     };
@@ -247,9 +277,11 @@ function applySuppleDataFromCloud(snap) {
   suppleMasters = snap.masters;
   suppleIntakes = snap.intakes;
   suppleRoutines = snap.routines || [];
+  suppleDismissedAutoRoutines = Array.isArray(snap.dismissedAutoRoutines) ? snap.dismissedAutoRoutines : [];
   saveSuppleMasters(suppleMasters, { touch: false, queueCloud: false });
   saveSuppleIntakes(suppleIntakes, { touch: false, queueCloud: false });
   saveSuppleRoutines(suppleRoutines, { touch: false, queueCloud: false });
+  saveSuppleDismissedAutoRoutines(suppleDismissedAutoRoutines, { touch: false, queueCloud: false });
   try {
     if (snap.updatedAtIso) localStorage.setItem(SUPPLE_UPDATED_AT_KEY, snap.updatedAtIso);
   } catch (_) { }
@@ -278,7 +310,8 @@ async function publishSuppleData(prefetched) {
     updatedAt,
     masters: suppleMasters,
     intakes: suppleIntakes,
-    routines: suppleRoutines
+    routines: suppleRoutines,
+    dismissedAutoRoutines: suppleDismissedAutoRoutines
   });
   if (typeof upsertSystemSnapshotRecord === 'function') {
     await upsertSystemSnapshotRecord({
@@ -683,29 +716,252 @@ function renderSuppleMasterList() {
   }).join('');
 }
 
+function normalizeSuppleRoutineItems(items) {
+  const merged = new Map();
+  (Array.isArray(items) ? items : []).forEach((it) => {
+    if (!it || !it.suppleId) return;
+    const id = String(it.suppleId);
+    if (!suppleMasters.some((m) => m.id === id)) return;
+    const qty = Math.max(1, Math.min(99, parseInt(it.qty, 10) || 1));
+    merged.set(id, Math.min(99, (merged.get(id) || 0) + qty));
+  });
+  const masterOrder = new Map(suppleMasters.map((m, idx) => [m.id, idx]));
+  return Array.from(merged.entries())
+    .map(([suppleId, qty]) => ({ suppleId, qty }))
+    .sort((a, b) => {
+      const oa = masterOrder.has(a.suppleId) ? masterOrder.get(a.suppleId) : 9999;
+      const ob = masterOrder.has(b.suppleId) ? masterOrder.get(b.suppleId) : 9999;
+      return oa - ob || a.suppleId.localeCompare(b.suppleId);
+    });
+}
+
+function suppleRoutineSignature(timing, items) {
+  const t = String(timing || '随時').trim() || '随時';
+  const normalized = normalizeSuppleRoutineItems(items);
+  if (!normalized.length) return '';
+  const key = normalized
+    .slice()
+    .sort((a, b) => a.suppleId.localeCompare(b.suppleId))
+    .map((it) => it.suppleId + ':' + it.qty)
+    .join(',');
+  return t + '|' + key;
+}
+
+function makeSuppleAutoRoutineId(signature) {
+  let h = 2166136261;
+  const s = String(signature || '');
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return 'auto_' + (h >>> 0).toString(16).padStart(8, '0');
+}
+
+function collectSuppleHistoryRoutineCandidates() {
+  const validMasterIds = new Set(suppleMasters.map((m) => m.id));
+  const validIntakes = (Array.isArray(suppleIntakes) ? suppleIntakes : [])
+    .filter((it) => it && it.date && it.suppleId && validMasterIds.has(it.suppleId))
+    .slice()
+    .sort((a, b) => {
+      const d = String(a.date).localeCompare(String(b.date));
+      if (d !== 0) return d;
+      return String(a.createdAt || '').localeCompare(String(b.createdAt || ''));
+    });
+
+  // 同じ日・同じタイミングの摂取を1セッションとしてまとめる
+  // 同一サプリが同じ日・タイミングで再度記録された場合は別セッションとして扱う（1タップ記録の回数増など）
+  const sessions = [];
+  const openSessionBySlot = new Map();
+  validIntakes.forEach((intake) => {
+    const date = String(intake.date);
+    const timing = String(intake.timing || '随時').trim() || '随時';
+    const slotKey = date + '::' + timing;
+    const qty = Math.max(1, Math.min(99, parseInt(intake.qty, 10) || 1));
+    let session = openSessionBySlot.get(slotKey);
+    if (!session || session.seenSuppleIds.has(intake.suppleId)) {
+      session = {
+        date,
+        timing,
+        lastCreatedAt: String(intake.createdAt || ''),
+        items: [],
+        seenSuppleIds: new Set()
+      };
+      sessions.push(session);
+      openSessionBySlot.set(slotKey, session);
+    }
+    session.seenSuppleIds.add(intake.suppleId);
+    session.items.push({ suppleId: intake.suppleId, qty });
+    if (String(intake.createdAt || '') > session.lastCreatedAt) {
+      session.lastCreatedAt = String(intake.createdAt || '');
+    }
+  });
+
+  const comboMap = new Map();
+  sessions.forEach((sess) => {
+    const items = normalizeSuppleRoutineItems(sess.items);
+    if (!items.length) return;
+    const signature = suppleRoutineSignature(sess.timing, items);
+    if (!signature) return;
+    const prev = comboMap.get(signature);
+    if (!prev) {
+      comboMap.set(signature, {
+        signature,
+        timing: sess.timing,
+        items,
+        count: 1,
+        lastDate: sess.date,
+        lastCreatedAt: sess.lastCreatedAt
+      });
+    } else {
+      prev.count += 1;
+      if (sess.date > prev.lastDate || (sess.date === prev.lastDate && sess.lastCreatedAt > prev.lastCreatedAt)) {
+        prev.lastDate = sess.date;
+        prev.lastCreatedAt = sess.lastCreatedAt;
+      }
+    }
+  });
+
+  return Array.from(comboMap.values()).sort((a, b) => {
+    const aRep = a.count >= 2 ? 1 : 0;
+    const bRep = b.count >= 2 ? 1 : 0;
+    if (aRep !== bRep) return bRep - aRep;
+    if (a.count !== b.count) return b.count - a.count;
+    const aMulti = a.items.length >= 2 ? 1 : 0;
+    const bMulti = b.items.length >= 2 ? 1 : 0;
+    if (aMulti !== bMulti) return bMulti - aMulti;
+    const dCmp = String(b.lastDate).localeCompare(String(a.lastDate));
+    if (dCmp !== 0) return dCmp;
+    const tCmp = String(b.lastCreatedAt).localeCompare(String(a.lastCreatedAt));
+    if (tCmp !== 0) return tCmp;
+    return b.items.length - a.items.length;
+  });
+}
+
+function buildSuppleAutoRoutines() {
+  const candidates = collectSuppleHistoryRoutineCandidates();
+  if (!candidates.length) return [];
+
+  const manualSigs = new Set(
+    (Array.isArray(suppleRoutines) ? suppleRoutines : [])
+      .map((r) => suppleRoutineSignature(r.timing, r.items))
+      .filter(Boolean)
+  );
+  const dismissedSigs = new Set(Array.isArray(suppleDismissedAutoRoutines) ? suppleDismissedAutoRoutines : []);
+  const usedNames = new Set(
+    (Array.isArray(suppleRoutines) ? suppleRoutines : [])
+      .map((r) => String(r && r.name || '').trim())
+      .filter(Boolean)
+  );
+
+  const selected = [];
+  const timingAcceptedCount = new Map();
+  const timingHasStrong = new Set();
+
+  for (let i = 0; i < candidates.length; i++) {
+    if (selected.length >= SUPPLE_AUTO_ROUTINE_MAX) break;
+    const c = candidates[i];
+    if (manualSigs.has(c.signature) || dismissedSigs.has(c.signature)) {
+      if (c.count >= 2 || c.items.length >= 2) timingHasStrong.add(c.timing);
+      continue;
+    }
+    const countForTiming = timingAcceptedCount.get(c.timing) || 0;
+    if (countForTiming >= 2) continue;
+    // 同じタイミングで既に複数種または複数回のセットがある場合は、1回だけの単発断片を出さない
+    if (c.count === 1 && c.items.length === 1 && timingHasStrong.has(c.timing)) continue;
+
+    selected.push(c);
+    timingAcceptedCount.set(c.timing, countForTiming + 1);
+    if (c.count >= 2 || c.items.length >= 2) {
+      timingHasStrong.add(c.timing);
+    }
+  }
+
+  return selected.map((c) => {
+    const baseName = c.timing + 'セット';
+    let name = baseName;
+    if (usedNames.has(name)) {
+      let n = 2;
+      while (usedNames.has(baseName + ' ' + n)) n += 1;
+      name = baseName + ' ' + n;
+    }
+    usedNames.add(name);
+    return {
+      id: makeSuppleAutoRoutineId(c.signature),
+      name,
+      timing: c.timing,
+      items: c.items,
+      isAuto: true,
+      signature: c.signature,
+      count: c.count,
+      lastDate: c.lastDate
+    };
+  });
+}
+
+function getAllSuppleRoutines() {
+  const manual = (Array.isArray(suppleRoutines) ? suppleRoutines : []).map((r) => ({ ...r, isAuto: false }));
+  const auto = buildSuppleAutoRoutines();
+  return manual.concat(auto);
+}
+
+function findSuppleRoutineById(routineId) {
+  if (!routineId) return null;
+  const all = getAllSuppleRoutines();
+  return all.find((item) => item.id === routineId) || null;
+}
+
+function hasDismissedSuppleAutoRoutinesInHistory() {
+  if (!Array.isArray(suppleDismissedAutoRoutines) || !suppleDismissedAutoRoutines.length) return false;
+  const dismissed = new Set(suppleDismissedAutoRoutines);
+  return collectSuppleHistoryRoutineCandidates().some((c) => dismissed.has(c.signature));
+}
+
+function restoreSuppleDismissedAutoRoutines() {
+  if (!suppleDismissedAutoRoutines.length) return;
+  saveSuppleDismissedAutoRoutines([]);
+  renderSuppleRoutines();
+}
+
 function renderSuppleRoutines() {
   const container = document.getElementById('supple-routines-list');
+  const allRoutines = getAllSuppleRoutines();
+  const hasDismissed = hasDismissedSuppleAutoRoutinesInHistory();
   if (container) {
-    if (!suppleRoutines.length) {
-      container.innerHTML = '<p class="text-[11px] text-slate-400 font-medium">よく飲む組み合わせを「＋ 選んで作成」→「⭐ この選択をセット保存」で登録できます</p>';
+    if (!allRoutines.length) {
+      container.innerHTML =
+        '<p class="text-[11px] text-slate-400 font-medium">摂取履歴からよく飲む組み合わせを自動で作成します（手動登録は「＋ 選んで作成」→「⭐ この選択をセット保存」）</p>'
+        + (hasDismissed
+          ? '<button type="button" onclick="restoreSuppleDismissedAutoRoutines()" class="text-[11px] font-bold text-cyan-300 hover:text-cyan-200 underline">↺ 非表示の自動セットを戻す</button>'
+          : '');
     } else {
-      container.innerHTML = suppleRoutines.map((r) => {
+      const chipsHtml = allRoutines.map((r) => {
         const names = (r.items || []).map((it) => {
           const m = suppleMasters.find((x) => x.id === it.suppleId);
           return m ? m.name + (it.qty > 1 ? '×' + it.qty : '') : '';
         }).filter(Boolean).join(' / ');
+        const autoBadge = r.isAuto
+          ? `<span class="inline-block ml-1 px-1.5 py-0.2 rounded-md bg-emerald-950/80 border border-emerald-600/45 text-[9px] font-extrabold text-emerald-300 align-middle">自動${r.count >= 2 ? '・' + r.count + '回' : ''}</span>`
+          : '';
+        const cardClass = r.isAuto
+          ? 'inline-flex items-center gap-1 rounded-2xl bg-slate-900/85 border border-emerald-700/55 pl-3 pr-1.5 py-1.5 max-w-full'
+          : 'inline-flex items-center gap-1 rounded-2xl bg-slate-900/85 border border-cyan-800/60 pl-3 pr-1.5 py-1.5 max-w-full';
+        const delTitle = r.isAuto ? 'この自動セットを非表示にする' : 'セットを削除';
         return `
-      <div class="inline-flex items-center gap-1 rounded-2xl bg-slate-900/85 border border-cyan-800/60 pl-3 pr-1.5 py-1.5 max-w-full">
+      <div class="${cardClass}" data-supple-routine-auto="${r.isAuto ? '1' : '0'}">
         <button type="button" onclick="runSuppleRoutine('${escapeHtml(r.id)}')" class="text-left min-w-0 active:scale-95 transition">
-          <span class="block text-xs font-extrabold text-cyan-100">⚡ ${escapeHtml(r.name)} <span class="text-[10px] text-emerald-300 font-bold">(${escapeHtml(r.timing || '随時')})</span></span>
+          <span class="block text-xs font-extrabold text-cyan-100">⚡ ${escapeHtml(r.name)} <span class="text-[10px] text-emerald-300 font-bold">(${escapeHtml(r.timing || '随時')})</span>${autoBadge}</span>
           ${names ? `<span class="block text-[9px] text-slate-400 truncate max-w-[200px]">${escapeHtml(names)}</span>` : ''}
         </button>
         <button type="button" onclick="deleteSuppleRoutine('${escapeHtml(r.id)}', event)"
           class="w-6 h-6 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-slate-800 text-[11px] shrink-0"
-          title="セットを削除" aria-label="セットを削除">✕</button>
+          title="${delTitle}" aria-label="${delTitle}">✕</button>
       </div>
     `;
       }).join('');
+      const restoreHtml = hasDismissed
+        ? '<div class="w-full pt-0.5"><button type="button" onclick="restoreSuppleDismissedAutoRoutines()" class="text-[10px] font-bold text-slate-400 hover:text-cyan-300 underline">↺ 非表示の自動セットを戻す</button></div>'
+        : '';
+      container.innerHTML = chipsHtml + restoreHtml;
     }
   }
   renderSuppleIntakeRoutines();
@@ -715,35 +971,40 @@ function renderSuppleIntakeRoutines() {
   const wrap = document.getElementById('supple-intake-routines-wrap');
   const listEl = document.getElementById('supple-intake-routines-list');
   if (!wrap || !listEl) return;
-  if (!suppleRoutines.length) {
+  const allRoutines = getAllSuppleRoutines();
+  if (!allRoutines.length) {
     wrap.classList.add('hidden');
     listEl.innerHTML = '';
     return;
   }
   wrap.classList.remove('hidden');
-  listEl.innerHTML = suppleRoutines.map((r) => {
+  listEl.innerHTML = allRoutines.map((r) => {
     const validCount = (r.items || []).filter((it) => suppleMasters.some((m) => m.id === it.suppleId)).length;
     const names = (r.items || []).map((it) => {
       const m = suppleMasters.find((x) => x.id === it.suppleId);
       return m ? m.name + (it.qty > 1 ? '×' + it.qty : '') : '';
     }).filter(Boolean).join(' / ');
+    const autoBadge = r.isAuto
+      ? `<span class="inline-block ml-1 px-1 py-0.2 rounded bg-emerald-950/80 border border-emerald-600/45 text-[9px] font-extrabold text-emerald-300 align-middle">自動</span>`
+      : '';
+    const delTitle = r.isAuto ? 'この自動セットを非表示にする' : 'セットを削除';
     return `
-      <div class="inline-flex items-center gap-1 rounded-xl bg-amber-950/45 border border-amber-600/50 pl-3 pr-1.5 py-1.5 max-w-full">
+      <div class="inline-flex items-center gap-1 rounded-xl bg-amber-950/45 border border-amber-600/50 pl-3 pr-1.5 py-1.5 max-w-full" data-supple-routine-auto="${r.isAuto ? '1' : '0'}">
         <button type="button" onclick="applySuppleRoutineToIntakePicker('${escapeHtml(r.id)}')"
           class="text-left min-w-0 text-amber-100 hover:text-white transition active:scale-95">
-          <span class="block text-xs font-extrabold">⚡ ${escapeHtml(r.name)} <span class="text-[10px] text-emerald-300 font-bold">(${escapeHtml(r.timing || '随時')}${validCount ? '・' + validCount + '種' : ''})</span></span>
+          <span class="block text-xs font-extrabold">⚡ ${escapeHtml(r.name)} <span class="text-[10px] text-emerald-300 font-bold">(${escapeHtml(r.timing || '随時')}${validCount ? '・' + validCount + '種' : ''})</span>${autoBadge}</span>
           ${names ? `<span class="block text-[9px] text-amber-200/75 truncate max-w-[200px]">${escapeHtml(names)}</span>` : ''}
         </button>
         <button type="button" onclick="deleteSuppleRoutine('${escapeHtml(r.id)}', event)"
           class="w-6 h-6 rounded-lg text-amber-300/70 hover:text-rose-400 hover:bg-slate-800/80 text-[11px] shrink-0"
-          title="セットを削除" aria-label="セットを削除">✕</button>
+          title="${delTitle}" aria-label="${delTitle}">✕</button>
       </div>
     `;
   }).join('');
 }
 
 function applySuppleRoutineToIntakePicker(routineId) {
-  const r = suppleRoutines.find((item) => item.id === routineId);
+  const r = findSuppleRoutineById(routineId);
   if (!r) return;
   const validItems = (r.items || []).filter((it) => suppleMasters.some((m) => m.id === it.suppleId));
   if (!validItems.length) {
@@ -786,7 +1047,7 @@ function saveCurrentSuppleRoutine() {
 }
 
 function runSuppleRoutine(routineId) {
-  const r = suppleRoutines.find((item) => item.id === routineId);
+  const r = findSuppleRoutineById(routineId);
   if (!r) return;
   const validItems = (r.items || []).filter((it) => suppleMasters.some((m) => m.id === it.suppleId));
   if (!validItems.length) {
@@ -826,8 +1087,16 @@ function runSuppleRoutine(routineId) {
 
 function deleteSuppleRoutine(routineId, ev) {
   if (ev) ev.stopPropagation();
-  const r = suppleRoutines.find((item) => item.id === routineId);
+  const r = findSuppleRoutineById(routineId);
   if (!r) return;
+  if (r.isAuto) {
+    if (!confirm('自動作成されたクイックセット「' + r.name + '」を非表示にしますか？')) return;
+    if (r.signature && !suppleDismissedAutoRoutines.includes(r.signature)) {
+      saveSuppleDismissedAutoRoutines(suppleDismissedAutoRoutines.concat([r.signature]));
+    }
+    renderSuppleRoutines();
+    return;
+  }
   if (!confirm('クイックセット「' + r.name + '」を削除しますか？')) return;
   suppleRoutines = suppleRoutines.filter((item) => item.id !== routineId);
   saveSuppleRoutines(suppleRoutines);

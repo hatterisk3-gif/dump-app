@@ -49358,7 +49358,7 @@
       });
     });
 
-    const APP_BUILD = window.__DUMP_BUILD__ || 'v455';
+    const APP_BUILD = window.__DUMP_BUILD__ || 'v456';
     function renderAppBuildTag() {
       ['app-build-tag', 'app-build-tag-settings'].forEach((id) => {
         const el = document.getElementById(id);

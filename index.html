@@ -91,7 +91,7 @@
     }
   </style>
   <script>
-    window.__DUMP_BUILD__ = 'v455';
+    window.__DUMP_BUILD__ = 'v456';
     // かつてここで「既知の最新ビルドより古い＝巻き戻り」と判定し、キャッシュ全消し＋SW登録解除を
     // していたが、その直後はオフライン用の控えが無く、ネットワークが不調だと起動不能になった。
     // 判定値(dump_known_good_build)は下がらない一方通行のため、一度ずれると毎回自己破壊を繰り返す。
@@ -8314,12 +8314,12 @@
           <section id="supple-routines-section"
             class="bg-[#0b1021]/90 rounded-3xl p-4 border border-cyan-900/50 space-y-2.5">
             <div class="flex items-center justify-between gap-2">
-              <div class="flex items-center gap-1.5">
-                <span class="text-sm">⚡</span>
-                <h3 class="font-extrabold text-cyan-50 text-xs sm:text-sm">クイックセット（1タップ記録）</h3>
+              <div class="flex items-center gap-1.5 min-w-0">
+                <span class="text-sm shrink-0">⚡</span>
+                <h3 class="font-extrabold text-cyan-50 text-xs sm:text-sm truncate">クイックセット（1タップ記録）</h3>
               </div>
               <button type="button" onclick="openSuppleIntakeModal()"
-                class="text-[11px] font-bold text-emerald-300 hover:text-emerald-200 px-2.5 py-1 rounded-lg bg-emerald-950/40 border border-emerald-700/50 transition active:scale-95">
+                class="shrink-0 whitespace-nowrap text-[11px] font-bold text-emerald-300 hover:text-emerald-200 px-2.5 py-1 rounded-lg bg-emerald-950/40 border border-emerald-700/50 transition active:scale-95">
                 ＋ 選んで作成
               </button>
             </div>

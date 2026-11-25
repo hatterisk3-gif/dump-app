@@ -1185,7 +1185,10 @@
         if (reg && typeof reg.update === 'function') await reg.update();
         const worker = await waitForInstallingWorker(reg, 8000);
         if (worker) {
-          try { sessionStorage.setItem('sw_update_reload', '1'); } catch (_) { }
+          try {
+            sessionStorage.setItem('sw_update_reload', '1');
+            sessionStorage.setItem('dump_force_splash', '1');
+          } catch (_) { }
           worker.postMessage({ type: 'SKIP_WAITING' });
           return 'reloading';
         }
@@ -1208,6 +1211,7 @@
       try {
         sessionStorage.setItem('sw_update_reload', '1');
         sessionStorage.setItem('dump_manual_hard_restart', '1');
+        sessionStorage.setItem('dump_force_splash', '1');
       } catch (_) { }
 
       // reg.update() を await すると返ってこずリロード不能になる端末があるので待たない

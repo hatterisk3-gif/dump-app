@@ -36206,6 +36206,37 @@
       }
     }
 
+    let inputCaretRevealToken = 0;
+    /** 入力欄の表示位置をカーソルに合わせる。先頭なら上端まで戻す。 */
+    function revealInputCaret(input) {
+      const ta = (input && input.id === 'input-content')
+        ? input
+        : document.getElementById('input-content');
+      if (!ta) return;
+      const token = ++inputCaretRevealToken;
+      const apply = () => {
+        if (token !== inputCaretRevealToken || !ta.isConnected) return;
+        const start = typeof ta.selectionStart === 'number' ? ta.selectionStart : 0;
+        const end = typeof ta.selectionEnd === 'number' ? ta.selectionEnd : start;
+        if (start === 0 && end === 0) {
+          if (ta.scrollTop !== 0) ta.scrollTop = 0;
+          return;
+        }
+        const style = getComputedStyle(ta);
+        const parsed = parseFloat(style.lineHeight);
+        const lineHeight = Number.isFinite(parsed) && parsed > 0 ? parsed : 24;
+        const caretLine = String(ta.value || '').slice(0, end).split('\n').length - 1;
+        const caretTop = Math.max(0, caretLine * lineHeight);
+        const caretBottom = caretTop + lineHeight;
+        const viewBottom = ta.scrollTop + Math.max(0, ta.clientHeight - 6);
+        if (caretTop < ta.scrollTop) ta.scrollTop = caretTop;
+        else if (caretBottom > viewBottom) ta.scrollTop = Math.max(0, caretBottom - ta.clientHeight + 6);
+      };
+      apply();
+      requestAnimationFrame(apply);
+      [80, 240, 520, 900, 1400].forEach((ms) => setTimeout(apply, ms));
+    }
+
     function resetCaptureOverlayViewport() {
       const overlay = document.getElementById('capture-overlay');
       if (!overlay) return;
@@ -36259,6 +36290,7 @@
       const keyboardOpen = realKeyboard;
       const wasKeyboard = overlay.classList.contains('is-keyboard-open');
       if (wasKeyboard !== keyboardOpen) overlay.classList.toggle('is-keyboard-open', keyboardOpen);
+      if (!wasKeyboard && keyboardOpen && input) revealInputCaret(input);
 
       // キーボードが閉じたら必ず下タブを戻す（狭い画面のみキーボード中は隠す）
       const hideBottomChrome = keyboardOpen && narrow;
@@ -36303,7 +36335,10 @@
       }
       window.addEventListener('resize', sync);
       document.addEventListener('focusin', (e) => {
-        if (e.target && e.target.id === 'input-content') sync();
+        if (e.target && e.target.id === 'input-content') {
+          sync();
+          revealInputCaret(e.target);
+        }
       });
       document.addEventListener('focusout', (e) => {
         if (e.target && e.target.id === 'input-content') {
@@ -36370,6 +36405,7 @@
         ensureSubmitInboxReady({ force: true, reason: 'open_capture_settle' });
         syncCaptureOverlayViewport();
       }, 50);
+      revealInputCaret(input);
       if (!opts.skipAutoFocus) {
         const focusDelay = opts.quickFocus ? 80 : 150;
         setTimeout(() => {
@@ -36379,15 +36415,23 @@
             try { input.focus({ preventScroll: true }); } catch (_) {
               try { input.focus(); } catch (__) { }
             }
+            revealInputCaret(input);
           }
         }, focusDelay);
       } else {
         setTimeout(() => {
           ensureSubmitInboxReady({ force: true, reason: 'open_capture_late' });
           syncCaptureOverlayViewport();
+          revealInputCaret(input);
         }, 120);
       }
     }
+    window.addEventListener('pageshow', () => {
+      if (isCaptureOverlayOpen()) revealInputCaret();
+    });
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible' && isCaptureOverlayOpen()) revealInputCaret();
+    });
     function closeCaptureOverlay(opts) {
       opts = opts || {};
       const inputMode = document.getElementById('input-mode');
@@ -49402,10 +49446,10 @@
     }
 
     // 起動を最優先する更新方式。
-    // 原則: 起動時に「キャッシュ削除」も「SW登録解除」も絶対にしない。
-    //       それをやると控えが無い丸裸の状態でリロードすることになり、
-    //       ネットワークが不調なだけでアプリが開けなくなる（閉じるたびに再発する）。
-    // 更新は SW 標準の install → skipWaiting → controllerchange で1回だけリロードする。
+    // 原則: 起動時に「キャッシュ削除」も「SW登録解除」も「自動リロード」もしない。
+    //       自動リロードすると、開いた直後にもう一度スタートアップ画面が出る。
+    // 新しい Service Worker は裏で受け取るだけにし、反映は次に開き直したとき、
+    // またはユーザーが「最新」を押したときに任せる。
     // 万一リロードが連鎖しても、回数ガードで必ず止めて「とにかく起動する」side に倒す。
     const RELOAD_GUARD_KEY = 'dump_reload_guard';
     const RELOAD_GUARD_WINDOW_MS = 60 * 1000;
@@ -49447,29 +49491,11 @@
         location.reload();
       });
 
-      const askSkipWaiting = (worker) => {
-        if (!worker) return;
-        try {
-          sessionStorage.setItem('sw_update_reload', '1');
-          worker.postMessage({ type: 'SKIP_WAITING' });
-        } catch (_) { }
-      };
-
       navigator.serviceWorker
         .register('./service-worker.js', { updateViaCache: 'none' })
         .then((reg) => {
-          if (reg.waiting && navigator.serviceWorker.controller) {
-            askSkipWaiting(reg.waiting);
-          }
-          reg.addEventListener('updatefound', () => {
-            const nw = reg.installing;
-            if (!nw) return;
-            nw.addEventListener('statechange', () => {
-              if (nw.state === 'installed' && navigator.serviceWorker.controller) {
-                askSkipWaiting(nw);
-              }
-            });
-          });
+          // 見つかった更新はその場で適用してリロードしない。
+          // install 側の skipWaiting で制御が替わっても、フラグが無いので画面は再起動しない。
           // 新しいビルドがあれば SW の install が新 index を取り込む。
           // 旧キャッシュは新キャッシュの準備が整うまで消さない（activate 側で保証）。
           const quietUpdate = () => {

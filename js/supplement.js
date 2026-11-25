@@ -173,7 +173,7 @@ function loadSuppleRoutines() {
     if (d) {
       const list = JSON.parse(d);
       if (Array.isArray(list)) {
-        return list.filter((r) => r && r.id && r.name && Array.isArray(r.items));
+        return list.filter(isStoredSuppleRoutine);
       }
     }
   } catch (_) { }
@@ -245,7 +245,7 @@ function parseCloudSuppleSnapshot(row) {
       masters: payload.masters.map(normalizeSuppleMaster).filter((m) => m && m.name),
       intakes: payload.intakes.filter((i) => i && i.id && i.suppleId && i.date),
       routines: Array.isArray(payload.routines)
-        ? payload.routines.filter((r) => r && r.id && r.name && Array.isArray(r.items))
+        ? payload.routines.filter(isStoredSuppleRoutine)
         : [],
       dismissedAutoRoutines: Array.isArray(payload.dismissedAutoRoutines)
         ? Array.from(new Set(payload.dismissedAutoRoutines.map((s) => String(s || '').trim()).filter(Boolean)))
@@ -847,11 +847,6 @@ function buildSuppleAutoRoutines() {
       .filter(Boolean)
   );
   const dismissedSigs = new Set(Array.isArray(suppleDismissedAutoRoutines) ? suppleDismissedAutoRoutines : []);
-  const usedNames = new Set(
-    (Array.isArray(suppleRoutines) ? suppleRoutines : [])
-      .map((r) => String(r && r.name || '').trim())
-      .filter(Boolean)
-  );
 
   const selected = [];
   const timingAcceptedCount = new Map();
@@ -876,26 +871,88 @@ function buildSuppleAutoRoutines() {
     }
   }
 
-  return selected.map((c) => {
-    const baseName = c.timing + 'セット';
-    let name = baseName;
-    if (usedNames.has(name)) {
-      let n = 2;
-      while (usedNames.has(baseName + ' ' + n)) n += 1;
-      name = baseName + ' ' + n;
+  return selected.map((c) => ({
+    id: makeSuppleAutoRoutineId(c.signature),
+    name: '',
+    timing: c.timing,
+    items: c.items,
+    isAuto: true,
+    signature: c.signature,
+    count: c.count,
+    lastDate: c.lastDate
+  }));
+}
+
+function isStoredSuppleRoutine(r) {
+  return !!(r && r.id && Array.isArray(r.items));
+}
+
+function formatSuppleRoutineDateLabel(dateStr) {
+  const raw = String(dateStr || '').trim().slice(0, 10);
+  const match = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return '日付なし';
+  return Number(match[2]) + '月' + Number(match[3]) + '日';
+}
+
+function suppleRoutineDateSource(r) {
+  if (r && /^\d{4}-\d{2}-\d{2}$/.test(String(r.lastDate || ''))) return String(r.lastDate);
+  if (r && r.createdAt) {
+    const d = new Date(r.createdAt);
+    if (Number.isFinite(d.getTime())) {
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return d.getFullYear() + '-' + m + '-' + day;
     }
-    usedNames.add(name);
-    return {
-      id: makeSuppleAutoRoutineId(c.signature),
-      name,
-      timing: c.timing,
-      items: c.items,
-      isAuto: true,
-      signature: c.signature,
-      count: c.count,
-      lastDate: c.lastDate
-    };
+  }
+  return getSuppleTodayStr(0);
+}
+
+function isPlaceholderSuppleRoutineName(name, timing) {
+  const n = String(name || '').trim();
+  const t = String(timing || '').trim();
+  if (!n || !t) return !n;
+  if (n === t + 'セット') return true;
+  const prefix = t + 'セット ';
+  return n.startsWith(prefix) && /^\d+$/.test(n.slice(prefix.length));
+}
+
+function suppleRoutineCustomName(r) {
+  const name = String(r && r.name || '').trim();
+  if (!name || r.isAuto || isPlaceholderSuppleRoutineName(name, r && r.timing)) return '';
+  return name;
+}
+
+function suppleRoutineDisplayName(r) {
+  const custom = suppleRoutineCustomName(r);
+  if (custom) return custom;
+  return formatSuppleRoutineDateLabel(suppleRoutineDateSource(r));
+}
+
+function orderedSuppleRoutines(list) {
+  const rank = { '朝': 0, '昼': 1, '夜': 2, '運動前後': 3, '随時': 4 };
+  return (Array.isArray(list) ? list : []).slice().sort((a, b) => {
+    const ra = Object.prototype.hasOwnProperty.call(rank, a && a.timing) ? rank[a.timing] : 9;
+    const rb = Object.prototype.hasOwnProperty.call(rank, b && b.timing) ? rank[b.timing] : 9;
+    if (ra !== rb) return ra - rb;
+    if (!!a.isAuto !== !!b.isAuto) return a.isAuto ? 1 : -1;
+    return 0;
   });
+}
+
+function suppleRoutineThumbsHtml(items, size) {
+  const px = Math.max(22, parseInt(size, 10) || 36);
+  const html = (Array.isArray(items) ? items : []).map((it) => {
+    const m = suppleMasters.find((x) => x && x.id === it.suppleId);
+    if (!m) return '';
+    const qty = Math.max(1, parseInt(it.qty, 10) || 1);
+    const badge = qty > 1
+      ? '<span class="absolute -bottom-1 -right-1 min-w-[14px] h-[14px] px-0.5 rounded-full bg-cyan-950 border border-cyan-400/70 text-[8px] font-black leading-[12px] text-cyan-50 text-center">' + qty + '</span>'
+      : '';
+    return '<span class="relative inline-flex shrink-0" title="' + escapeHtml(m.name) + '">'
+      + getSupplePhotoThumbHtml(m.photo, px) + badge + '</span>';
+  }).filter(Boolean).join('');
+  if (!html) return '';
+  return '<span class="flex flex-wrap items-center gap-1.5 mt-1.5">' + html + '</span>';
 }
 
 function getAllSuppleRoutines() {
@@ -924,33 +981,39 @@ function restoreSuppleDismissedAutoRoutines() {
 
 function renderSuppleRoutines() {
   const container = document.getElementById('supple-routines-list');
-  const allRoutines = getAllSuppleRoutines();
+  const allRoutines = orderedSuppleRoutines(getAllSuppleRoutines());
   const hasDismissed = hasDismissedSuppleAutoRoutinesInHistory();
   if (container) {
     if (!allRoutines.length) {
       container.innerHTML =
-        '<p class="text-[11px] text-slate-400 font-medium">摂取履歴からよく飲む組み合わせを自動で作成します（手動登録は「＋ 選んで作成」→「⭐ この選択をセット保存」）</p>'
+        '<p class="text-[11px] text-slate-400 font-medium sm:col-span-2">摂取履歴からよく飲む組み合わせを自動で作成します（手動登録は「＋ 選んで作成」→「⭐ この選択をセット保存」）</p>'
         + (hasDismissed
-          ? '<button type="button" onclick="restoreSuppleDismissedAutoRoutines()" class="text-[11px] font-bold text-cyan-300 hover:text-cyan-200 underline">↺ 非表示の自動セットを戻す</button>'
+          ? '<button type="button" onclick="restoreSuppleDismissedAutoRoutines()" class="text-[11px] font-bold text-cyan-300 hover:text-cyan-200 underline sm:col-span-2 text-left">↺ 非表示の自動セットを戻す</button>'
           : '');
     } else {
       const chipsHtml = allRoutines.map((r) => {
+        const label = suppleRoutineDisplayName(r);
+        const isMorning = (r.timing || '') === '朝';
         const names = (r.items || []).map((it) => {
           const m = suppleMasters.find((x) => x.id === it.suppleId);
           return m ? m.name + (it.qty > 1 ? '×' + it.qty : '') : '';
         }).filter(Boolean).join(' / ');
+        const thumbs = suppleRoutineThumbsHtml(r.items, isMorning ? 48 : 34);
         const autoBadge = r.isAuto
           ? `<span class="inline-block ml-1 px-1.5 py-0.2 rounded-md bg-emerald-950/80 border border-emerald-600/45 text-[9px] font-extrabold text-emerald-300 align-middle">自動${r.count >= 2 ? '・' + r.count + '回' : ''}</span>`
           : '';
-        const cardClass = r.isAuto
-          ? 'inline-flex items-center gap-1 rounded-2xl bg-slate-900/85 border border-emerald-700/55 pl-3 pr-1.5 py-1.5 max-w-full'
-          : 'inline-flex items-center gap-1 rounded-2xl bg-slate-900/85 border border-cyan-800/60 pl-3 pr-1.5 py-1.5 max-w-full';
+        const cardClass = isMorning
+          ? 'flex items-start gap-1 rounded-2xl bg-slate-900/85 border border-amber-500/55 pl-3 pr-1.5 py-2 w-full sm:col-span-2'
+          : (r.isAuto
+            ? 'flex items-start gap-1 rounded-2xl bg-slate-900/85 border border-emerald-700/55 pl-3 pr-1.5 py-2 w-full'
+            : 'flex items-start gap-1 rounded-2xl bg-slate-900/85 border border-cyan-800/60 pl-3 pr-1.5 py-2 w-full');
         const delTitle = r.isAuto ? 'この自動セットを非表示にする' : 'セットを削除';
         return `
-      <div class="${cardClass}" data-supple-routine-auto="${r.isAuto ? '1' : '0'}">
-        <button type="button" onclick="runSuppleRoutine('${escapeHtml(r.id)}')" class="text-left min-w-0 active:scale-95 transition">
-          <span class="block text-xs font-extrabold text-cyan-100">⚡ ${escapeHtml(r.name)} <span class="text-[10px] text-emerald-300 font-bold">(${escapeHtml(r.timing || '随時')})</span>${autoBadge}</span>
-          ${names ? `<span class="block text-[9px] text-slate-400 truncate max-w-[200px]">${escapeHtml(names)}</span>` : ''}
+      <div class="${cardClass}" data-supple-routine-auto="${r.isAuto ? '1' : '0'}" data-supple-routine-timing="${escapeHtml(r.timing || '')}">
+        <button type="button" onclick="runSuppleRoutine('${escapeHtml(r.id)}')" class="text-left min-w-0 flex-1 active:scale-[0.99] transition">
+          <span class="block text-xs font-extrabold text-cyan-100">⚡ ${escapeHtml(label)} <span class="text-[10px] text-emerald-300 font-bold">(${escapeHtml(r.timing || '随時')})</span>${autoBadge}</span>
+          ${thumbs}
+          ${names ? `<span class="block text-[9px] text-slate-400 mt-1 leading-snug">${escapeHtml(names)}</span>` : ''}
         </button>
         <button type="button" onclick="deleteSuppleRoutine('${escapeHtml(r.id)}', event)"
           class="w-6 h-6 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-slate-800 text-[11px] shrink-0"
@@ -959,7 +1022,7 @@ function renderSuppleRoutines() {
     `;
       }).join('');
       const restoreHtml = hasDismissed
-        ? '<div class="w-full pt-0.5"><button type="button" onclick="restoreSuppleDismissedAutoRoutines()" class="text-[10px] font-bold text-slate-400 hover:text-cyan-300 underline">↺ 非表示の自動セットを戻す</button></div>'
+        ? '<div class="sm:col-span-2 pt-0.5"><button type="button" onclick="restoreSuppleDismissedAutoRoutines()" class="text-[10px] font-bold text-slate-400 hover:text-cyan-300 underline">↺ 非表示の自動セットを戻す</button></div>'
         : '';
       container.innerHTML = chipsHtml + restoreHtml;
     }
@@ -978,22 +1041,27 @@ function renderSuppleIntakeRoutines() {
     return;
   }
   wrap.classList.remove('hidden');
-  listEl.innerHTML = allRoutines.map((r) => {
+  const ordered = orderedSuppleRoutines(allRoutines);
+  listEl.innerHTML = ordered.map((r) => {
+    const label = suppleRoutineDisplayName(r);
+    const isMorning = (r.timing || '') === '朝';
     const validCount = (r.items || []).filter((it) => suppleMasters.some((m) => m.id === it.suppleId)).length;
     const names = (r.items || []).map((it) => {
       const m = suppleMasters.find((x) => x.id === it.suppleId);
       return m ? m.name + (it.qty > 1 ? '×' + it.qty : '') : '';
     }).filter(Boolean).join(' / ');
+    const thumbs = suppleRoutineThumbsHtml(r.items, isMorning ? 40 : 28);
     const autoBadge = r.isAuto
       ? `<span class="inline-block ml-1 px-1 py-0.2 rounded bg-emerald-950/80 border border-emerald-600/45 text-[9px] font-extrabold text-emerald-300 align-middle">自動</span>`
       : '';
     const delTitle = r.isAuto ? 'この自動セットを非表示にする' : 'セットを削除';
     return `
-      <div class="inline-flex items-center gap-1 rounded-xl bg-amber-950/45 border border-amber-600/50 pl-3 pr-1.5 py-1.5 max-w-full" data-supple-routine-auto="${r.isAuto ? '1' : '0'}">
+      <div class="flex items-start gap-1 rounded-xl bg-amber-950/45 border ${isMorning ? 'border-amber-400/70' : 'border-amber-600/50'} pl-3 pr-1.5 py-2 w-full" data-supple-routine-auto="${r.isAuto ? '1' : '0'}">
         <button type="button" onclick="applySuppleRoutineToIntakePicker('${escapeHtml(r.id)}')"
-          class="text-left min-w-0 text-amber-100 hover:text-white transition active:scale-95">
-          <span class="block text-xs font-extrabold">⚡ ${escapeHtml(r.name)} <span class="text-[10px] text-emerald-300 font-bold">(${escapeHtml(r.timing || '随時')}${validCount ? '・' + validCount + '種' : ''})</span>${autoBadge}</span>
-          ${names ? `<span class="block text-[9px] text-amber-200/75 truncate max-w-[200px]">${escapeHtml(names)}</span>` : ''}
+          class="text-left min-w-0 flex-1 text-amber-100 hover:text-white transition active:scale-[0.99]">
+          <span class="block text-xs font-extrabold">⚡ ${escapeHtml(label)} <span class="text-[10px] text-emerald-300 font-bold">(${escapeHtml(r.timing || '随時')}${validCount ? '・' + validCount + '種' : ''})</span>${autoBadge}</span>
+          ${thumbs}
+          ${names ? `<span class="block text-[9px] text-amber-200/75 mt-1 leading-snug">${escapeHtml(names)}</span>` : ''}
         </button>
         <button type="button" onclick="deleteSuppleRoutine('${escapeHtml(r.id)}', event)"
           class="w-6 h-6 rounded-lg text-amber-300/70 hover:text-rose-400 hover:bg-slate-800/80 text-[11px] shrink-0"
@@ -1030,12 +1098,11 @@ function saveCurrentSuppleRoutine() {
   }
   const timingEl = document.getElementById('supple-input-timing');
   const timing = timingEl ? timingEl.value : '夜';
-  const defaultName = timing + 'セット';
-  const name = prompt('クイックセットの名前を入力してください:', defaultName);
-  if (!name || !name.trim()) return;
+  const nameInput = prompt('クイックセットの名前を入力してください。\n空欄のままOKすると、日付で表示します。', '');
+  if (nameInput === null) return;
   const routine = {
     id: 'routine_' + Date.now(),
-    name: name.trim().slice(0, 40),
+    name: String(nameInput).trim().slice(0, 40),
     timing,
     items: picks.map((p) => ({ suppleId: p.id, qty: p.qty })),
     createdAt: new Date().toISOString()
@@ -1043,7 +1110,7 @@ function saveCurrentSuppleRoutine() {
   suppleRoutines.push(routine);
   saveSuppleRoutines(suppleRoutines);
   renderSuppleRoutines();
-  alert('「' + routine.name + '」をクイックセットに保存しました');
+  alert('「' + suppleRoutineDisplayName(routine) + '」をクイックセットに保存しました');
 }
 
 function runSuppleRoutine(routineId) {
@@ -1060,7 +1127,9 @@ function runSuppleRoutine(routineId) {
     return '・' + (m ? m.name : '不明') + ' × ' + qty;
   }).join('\n');
   const timingLabel = r.timing || '随時';
-  if (!confirm('クイックセット「' + r.name + '」（' + timingLabel + '）を記録しますか？\n\n' + itemLines)) {
+  const label = suppleRoutineDisplayName(r);
+  const customName = suppleRoutineCustomName(r);
+  if (!confirm('クイックセット「' + label + '」（' + timingLabel + '）を記録しますか？\n\n' + itemLines)) {
     return;
   }
   const today = getSuppleTodayStr(0);
@@ -1074,7 +1143,7 @@ function runSuppleRoutine(routineId) {
       suppleId: it.suppleId,
       qty,
       timing: r.timing || '随時',
-      note: '⚡ ' + r.name,
+      note: customName ? '⚡ ' + customName : '',
       createdAt: new Date().toISOString()
     });
     if (adjustSuppleStock(it.suppleId, -qty)) stockUpdated = true;
@@ -1082,22 +1151,23 @@ function runSuppleRoutine(routineId) {
   if (stockUpdated) saveSuppleMasters(suppleMasters, { queueCloud: false });
   saveSuppleIntakes(suppleIntakes);
   renderSuppleAll();
-  setSuppleSyncStatus('⚡ 「' + r.name + '」を記録しました（' + validItems.length + '種）', 'ok');
+  setSuppleSyncStatus('⚡ 「' + label + '」を記録しました（' + validItems.length + '種）', 'ok');
 }
 
 function deleteSuppleRoutine(routineId, ev) {
   if (ev) ev.stopPropagation();
   const r = findSuppleRoutineById(routineId);
   if (!r) return;
+  const label = suppleRoutineDisplayName(r);
   if (r.isAuto) {
-    if (!confirm('自動作成されたクイックセット「' + r.name + '」を非表示にしますか？')) return;
+    if (!confirm('自動作成されたクイックセット「' + label + '」を非表示にしますか？')) return;
     if (r.signature && !suppleDismissedAutoRoutines.includes(r.signature)) {
       saveSuppleDismissedAutoRoutines(suppleDismissedAutoRoutines.concat([r.signature]));
     }
     renderSuppleRoutines();
     return;
   }
-  if (!confirm('クイックセット「' + r.name + '」を削除しますか？')) return;
+  if (!confirm('クイックセット「' + label + '」を削除しますか？')) return;
   suppleRoutines = suppleRoutines.filter((item) => item.id !== routineId);
   saveSuppleRoutines(suppleRoutines);
   renderSuppleRoutines();

@@ -91,7 +91,7 @@
     }
   </style>
   <script>
-    window.__DUMP_BUILD__ = 'v456';
+    window.__DUMP_BUILD__ = 'v457';
     // かつてここで「既知の最新ビルドより古い＝巻き戻り」と判定し、キャッシュ全消し＋SW登録解除を
     // していたが、その直後はオフライン用の控えが無く、ネットワークが不調だと起動不能になった。
     // 判定値(dump_known_good_build)は下がらない一方通行のため、一度ずれると毎回自己破壊を繰り返す。
@@ -6678,6 +6678,21 @@
         if (savedStyle) currentSplashStyle = savedStyle;
       } catch (e) { }
 
+      // 起動直後の自動リロードでスタートアップ画面が二度出るのを防ぐ。
+      // 手動の再起動（「最新」）は dump_force_splash を立ててからリロードする。
+      var skipRepeatSplash = false;
+      try {
+        var forceSplash = sessionStorage.getItem('dump_force_splash') === '1';
+        if (forceSplash) sessionStorage.removeItem('dump_force_splash');
+        var navEntry = (performance.getEntriesByType && performance.getEntriesByType('navigation') || [])[0];
+        var reloaded = !!(navEntry && navEntry.type === 'reload');
+        if (!reloaded && performance.navigation && performance.navigation.type === 1) reloaded = true;
+        var prevSplashAt = parseInt(sessionStorage.getItem('dump_splash_at') || '0', 10) || 0;
+        if (!forceSplash && reloaded && prevSplashAt && (Date.now() - prevSplashAt) < 15000) {
+          skipRepeatSplash = true;
+        }
+      } catch (e) { }
+
       var splashTimer = null;
       var hardRemoved = false;
       var readyToDismiss = false;
@@ -6770,8 +6785,8 @@
         afterSplashQueue.push(fn);
       };
 
-      // 即時起動の場合は即座に非表示、それ以外は暗闇から演出を展開
-      if (currentSplashStyle === 'instant') {
+      // 即時起動・起動直後の再表示は即座に非表示。それ以外は暗闇から演出を展開
+      if (currentSplashStyle === 'instant' || skipRepeatSplash) {
         document.documentElement.classList.add('boot-surface-ready', 'ui-ready');
         if (s0) {
           s0.style.display = 'none';
@@ -6779,6 +6794,7 @@
         }
         flushAfterBootSplash();
       } else if (s0) {
+        try { sessionStorage.setItem('dump_splash_at', String(Date.now())); } catch (e) { }
         window.__renderSplashContent(s0, currentSplashStyle);
       }
 
@@ -8323,7 +8339,7 @@
                 ＋ 選んで作成
               </button>
             </div>
-            <div id="supple-routines-list" class="flex flex-wrap gap-2"></div>
+            <div id="supple-routines-list" class="grid grid-cols-1 sm:grid-cols-2 gap-2"></div>
           </section>
 
           <!-- 登録サプリ・在庫一覧（折りたたみ） -->
@@ -13030,7 +13046,7 @@
             <label class="text-xs font-bold text-amber-200">⚡ セットから選択</label>
             <span class="text-[10px] text-slate-400 font-bold">タップで一括選択</span>
           </div>
-          <div id="supple-intake-routines-list" class="flex flex-wrap gap-1.5"></div>
+          <div id="supple-intake-routines-list" class="grid grid-cols-1 gap-1.5"></div>
         </div>
 
         <!-- 2. サプリ選択（複数・個数・削除） -->

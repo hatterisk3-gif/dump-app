@@ -35116,9 +35116,7 @@
         });
       });
       el.querySelectorAll('.dump-content-image-copy-btn').forEach((btn) => {
-        btn.addEventListener('click', (e) => {
-          e.preventDefault();
-          e.stopPropagation();
+        bindInputHistoryActionButton(btn, () => {
           const imgUrl = btn.getAttribute('data-image-url') || '';
           if (imgUrl && typeof copySingleDumpImageUrl === 'function') {
             copySingleDumpImageUrl(imgUrl, btn);
@@ -37735,6 +37733,8 @@
     function bindInputHistoryActionButton(btn, handler) {
       if (!btn || typeof handler !== 'function') return;
       let activePointer = null;
+      let startX = 0;
+      let startY = 0;
       const clearPressed = () => {
         activePointer = null;
         btn.classList.remove('is-pressed');
@@ -37745,16 +37745,26 @@
         e.preventDefault();
         e.stopPropagation();
         activePointer = e.pointerId;
+        startX = e.clientX;
+        startY = e.clientY;
         btn.classList.add('is-pressed');
+        // 写真の読み込みでボタンが動いても pointerup を受け取れるようにする
+        try { btn.setPointerCapture(e.pointerId); } catch (_) { }
       });
       btn.addEventListener('pointerup', (e) => {
         if (activePointer == null || e.pointerId !== activePointer) return;
+        const moved = Math.hypot(e.clientX - startX, e.clientY - startY) > 14;
         clearPressed();
         e.preventDefault();
         e.stopPropagation();
+        try { btn.releasePointerCapture(e.pointerId); } catch (_) { }
+        if (moved) return;
         try { handler(e); } catch (err) { console.warn('history action failed', err); }
       });
-      btn.addEventListener('pointercancel', clearPressed);
+      btn.addEventListener('pointercancel', (e) => {
+        clearPressed();
+        try { btn.releasePointerCapture(e.pointerId); } catch (_) { }
+      });
       // 二重発火防止。キーボード非表示時のフォールバックは pointerup で足りる
       btn.addEventListener('click', (e) => {
         e.preventDefault();
@@ -46525,9 +46535,35 @@
       }
     }
 
+    function syncDumpCopyChooserViewport() {
+      const overlay = document.getElementById('dump-copy-chooser');
+      if (!overlay) return;
+      const vv = window.visualViewport;
+      if (!vv) {
+        overlay.style.top = '0px';
+        overlay.style.left = '0px';
+        overlay.style.width = '100%';
+        overlay.style.height = '100%';
+        overlay.style.right = 'auto';
+        overlay.style.bottom = 'auto';
+        return;
+      }
+      // キーボードで隠れているレイアウト下端ではなく、今見えている範囲の下に出す
+      overlay.style.top = Math.round(vv.offsetTop) + 'px';
+      overlay.style.left = Math.round(vv.offsetLeft) + 'px';
+      overlay.style.width = Math.round(vv.width) + 'px';
+      overlay.style.height = Math.round(vv.height) + 'px';
+      overlay.style.right = 'auto';
+      overlay.style.bottom = 'auto';
+    }
+
     function closeDumpCopyChooser() {
       const el = document.getElementById('dump-copy-chooser');
-      if (el) el.remove();
+      if (!el) return;
+      if (typeof el._dumpCopyChooserCleanup === 'function') {
+        try { el._dumpCopyChooserCleanup(); } catch (_) { }
+      }
+      el.remove();
     }
 
     /** 文字＋写真メモ / 写真複数枚メモ: 何をコピーするか選んでもらう */
@@ -46541,10 +46577,23 @@
 
       const overlay = document.createElement('div');
       overlay.id = 'dump-copy-chooser';
-      overlay.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(2,4,10,0.72);display:flex;align-items:flex-end;justify-content:center;padding:16px;padding-bottom:calc(16px + env(safe-area-inset-bottom,0px));';
+      overlay.style.cssText = 'position:fixed;z-index:100000;background:rgba(2,4,10,0.72);display:flex;align-items:flex-end;justify-content:center;padding:12px;padding-bottom:calc(12px + env(safe-area-inset-bottom,0px));box-sizing:border-box;';
       overlay.addEventListener('click', (e) => {
         if (e.target === overlay) closeDumpCopyChooser();
       });
+      const onViewport = () => syncDumpCopyChooserViewport();
+      if (window.visualViewport) {
+        window.visualViewport.addEventListener('resize', onViewport);
+        window.visualViewport.addEventListener('scroll', onViewport);
+      }
+      window.addEventListener('resize', onViewport);
+      overlay._dumpCopyChooserCleanup = () => {
+        if (window.visualViewport) {
+          window.visualViewport.removeEventListener('resize', onViewport);
+          window.visualViewport.removeEventListener('scroll', onViewport);
+        }
+        window.removeEventListener('resize', onViewport);
+      };
 
       const sheet = document.createElement('div');
       sheet.style.cssText = 'width:100%;max-width:420px;max-height:85vh;overflow-y:auto;background:#0b1021;border:1px solid rgba(34,211,238,0.35);border-radius:18px;padding:14px;box-shadow:0 0 28px rgba(34,211,238,0.18);';
@@ -46638,6 +46687,8 @@
       sheet.appendChild(cancel);
       overlay.appendChild(sheet);
       document.body.appendChild(overlay);
+      syncDumpCopyChooserViewport();
+      requestAnimationFrame(syncDumpCopyChooserViewport);
     }
 
     async function copyTextToClipboard(text, btn) {

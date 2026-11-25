@@ -41239,9 +41239,9 @@
           if (res && res.success) {
             setGanttSyncStatus('📅 Googleカレンダーに反映しました', 'text-sky-400 font-bold');
             setTimeout(() => setGanttSyncStatus(''), 2500);
-          } else if (res && res.error) {
-            setGanttSyncStatus('カレンダー同期失敗: ' + res.error, 'text-amber-400 font-bold');
-            setTimeout(() => setGanttSyncStatus(''), 3500);
+          } else {
+            setGanttSyncStatus('カレンダー同期失敗: ' + formatGanttGCalError(res), 'text-amber-400 font-bold');
+            setTimeout(() => setGanttSyncStatus(''), 5000);
           }
         });
       }
@@ -41287,6 +41287,15 @@
       } catch (_) { }
     }
 
+    function formatGanttGCalError(err) {
+      const raw = err == null ? '' : String(err.message || err.error || err);
+      if (!raw) return 'カレンダー同期に失敗しました';
+      if (/permission|Required permissions|Authorization|権限が未許可|authorizeGanttCalendar/i.test(raw)) {
+        return 'カレンダー権限が未許可です。GASで authorizeGanttCalendar を実行して許可してください';
+      }
+      return raw.length > 120 ? raw.slice(0, 120) + '…' : raw;
+    }
+
     async function syncTaskToGCal(task) {
       if (!task || !task.title) return null;
       try {
@@ -41294,7 +41303,7 @@
         if (res && res.success && res.googleEventId) {
           task.googleEventId = res.googleEventId;
           ganttTasks = ganttTasks.map((t) => t.id === task.id ? { ...t, googleEventId: res.googleEventId } : t);
-          saveGanttCache(ganttTasks, { queueCloud: true });
+          saveGanttCache(ganttTasks, { rawCloud: true });
           renderGanttTaskList();
         }
         return res;
@@ -41324,25 +41333,35 @@
       if (btn) btn.disabled = true;
       try {
         const res = await callAPI('syncAllGanttToCalendar', { tasks: ganttTasks }, { silent: true });
-        if (res && res.success && Array.isArray(res.results)) {
-          const map = {};
-          res.results.forEach((r) => {
-            if (r && r.id && r.googleEventId) map[r.id] = r.googleEventId;
-          });
+        const results = (res && Array.isArray(res.results)) ? res.results : [];
+        const map = {};
+        let okCount = 0;
+        results.forEach((r) => {
+          if (r && r.id && r.success && r.googleEventId) {
+            map[r.id] = r.googleEventId;
+            okCount++;
+          }
+        });
+        if (okCount > 0) {
           ganttTasks = ganttTasks.map((t) => {
             if (map[t.id]) return { ...t, googleEventId: map[t.id] };
             return t;
           });
-          saveGanttCache(ganttTasks, { queueCloud: true });
+          saveGanttCache(ganttTasks, { rawCloud: true });
           renderGanttTaskList();
-          setGanttSyncStatus(`📅 Googleカレンダーに同期しました（${res.results.length}件）`, 'text-emerald-400 font-bold');
+        }
+        const failCount = typeof res?.fail === 'number'
+          ? res.fail
+          : Math.max(0, results.length - okCount);
+        if (okCount > 0 && failCount === 0) {
+          setGanttSyncStatus(`📅 Googleカレンダーに同期しました（${okCount}件）`, 'text-emerald-400 font-bold');
           setTimeout(() => setGanttSyncStatus(''), 3000);
-        } else if (res && res.error) {
-          setGanttSyncStatus('カレンダー同期エラー: ' + res.error, 'text-rose-400 font-bold');
-          setTimeout(() => setGanttSyncStatus(''), 4000);
+        } else if (okCount > 0) {
+          setGanttSyncStatus(`📅 一部同期（成功${okCount} / 失敗${failCount}）`, 'text-amber-400 font-bold');
+          setTimeout(() => setGanttSyncStatus(''), 4500);
         } else {
-          setGanttSyncStatus('カレンダー同期に失敗しました', 'text-rose-400 font-bold');
-          setTimeout(() => setGanttSyncStatus(''), 3000);
+          setGanttSyncStatus('カレンダー同期エラー: ' + formatGanttGCalError(res && (res.error || results[0])), 'text-rose-400 font-bold');
+          setTimeout(() => setGanttSyncStatus(''), 6000);
         }
       } catch (err) {
         setGanttSyncStatus('カレンダー同期通信エラー', 'text-rose-400 font-bold');

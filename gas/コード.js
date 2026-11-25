@@ -1230,7 +1230,22 @@ function moveDataRecords(items) {
 
 /**
  * ===== ガント × Googleカレンダー連携 =====
+ * 初回のみ: エディタで authorizeGanttCalendar を実行し、カレンダー権限を許可する。
  */
+function authorizeGanttCalendar() {
+  const cal = CalendarApp.getDefaultCalendar();
+  const name = cal ? cal.getName() : '';
+  return { success: !!cal, calendar: name };
+}
+
+function formatGanttCalendarError_(err) {
+  const msg = err ? String(err.message || err) : 'unknown';
+  if (/does not have permission|Required permissions|Authorization is required|認可|権限/i.test(msg)) {
+    return 'カレンダー権限が未許可です。Apps Script で authorizeGanttCalendar を実行して許可してください';
+  }
+  return msg;
+}
+
 function parseGanttDateForCalendar_(str, addDays) {
   if (!str) return new Date();
   const parts = String(str).split('-');
@@ -1275,7 +1290,7 @@ function syncGanttCalendarEvent(task) {
       return { success: true, googleEventId: created.getId(), created: true };
     }
   } catch (err) {
-    return { success: false, error: err.toString() };
+    return { success: false, error: formatGanttCalendarError_(err) };
   }
 }
 
@@ -1290,26 +1305,41 @@ function deleteGanttCalendarEvent(googleEventId) {
     }
     return { success: true };
   } catch (err) {
-    return { success: false, error: err.toString() };
+    return { success: false, error: formatGanttCalendarError_(err) };
   }
 }
 
 function syncAllGanttToCalendar(tasks) {
   const list = Array.isArray(tasks) ? tasks : [];
   const results = [];
+  let ok = 0;
+  let fail = 0;
+  let firstError = '';
   for (let i = 0; i < list.length; i++) {
     const t = list[i];
     if (t && t.title) {
       const res = syncGanttCalendarEvent(t);
+      const succeeded = !!(res && res.success && res.googleEventId);
+      if (succeeded) ok++;
+      else {
+        fail++;
+        if (!firstError && res && res.error) firstError = String(res.error);
+      }
       results.push({
         id: t.id,
-        success: !!(res && res.success),
-        googleEventId: res && res.googleEventId ? res.googleEventId : (t.googleEventId || ''),
+        success: succeeded,
+        googleEventId: succeeded ? res.googleEventId : '',
         error: res && res.error
       });
     }
   }
-  return { success: true, results: results };
+  return {
+    success: fail === 0 && ok > 0,
+    ok: ok,
+    fail: fail,
+    error: fail ? (firstError || 'カレンダー同期に失敗しました') : undefined,
+    results: results
+  };
 }
 
 function cleanJanProductName_(raw) {

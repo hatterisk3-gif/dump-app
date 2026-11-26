@@ -21374,12 +21374,28 @@
             '水気：内省・柔軟に流れを読む日'
           ];
           const guide = elemThemes[stemElemIdx] || '';
-          const insightText = guide
+          let quote = '';
+          try {
+            const rawPrev = localStorage.getItem('dump_daily_fortune_insight');
+            if (rawPrev) {
+              const prev = JSON.parse(rawPrev);
+              if (prev && prev.date === todayIso) {
+                if (typeof prev.quote === 'string' && prev.quote.trim()) quote = prev.quote.trim();
+                else if (typeof prev.text === 'string' && prev.text.trim() && !/^今日の干支：/.test(prev.text.trim())) {
+                  quote = prev.text.trim();
+                }
+              }
+            }
+          } catch (_) { }
+          const kanshiLine = guide
             ? `今日の干支：${dayPillar.ganzi}（${guide}）`
             : `今日の干支：${dayPillar.ganzi}`;
           localStorage.setItem('dump_daily_fortune_insight', JSON.stringify({
             date: todayIso,
-            text: insightText
+            kanshi: dayPillar.ganzi,
+            guide,
+            quote,
+            text: quote ? `${kanshiLine} / ${quote}` : kanshiLine
           }));
         }
       } catch (_) { }
@@ -26532,7 +26548,7 @@
       { id: 'terminal-boot', name: 'ターミナル起動', icon: '💻', desc: '高速にシステムチェックログが流れるCUIハッカースタイル', duration: 1600 },
       { id: 'ripple-warp', name: 'ワープ波紋', icon: '🌊', desc: '中央から光の衝撃波リングが幾重にも広がる演出', duration: 1300 },
       { id: 'zoom-through', name: 'シームレス・ズーム', icon: '🚀', desc: 'ロゴがカメラ手前へ一気に突き抜け空間に突入する3D感', duration: 1500 },
-      { id: 'daily-insight', name: '道標・一言インサイト', icon: '⛩️', desc: '「今日の一言」が静かに浮かび上がり思考を整える', duration: 1800 },
+      { id: 'daily-insight', name: '道標・一言インサイト', icon: '⛩️', desc: '今日の干支と一言が静かに浮かび上がり思考を整える', duration: 1800 },
       { id: 'minimal-bar', name: 'ミニマル・レーザー', icon: '📏', desc: '極細のレーザープログレスバーが滑らかに走る洗練演出', duration: 1100 },
       { id: 'instant', name: '即時起動（演出なし）', icon: '⚡', desc: 'スプラッシュを待たずミリ秒でメモ画面に直行する最速仕様', duration: 0 }
     ];

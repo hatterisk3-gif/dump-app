@@ -91,7 +91,7 @@
     }
   </style>
   <script>
-    window.__DUMP_BUILD__ = 'v459';
+    window.__DUMP_BUILD__ = 'v460';
     // かつてここで「既知の最新ビルドより古い＝巻き戻り」と判定し、キャッシュ全消し＋SW登録解除を
     // していたが、その直後はオフライン用の控えが無く、ネットワークが不調だと起動不能になった。
     // 判定値(dump_known_good_build)は下がらない一方通行のため、一度ずれると毎回自己破壊を繰り返す。
@@ -2653,6 +2653,31 @@
       background: rgba(245, 158, 11, 0.12);
       border: 1px solid rgba(245, 158, 11, 0.3);
       margin-bottom: 16px;
+    }
+
+    .splash-insight-kanshi {
+      margin: 0 auto 14px;
+      padding: 10px 14px;
+      border-radius: 14px;
+      background: rgba(14, 165, 233, 0.1);
+      border: 1px solid rgba(56, 189, 248, 0.28);
+    }
+
+    .splash-insight-kanshi-label {
+      display: block;
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: 0.22em;
+      color: rgba(125, 211, 252, 0.85);
+      margin-bottom: 4px;
+    }
+
+    .splash-insight-kanshi-text {
+      font-size: 15px;
+      font-weight: 800;
+      line-height: 1.45;
+      color: #e0f2fe;
+      letter-spacing: 0.04em;
     }
 
     .splash-insight-quote {
@@ -6707,7 +6732,7 @@
         'terminal-boot': 980,
         'ripple-warp': 780,
         'zoom-through': 900,
-        'daily-insight': 1100,
+        'daily-insight': 1500,
         'minimal-bar': 640,
         'instant': 0
       };
@@ -6720,6 +6745,99 @@
         '完璧を捨て、まずダンプする。',
         '頭の中の混沌は、アイデアの原石。'
       ];
+      var kanshiElemThemes = [
+        '木気：芽吹き・アイデアを伸ばす日',
+        '火気：直感・熱量を言葉にする日',
+        '土気：整理・思考の輪郭を固める日',
+        '金気：決断・余分を削ぎ落とす日',
+        '水気：内省・柔軟に流れを読む日'
+      ];
+
+      function splashEscapeHtml(s) {
+        return String(s)
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#39;');
+      }
+
+      function splashTodayIso() {
+        var nowD = new Date();
+        return nowD.getFullYear() + '-' + String(nowD.getMonth() + 1).padStart(2, '0') + '-' + String(nowD.getDate()).padStart(2, '0');
+      }
+
+      // 日柱のみ（1900-01-01=甲戌）。スプラッシュ時点では app.js 未読込のため軽量実装
+      function splashTodayDayKanshi() {
+        try {
+          var stems = '甲乙丙丁戊己庚辛壬癸';
+          var branches = '子丑寅卯辰巳午未申酉戌亥';
+          var now = new Date();
+          var base = Date.UTC(1900, 0, 1);
+          var target = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
+          var diffDays = Math.round((target - base) / 86400000);
+          var idx = ((10 + diffDays) % 60 + 60) % 60;
+          var stem = idx % 10;
+          var branch = idx % 12;
+          return {
+            ganzi: stems.charAt(stem) + branches.charAt(branch),
+            stem: stem,
+            guide: kanshiElemThemes[Math.floor(stem / 2)] || ''
+          };
+        } catch (_) {
+          return null;
+        }
+      }
+
+      function splashReadDailyInsightPack() {
+        var todayIso = splashTodayIso();
+        var pack = { date: todayIso, kanshi: '', guide: '', quote: '' };
+        try {
+          var rawInsight = localStorage.getItem('dump_daily_fortune_insight');
+          if (rawInsight) {
+            var parsed = JSON.parse(rawInsight);
+            if (parsed && parsed.date === todayIso) {
+              if (typeof parsed.kanshi === 'string' && parsed.kanshi.trim()) pack.kanshi = parsed.kanshi.trim();
+              if (typeof parsed.guide === 'string' && parsed.guide.trim()) pack.guide = parsed.guide.trim();
+              if (typeof parsed.quote === 'string' && parsed.quote.trim()) pack.quote = parsed.quote.trim();
+              // 旧形式: text に干支文か一言のどちらかが入っている
+              if (!pack.kanshi && !pack.quote && typeof parsed.text === 'string' && parsed.text.trim()) {
+                var legacy = parsed.text.trim();
+                var m = legacy.match(/^今日の干支：([^\s（(]+)(?:[（(](.+?)[）)])?/);
+                if (m) {
+                  pack.kanshi = m[1];
+                  pack.guide = (m[2] || '').trim();
+                } else {
+                  pack.quote = legacy;
+                }
+              }
+            }
+          }
+        } catch (_) { }
+        if (!pack.kanshi) {
+          var computed = splashTodayDayKanshi();
+          if (computed && computed.ganzi) {
+            pack.kanshi = computed.ganzi;
+            if (!pack.guide) pack.guide = computed.guide || '';
+          }
+        }
+        if (!pack.quote) {
+          pack.quote = quoteList[Math.floor(Math.random() * quoteList.length)];
+        }
+        try {
+          localStorage.setItem('dump_daily_fortune_insight', JSON.stringify({
+            date: pack.date,
+            kanshi: pack.kanshi,
+            guide: pack.guide,
+            quote: pack.quote,
+            // 互換: 古い読取側向けに結合テキストも残す
+            text: pack.kanshi
+              ? ('今日の干支：' + pack.kanshi + (pack.guide ? '（' + pack.guide + '）' : '') + ' / ' + pack.quote)
+              : pack.quote
+          }));
+        } catch (_) { }
+        return pack;
+      }
 
       window.__renderSplashContent = function (target, style) {
         if (!target) return;
@@ -6733,25 +6851,13 @@
         } else if (style === 'zoom-through') {
           target.innerHTML = '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;"><div class="splash-zoom-logo">DUMP</div><div style="margin-top:16px;font-size:11px;font-weight:800;letter-spacing:0.25em;color:rgba(34,211,238,0.7);font-family:ui-monospace,monospace;">' + b + '</div></div>';
         } else if (style === 'daily-insight') {
-          var q = quoteList[Math.floor(Math.random() * quoteList.length)];
-          try {
-            var rawInsight = localStorage.getItem('dump_daily_fortune_insight');
-            if (rawInsight) {
-              var parsedInsight = JSON.parse(rawInsight);
-              var nowD = new Date();
-              var todayIso = nowD.getFullYear() + '-' + String(nowD.getMonth() + 1).padStart(2, '0') + '-' + String(nowD.getDate()).padStart(2, '0');
-              if (parsedInsight && parsedInsight.date === todayIso && typeof parsedInsight.text === 'string' && parsedInsight.text.trim()) {
-                q = parsedInsight.text.trim();
-              }
-            }
-          } catch (_) { }
-          var safeQ = String(q)
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;')
-            .replace(/'/g, '&#39;');
-          target.innerHTML = '<div class="splash-fade-in splash-insight-box"><div class="splash-insight-badge">◇ 本日の道標</div><div class="splash-insight-quote">' + safeQ + '</div><div class="splash-insight-brand">DUMP · ' + b + '</div></div>';
+          var pack = splashReadDailyInsightPack();
+          var kanshiHtml = '';
+          if (pack.kanshi) {
+            var kanshiLine = pack.kanshi + (pack.guide ? '（' + pack.guide + '）' : '');
+            kanshiHtml = '<div class="splash-insight-kanshi"><span class="splash-insight-kanshi-label">今日の干支</span><div class="splash-insight-kanshi-text">' + splashEscapeHtml(kanshiLine) + '</div></div>';
+          }
+          target.innerHTML = '<div class="splash-fade-in splash-insight-box"><div class="splash-insight-badge">◇ 本日の道標</div>' + kanshiHtml + '<div class="splash-insight-quote">' + splashEscapeHtml(pack.quote) + '</div><div class="splash-insight-brand">DUMP · ' + b + '</div></div>';
         } else if (style === 'minimal-bar') {
           target.innerHTML = '<div class="splash-fade-in splash-minimal-wrap"><div class="splash-minimal-logo">DUMP</div><div class="splash-minimal-progress-track"><div class="splash-minimal-progress-bar"></div></div><div style="margin-top:14px;font-size:10px;font-weight:800;letter-spacing:0.15em;color:rgba(255,255,255,0.4);font-family:ui-monospace,monospace;">' + b + '</div></div>';
         } else if (style === 'instant') {
@@ -6785,14 +6891,10 @@
         afterSplashQueue.push(fn);
       };
 
-      // 即時起動・起動直後の再表示は即座に非表示。それ以外は暗闇から演出を展開
+      // 即時起動／再表示スキップでも黒カバーは残し、レイアウト準備後に消す
+      // （早めに外すと Tailwind 未適用の生HTMLが一瞬見えて画面が乱れる）
       if (currentSplashStyle === 'instant' || skipRepeatSplash) {
-        document.documentElement.classList.add('boot-surface-ready', 'ui-ready');
-        if (s0) {
-          s0.style.display = 'none';
-          hardRemoved = true;
-        }
-        flushAfterBootSplash();
+        if (s0) s0.innerHTML = '';
       } else if (s0) {
         try { sessionStorage.setItem('dump_splash_at', String(Date.now())); } catch (e) { }
         window.__renderSplashContent(s0, currentSplashStyle);
@@ -6858,6 +6960,11 @@
 
       function revealBootSurface() {
         if (hardRemoved) return;
+        // 即時起動・再表示スキップはフェードせず、準備完了後に真っ黒から直行
+        if (currentSplashStyle === 'instant' || skipRepeatSplash) {
+          removeSplashNow();
+          return;
+        }
         smoothFadeSplash();
       }
 

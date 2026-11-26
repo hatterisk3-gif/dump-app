@@ -7898,6 +7898,7 @@
     const PROFILE_BIRTH_STORE_KEY = 'profile_birth_profiles';
     const PROFILE_BIRTH_ACTIVE_KEY = 'profile_birth_active_id';
     const PROFILE_BIRTH_UPDATED_AT_KEY = 'profile_birth_updated_at';
+    const FORTUNE_ACTIVE_CLEARED_KEY = 'fortune_active_profile_cleared';
     const PROFILE_BIRTH_SYNC_FOLDER = '__SYSTEM__';
     const PROFILE_BIRTH_SYNC_FILE = 'profile_birth_profiles';
     let profileBirthSyncTimer = null;
@@ -8011,18 +8012,32 @@
           saveProfileBirthList(merged, cloud.activeId, { touch: false });
           localStorage.setItem(PROFILE_BIRTH_UPDATED_AT_KEY, new Date().toISOString());
           await publishProfileBirthSnapshot();
+          if (!isFortuneProfileFormOpen()) {
+            const cloudActive = merged.find((p) => p.id === cloud.activeId && (p.name || '').trim() && p.date);
+            if (cloudActive) localStorage.removeItem(FORTUNE_ACTIVE_CLEARED_KEY);
+            hydrateFortuneActiveInputFromSaved({ syncUI: true });
+          }
           fillProfileBirthForm(getProfileBirth());
           refreshProfileBirthSelects();
           updateProfileBirthStatus();
           syncProfileBirthToFortunePanels(true);
+          const fModal = document.getElementById('fortune-profile-modal');
+          if (fModal && !fModal.classList.contains('hidden')) renderFortuneProfileHistoryList();
           setProfileBirthSyncStatus(additions.length ? '端末内の人物を統合して同期しました' : '端末間で同期済み');
         } else if (cloud && (!Number.isFinite(localUpdatedAt) || cloud.updatedAt > localUpdatedAt)) {
           saveProfileBirthList(cloud.profiles, cloud.activeId, { touch: false });
           localStorage.setItem(PROFILE_BIRTH_UPDATED_AT_KEY, cloud.updatedAtIso);
+          if (!isFortuneProfileFormOpen()) {
+            const cloudActive = cloud.profiles.find((p) => p.id === cloud.activeId && (p.name || '').trim() && p.date);
+            if (cloudActive) localStorage.removeItem(FORTUNE_ACTIVE_CLEARED_KEY);
+            hydrateFortuneActiveInputFromSaved({ syncUI: true });
+          }
           fillProfileBirthForm(getProfileBirth());
           refreshProfileBirthSelects();
           updateProfileBirthStatus();
           syncProfileBirthToFortunePanels(true);
+          const fModal = document.getElementById('fortune-profile-modal');
+          if (fModal && !fModal.classList.contains('hidden')) renderFortuneProfileHistoryList();
           setProfileBirthSyncStatus('他端末の最新設定を反映しました');
         } else if (!cloud || localUpdatedAt > cloud.updatedAt) {
           await publishProfileBirthSnapshot();
@@ -8138,7 +8153,7 @@
 
     // ===== ミチシルベ：スライダー＆名前管理 =====
     const fortuneActiveInput = {
-      name: '',             // 起動時は基本的に名前空白（キャッシュしない）
+      name: '',             // 起動時は保存済みの選択プロファイルを復元
       year: 1995,
       month: 1,
       day: 1,
@@ -8417,6 +8432,39 @@
         fortuneActiveInput.minute = 0;
         fortuneActiveInput.unknownTime = true;
       }
+    }
+
+    function hydrateFortuneActiveInputFromSaved(opts) {
+      if (isFortuneProfileFormOpen()) return false;
+      const syncUI = !opts || opts.syncUI !== false;
+      const cleared = localStorage.getItem(FORTUNE_ACTIVE_CLEARED_KEY) === '1';
+      const list = loadProfileBirthList();
+      const activeId = getActiveProfileBirthId();
+      const target = !cleared
+        ? list.find((p) => p.id === activeId && (p.name || '').trim() && p.date)
+        : null;
+      if (target) {
+        fortuneActiveInput.name = target.name || '';
+        fortuneActiveInput.profileId = target.id;
+        applyProfileToFortuneWheels(target);
+      } else {
+        fortuneActiveInput.name = '';
+        fortuneActiveInput.year = 1995;
+        fortuneActiveInput.month = 1;
+        fortuneActiveInput.day = 1;
+        fortuneActiveInput.hour = 12;
+        fortuneActiveInput.minute = 0;
+        fortuneActiveInput.unknownTime = false;
+        fortuneActiveInput.gender = 'male';
+        fortuneActiveInput.profileId = null;
+      }
+      rememberAppliedFortuneInput();
+      if (syncUI) {
+        syncFortuneSliderUI();
+        updateFortuneNameDisplay();
+        updateFortuneActiveBirthSync();
+      }
+      return Boolean(target);
     }
 
     function isFortuneProfileFormOpen() {
@@ -8706,11 +8754,14 @@
         fortuneEditingProfileId = null;
         setFortuneProfileFormMode('create');
         if (wasApplied) {
+          localStorage.removeItem(FORTUNE_ACTIVE_CLEARED_KEY);
           fortuneActiveInput.name = name;
           fortuneActiveInput.profileId = editingId;
           rememberAppliedFortuneInput();
+          fillProfileBirthForm(entry);
           updateFortuneNameDisplay();
           updateFortuneActiveBirthSync();
+          updateProfileBirthStatus();
         } else {
           restoreAppliedFortuneInput();
         }
@@ -8741,11 +8792,14 @@
       }
 
       saveProfileBirthList(nextList, targetId);
+      localStorage.removeItem(FORTUNE_ACTIVE_CLEARED_KEY);
       fortuneActiveInput.name = name;
       fortuneActiveInput.profileId = targetId;
       rememberAppliedFortuneInput();
+      fillProfileBirthForm(entry);
       updateFortuneNameDisplay();
       updateFortuneActiveBirthSync();
+      updateProfileBirthStatus();
       // 登録完了後はモーダルを閉じず、前の「登録済みの履歴から選択」画面に戻る
       renderFortuneProfileHistoryList();
       setFortuneProfileModalView('history');
@@ -8755,11 +8809,13 @@
     }
 
     function clearFortuneActiveName() {
+      localStorage.setItem(FORTUNE_ACTIVE_CLEARED_KEY, '1');
       fortuneActiveInput.name = '';
       fortuneActiveInput.profileId = null;
       rememberAppliedFortuneInput();
       updateFortuneNameDisplay();
       updateFortuneActiveBirthSync();
+      updateProfileBirthStatus();
       closeFortuneProfileModal();
       if (typeof notifyProfileSaved === 'function') {
         notifyProfileSaved('未設定', '名前をクリアしました');
@@ -8814,6 +8870,8 @@
     function applyFortuneProfileFromHistory(id) {
       const p = getProfileBirthById(id);
       if (!p) return;
+      localStorage.removeItem(FORTUNE_ACTIVE_CLEARED_KEY);
+      setActiveProfileBirthId(p.id);
       fortuneActiveInput.name = p.name || '';
       fortuneActiveInput.profileId = p.id;
       fortuneActiveInput.gender = p.gender === 'female' ? 'female' : 'male';
@@ -8840,8 +8898,11 @@
       }
 
       rememberAppliedFortuneInput();
+      fillProfileBirthForm(p);
       syncFortuneSliderUI();
+      updateFortuneNameDisplay();
       updateFortuneActiveBirthSync();
+      updateProfileBirthStatus();
       closeFortuneProfileModal();
       if (typeof notifyProfileSaved === 'function') {
         notifyProfileSaved(p.name || '選択', '呼び出し完了');
@@ -8856,13 +8917,20 @@
       if (!confirm(`「${name}」を履歴から削除してもよろしいですか？`)) return;
 
       const nextList = list.filter((p) => p.id !== id);
-      saveProfileBirthList(nextList, nextList.length ? nextList[0].id : null);
+      const deletedWasActive = fortuneActiveInput.profileId === id;
+      const keepActiveId = (!deletedWasActive && fortuneActiveInput.profileId && nextList.some((p) => p.id === fortuneActiveInput.profileId))
+        ? fortuneActiveInput.profileId
+        : (nextList.length ? nextList[0].id : null);
+      saveProfileBirthList(nextList, keepActiveId);
 
-      if (fortuneActiveInput.profileId === id) {
+      if (deletedWasActive) {
+        localStorage.setItem(FORTUNE_ACTIVE_CLEARED_KEY, '1');
         fortuneActiveInput.profileId = null;
         fortuneActiveInput.name = '';
+        rememberAppliedFortuneInput();
         updateFortuneNameDisplay();
         updateFortuneActiveBirthSync();
+        updateProfileBirthStatus();
       }
       renderFortuneProfileHistoryList();
     }
@@ -9099,8 +9167,11 @@
     function switchProfileBirth(nextId) {
       if (!nextId) return;
       saveProfileBirthInput();
+      localStorage.removeItem(FORTUNE_ACTIVE_CLEARED_KEY);
       setActiveProfileBirthId(nextId);
+      hydrateFortuneActiveInputFromSaved({ syncUI: false });
       fillProfileBirthForm(getProfileBirth());
+      updateFortuneNameDisplay();
       refreshProfileBirthSelects();
       updateProfileBirthStatus();
       syncProfileBirthToFortunePanels(true);
@@ -9253,8 +9324,11 @@
 
     function loadProfileBirthInput() {
       loadProfileBirthList();
+      hydrateFortuneActiveInputFromSaved({ syncUI: false });
       const p = getProfileBirth();
       fillProfileBirthForm(p);
+      updateFortuneNameDisplay();
+      updateFortuneSliderSummary();
       refreshProfileBirthSelects();
       updateProfileBirthStatus();
       syncProfileBirthToFortunePanels(false);
@@ -9266,8 +9340,11 @@
       const nextId = sel.value;
       // 先に現フォームを現行プロファイルへ保存（この中でセレクトが旧activeに戻るため、nextIdを先に保持）
       saveProfileBirthInput();
+      localStorage.removeItem(FORTUNE_ACTIVE_CLEARED_KEY);
       setActiveProfileBirthId(nextId);
+      hydrateFortuneActiveInputFromSaved({ syncUI: false });
       fillProfileBirthForm(getProfileBirth());
+      updateFortuneNameDisplay();
       refreshProfileBirthSelects();
       updateProfileBirthStatus();
       syncProfileBirthToFortunePanels(true);
@@ -9277,9 +9354,12 @@
 
     function handleFortuneProfileChange(nextId, prefix) {
       saveProfileBirthInput();
+      localStorage.removeItem(FORTUNE_ACTIVE_CLEARED_KEY);
       setActiveProfileBirthId(nextId);
+      hydrateFortuneActiveInputFromSaved({ syncUI: false });
       const p = getProfileBirth();
       fillProfileBirthForm(p);
+      updateFortuneNameDisplay();
       refreshProfileBirthSelects();
       updateProfileBirthStatus();
       syncProfileBirthToFortunePanels(false);
@@ -9474,8 +9554,11 @@
         gender: genderEl && genderEl.value === 'female' ? 'female' : 'male'
       });
       list.push(entry);
+      localStorage.removeItem(FORTUNE_ACTIVE_CLEARED_KEY);
       saveProfileBirthList(list, entry.id);
+      hydrateFortuneActiveInputFromSaved({ syncUI: false });
       fillProfileBirthForm(entry);
+      updateFortuneNameDisplay();
       refreshProfileBirthSelects();
       updateProfileBirthStatus();
       syncProfileBirthToFortunePanels(true);
@@ -9498,8 +9581,11 @@
       if (list.length <= 1) {
         if (!confirm(`「${label}」の登録内容をリセットしますか？`)) return;
         const cleared = normalizeProfileBirthEntry({ id: cur.id, name: '自分', date: '', time: '', gender: 'male' });
+        localStorage.setItem(FORTUNE_ACTIVE_CLEARED_KEY, '1');
         saveProfileBirthList([cleared], cleared.id);
+        hydrateFortuneActiveInputFromSaved({ syncUI: false });
         fillProfileBirthForm(cleared);
+        updateFortuneNameDisplay();
         refreshProfileBirthSelects();
         updateProfileBirthStatus();
         syncProfileBirthToFortunePanels(true);
@@ -9509,8 +9595,11 @@
       }
       if (!confirm(`登録人物「${label}」を削除しますか？`)) return;
       const next = list.filter((p) => p.id !== activeId);
+      localStorage.removeItem(FORTUNE_ACTIVE_CLEARED_KEY);
       saveProfileBirthList(next, next[0].id);
+      hydrateFortuneActiveInputFromSaved({ syncUI: false });
       fillProfileBirthForm(getProfileBirth());
+      updateFortuneNameDisplay();
       refreshProfileBirthSelects();
       updateProfileBirthStatus();
       syncProfileBirthToFortunePanels(true);
@@ -21418,10 +21507,9 @@
     function initFortuneHub() {
       document.documentElement.classList.remove('pause-animations');
       closeFortuneFeature({ silent: true });
-      // 起動時は基本的に名前空白にしておく（前の設定をキャッシュしない）
       if (!fortuneHubInitializedOnce) {
         fortuneHubInitializedOnce = true;
-        resetFortuneSliderToDefault();
+        hydrateFortuneActiveInputFromSaved({ syncUI: false });
       }
       refreshFortuneHome();
       if (typeof syncZiweiLateRatSelect === 'function') syncZiweiLateRatSelect();

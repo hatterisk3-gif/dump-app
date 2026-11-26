@@ -91,7 +91,7 @@
     }
   </style>
   <script>
-    window.__DUMP_BUILD__ = 'v461';
+    window.__DUMP_BUILD__ = 'v462';
     // かつてここで「既知の最新ビルドより古い＝巻き戻り」と判定し、キャッシュ全消し＋SW登録解除を
     // していたが、その直後はオフライン用の控えが無く、ネットワークが不調だと起動不能になった。
     // 判定値(dump_known_good_build)は下がらない一方通行のため、一度ずれると毎回自己破壊を繰り返す。
@@ -10204,16 +10204,7 @@
           </p>
           <div id="unified-panel" class="mt-2 space-y-3">
             <div id="unified-source-chips" class="flex flex-wrap gap-1.5 text-[11px] font-bold"></div>
-            <div class="fortune-inline-profile-picker">
-              <label class="block text-xs font-extrabold text-amber-400 mb-1.5">対象プロファイル</label>
-              <select id="unified-profile-select" onchange="onUnifiedProfileSelectChange()"
-                class="w-full p-3 border-2 border-amber-800/50 rounded-xl bg-black/40 text-sm font-bold text-amber-50 focus:outline-none focus:border-amber-400 h-12"></select>
-            </div>
-            <p id="unified-birth-hint" class="text-[11px] text-slate-400 font-bold leading-relaxed">読み込み元は上の対象プロファイルです。
-            </p>
-            <button type="button" onclick="calculateUnifiedReading()"
-              class="w-full text-sm text-amber-50 font-bold bg-gradient-to-r from-amber-700 to-orange-700 hover:from-amber-600 hover:to-orange-600 px-4 py-3 rounded-xl border border-amber-500/30 shadow-[0_0_15px_rgba(245,158,11,0.2)] transition active:scale-95">自分を知るレポートを生成</button>
-            <div id="unified-result" class="hidden mt-2 pt-4 border-t border-amber-900/60 space-y-3">
+            <div id="unified-result" class="hidden pt-2 border-t border-amber-900/60 space-y-3">
               <!-- 一括開閉ツールバー -->
               <div class="flex items-center justify-between gap-2 px-1 py-1">
                 <span class="text-xs font-black text-amber-300 tracking-wider">総合鑑定 レポート項目</span>
@@ -10367,20 +10358,8 @@
             <input type="hidden" id="sanmei-birth-date" value="">
             <input type="hidden" id="sanmei-birth-time" value="">
             <input type="hidden" id="sanmei-birth-gender" value="male">
-            <div class="fortune-inline-profile-picker">
-              <label class="block text-xs font-extrabold text-cyan-400 mb-1.5">対象プロファイル</label>
-              <select id="sanmei-profile-select" onchange="onSanmeiProfileSelectChange()"
-                class="w-full p-3 border-2 border-cyan-800/50 rounded-xl bg-black/40 text-sm font-bold text-cyan-50 focus:outline-none focus:border-cyan-400 h-12"></select>
-            </div>
-            <div id="sanmei-profile-source"
-              class="rounded-xl border border-cyan-800/50 bg-cyan-950/20 px-3 py-2.5 text-xs text-cyan-100 font-bold leading-relaxed">
-            </div>
-            <p class="text-[11px] text-slate-400 font-bold leading-relaxed">※
-              簡易判定・流派差あり。目安であり断定ではありません。節入りは太陽黄経による天文計算（JST）です。</p>
-            <button type="button" onclick="executeSanmeiReading()"
-              class="w-full text-sm text-cyan-50 font-bold bg-gradient-to-r from-cyan-700 to-sky-700 hover:from-cyan-600 hover:to-sky-600 px-4 py-3 rounded-xl border border-cyan-500/30 shadow-[0_0_15px_rgba(6,182,212,0.2)] transition active:scale-95">算命学の命式を鑑定</button>
 
-            <div id="sanmei-result" class="hidden mt-2 pt-4 border-t border-cyan-900/60 space-y-3">
+            <div id="sanmei-result" class="hidden pt-2 border-t border-cyan-900/60 space-y-3">
               <!-- 一括開閉ツールバー -->
               <div class="flex items-center justify-between gap-2 px-1 py-1">
                 <span class="text-xs font-black text-cyan-300 tracking-wider">算命学 鑑定メニュー</span>
@@ -11881,14 +11860,6 @@
             <input type="hidden" id="ziwei-birth-date" value="">
             <input type="hidden" id="ziwei-birth-time" value="">
             <input type="hidden" id="ziwei-birth-gender" value="male">
-            <div class="fortune-inline-profile-picker">
-              <label class="block text-xs font-extrabold text-fuchsia-400 mb-1.5">対象プロファイル</label>
-              <select id="ziwei-profile-select" onchange="onZiweiProfileSelectChange()"
-                class="w-full p-3 border-2 border-fuchsia-800/50 rounded-xl bg-black/40 text-sm font-bold text-fuchsia-50 focus:outline-none focus:border-fuchsia-400 h-12"></select>
-            </div>
-            <div id="ziwei-profile-source"
-              class="rounded-xl border border-fuchsia-800/50 bg-fuchsia-950/20 px-3 py-2.5 text-xs text-fuchsia-100 font-bold leading-relaxed">
-            </div>
             <div class="rounded-xl border border-fuchsia-800/40 bg-black/30 px-3 py-2 flex items-center justify-between gap-2">
               <label for="ziwei-late-rat-mode" class="text-[11px] font-extrabold text-fuchsia-300 shrink-0">23時台の扱い（子時）</label>
               <select id="ziwei-late-rat-mode" onchange="onZiweiLateRatModeChange(this.value)"
@@ -11897,12 +11868,8 @@
                 <option value="late">晩子（iztro 23時晩子扱い）</option>
               </select>
             </div>
-            <p class="text-[11px] text-slate-400 font-bold leading-relaxed">※
-              簡易判定・流派差あり。目安であり断定ではありません。本命の地図・十四の主役の星・生まれ年の変化に加え、10年の流れ・今年の流れも表示します。</p>
-            <button type="button" onclick="executeZiweiReading()"
-              class="w-full text-sm text-fuchsia-50 font-bold bg-gradient-to-r from-fuchsia-700 to-purple-700 hover:from-fuchsia-600 hover:to-purple-600 px-4 py-3 rounded-xl border border-fuchsia-500/30 shadow-[0_0_15px_rgba(217,70,239,0.2)] transition active:scale-95">紫微斗数の命盤を鑑定</button>
 
-            <div id="ziwei-result" class="hidden mt-2 pt-4 border-t border-fuchsia-900/60 space-y-3">
+            <div id="ziwei-result" class="hidden pt-2 border-t border-fuchsia-900/60 space-y-3">
               <!-- メタ情報バッジ -->
               <div class="flex flex-wrap gap-2 text-xs font-bold">
                 <span id="ziwei-meta-soul"
@@ -12234,14 +12201,6 @@
             <input type="hidden" id="bazi-birth-date" value="">
             <input type="hidden" id="bazi-birth-time" value="">
             <input type="hidden" id="bazi-birth-gender" value="male">
-            <div class="fortune-inline-profile-picker">
-              <label class="block text-xs font-extrabold text-emerald-400 mb-1.5">対象プロファイル</label>
-              <select id="bazi-profile-select" onchange="onBaziProfileSelectChange()"
-                class="w-full p-3 border-2 border-emerald-800/50 rounded-xl bg-black/40 text-sm font-bold text-emerald-50 focus:outline-none focus:border-emerald-400 h-12"></select>
-            </div>
-            <div id="bazi-profile-source"
-              class="rounded-xl border border-emerald-800/50 bg-emerald-950/20 px-3 py-2.5 text-xs text-emerald-100 font-bold leading-relaxed">
-            </div>
             <div class="rounded-xl border border-amber-900/40 bg-amber-950/15 px-3 py-2.5 space-y-2">
               <label class="flex items-start gap-2 cursor-pointer">
                 <input type="checkbox" id="bazi-solar-enabled" onchange="toggleBaziSolarTime()"
@@ -12267,12 +12226,8 @@
                 <p id="bazi-solar-note" class="text-[10px] text-amber-300/80 font-bold leading-relaxed"></p>
               </div>
             </div>
-            <p class="text-[11px] text-slate-400 font-bold leading-relaxed">※
-              簡易判定・流派差あり。目安であり断定ではありません。節入りは太陽黄経による天文計算（JST）、蔵干・大運も算命学パネルと共通です。</p>
-            <button type="button" onclick="executeBaziReading()"
-              class="w-full text-sm text-emerald-50 font-bold bg-gradient-to-r from-emerald-700 to-teal-700 hover:from-emerald-600 hover:to-teal-600 px-4 py-3 rounded-xl border border-emerald-500/30 shadow-[0_0_15px_rgba(16,185,129,0.2)] transition active:scale-95">四柱推命の命式を鑑定</button>
 
-            <div id="bazi-result" class="hidden mt-2 pt-4 border-t border-emerald-900/60 space-y-3">
+            <div id="bazi-result" class="hidden pt-2 border-t border-emerald-900/60 space-y-3">
               <!-- メタ情報バッジ -->
               <div class="flex flex-wrap gap-2 text-xs font-bold">
                 <span id="bazi-day-stem-label"

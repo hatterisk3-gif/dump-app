@@ -8762,6 +8762,7 @@
           updateFortuneNameDisplay();
           updateFortuneActiveBirthSync();
           updateProfileBirthStatus();
+          if (typeof refreshOpenFortuneFeatureReading === 'function') refreshOpenFortuneFeatureReading();
         } else {
           restoreAppliedFortuneInput();
         }
@@ -8800,6 +8801,7 @@
       updateFortuneNameDisplay();
       updateFortuneActiveBirthSync();
       updateProfileBirthStatus();
+      if (typeof refreshOpenFortuneFeatureReading === 'function') refreshOpenFortuneFeatureReading();
       // 登録完了後はモーダルを閉じず、前の「登録済みの履歴から選択」画面に戻る
       renderFortuneProfileHistoryList();
       setFortuneProfileModalView('history');
@@ -8816,6 +8818,7 @@
       updateFortuneNameDisplay();
       updateFortuneActiveBirthSync();
       updateProfileBirthStatus();
+      if (typeof refreshOpenFortuneFeatureReading === 'function') refreshOpenFortuneFeatureReading();
       closeFortuneProfileModal();
       if (typeof notifyProfileSaved === 'function') {
         notifyProfileSaved('未設定', '名前をクリアしました');
@@ -8903,6 +8906,7 @@
       updateFortuneNameDisplay();
       updateFortuneActiveBirthSync();
       updateProfileBirthStatus();
+      if (typeof refreshOpenFortuneFeatureReading === 'function') refreshOpenFortuneFeatureReading();
       closeFortuneProfileModal();
       if (typeof notifyProfileSaved === 'function') {
         notifyProfileSaved(p.name || '選択', '呼び出し完了');
@@ -8931,6 +8935,7 @@
         updateFortuneNameDisplay();
         updateFortuneActiveBirthSync();
         updateProfileBirthStatus();
+        if (typeof refreshOpenFortuneFeatureReading === 'function') refreshOpenFortuneFeatureReading();
       }
       renderFortuneProfileHistoryList();
     }
@@ -9393,7 +9398,7 @@
       handleFortuneProfileChange(sel.value, 'bazi');
     }
 
-    function executeSanmeiReading() {
+    function executeSanmeiReading(opts) {
       const p = getProfileBirth();
       if (!p || !p.date) {
         alert('生年月日が設定されていません。パーソナライズから生年月日を登録してください。');
@@ -9405,11 +9410,13 @@
       const resultEl = document.getElementById('sanmei-result');
       if (resultEl) {
         resultEl.classList.remove('hidden');
-        requestAnimationFrame(() => resultEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' }));
+        if (!opts || opts.scroll !== false) {
+          requestAnimationFrame(() => resultEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' }));
+        }
       }
     }
 
-    async function executeZiweiReading() {
+    async function executeZiweiReading(opts) {
       const p = getProfileBirth();
       if (!p || !p.date) {
         alert('生年月日が設定されていません。パーソナライズから生年月日を登録してください。');
@@ -9424,11 +9431,13 @@
       const resultEl = document.getElementById('ziwei-result');
       if (resultEl) {
         resultEl.classList.remove('hidden');
-        requestAnimationFrame(() => resultEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' }));
+        if (!opts || opts.scroll !== false) {
+          requestAnimationFrame(() => resultEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' }));
+        }
       }
     }
 
-    function executeBaziReading() {
+    function executeBaziReading(opts) {
       const p = getProfileBirth();
       if (!p || !p.date) {
         alert('生年月日が設定されていません。パーソナライズから生年月日を登録してください。');
@@ -9440,7 +9449,9 @@
       const resultEl = document.getElementById('bazi-result');
       if (resultEl) {
         resultEl.classList.remove('hidden');
-        requestAnimationFrame(() => resultEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' }));
+        if (!opts || opts.scroll !== false) {
+          requestAnimationFrame(() => resultEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' }));
+        }
       }
     }
 
@@ -19929,7 +19940,7 @@
       });
     }
 
-    function calculateUnifiedReading() {
+    function calculateUnifiedReading(opts) {
       refreshUnifiedSourceChips();
       const birth = unifiedResolveBirth();
       if (!birth.date) {
@@ -20015,7 +20026,9 @@
 
       if (resultEl) resultEl.classList.remove('hidden');
       window.__unifiedReading = pack;
-      if (resultEl) resultEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      if (resultEl && (!opts || opts.scroll !== false)) {
+        resultEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }
     }
 
     const ZIWEI_LATE_RAT_KEY = 'ziwei_late_rat_mode';
@@ -21809,7 +21822,7 @@
     window.openFortuneQuickSearch = openFortuneQuickSearch;
     window.closeFortuneQuickSearch = closeFortuneQuickSearch;
 
-    function openFortuneFeature(key) {
+    async function openFortuneFeature(key) {
       if (!FORTUNE_FEATURE_KEYS.includes(key)) return;
       const profile = typeof getProfileBirth === 'function' ? getProfileBirth() : null;
       if (!hasActiveFortuneTarget() || !profile || !profile.date) {
@@ -21829,19 +21842,39 @@
       });
       if (typeof refreshProfileBirthSelects === 'function') refreshProfileBirthSelects();
       if (typeof updateFortuneProfileSources === 'function') updateFortuneProfileSources();
-      if (key === 'unified') {
-        if (typeof refreshUnifiedSourceChips === 'function') refreshUnifiedSourceChips();
-      } else if (key === 'bazi') {
-        if (typeof loadBaziBirthInput === 'function') loadBaziBirthInput();
-        applyBirthToPanel('bazi', profile, { recalc: false });
-      } else {
-        applyBirthToPanel(key, profile, { recalc: false });
-        if (key === 'ziwei' && typeof syncZiweiLateRatSelect === 'function') syncZiweiLateRatSelect();
-      }
       const card = document.getElementById('fortune-card-' + key);
       if (card) {
         requestAnimationFrame(() => card.scrollIntoView({ behavior: 'smooth', block: 'start' }));
       }
+      if (key === 'unified') {
+        if (typeof refreshUnifiedSourceChips === 'function') refreshUnifiedSourceChips();
+        if (typeof calculateUnifiedReading === 'function') calculateUnifiedReading({ scroll: false });
+      } else if (key === 'sanmei') {
+        if (typeof executeSanmeiReading === 'function') executeSanmeiReading({ scroll: false });
+      } else if (key === 'ziwei') {
+        if (typeof syncZiweiLateRatSelect === 'function') syncZiweiLateRatSelect();
+        if (typeof executeZiweiReading === 'function') await executeZiweiReading({ scroll: false });
+      } else if (key === 'bazi') {
+        if (typeof loadBaziBirthInput === 'function') loadBaziBirthInput();
+        if (typeof executeBaziReading === 'function') executeBaziReading({ scroll: false });
+      }
+    }
+
+    function refreshOpenFortuneFeatureReading() {
+      const openKey = FORTUNE_FEATURE_KEYS.find((k) => {
+        const card = document.getElementById('fortune-card-' + k);
+        return card && !card.classList.contains('hidden');
+      });
+      if (!openKey) return;
+      const p = typeof getProfileBirth === 'function' ? getProfileBirth() : null;
+      if (!hasActiveFortuneTarget() || !p || !p.date) {
+        closeFortuneFeature({ silent: true });
+        return;
+      }
+      if (openKey === 'unified') calculateUnifiedReading({ scroll: false });
+      else if (openKey === 'sanmei') executeSanmeiReading({ scroll: false });
+      else if (openKey === 'ziwei') executeZiweiReading({ scroll: false });
+      else if (openKey === 'bazi') executeBaziReading({ scroll: false });
     }
 
     window.openFortuneProfileCard = openFortuneProfileCard;

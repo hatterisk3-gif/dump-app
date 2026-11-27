@@ -5,7 +5,7 @@ const SUPPLE_MASTERS_KEY = 'dump_supple_masters_v1';
 const SUPPLE_INTAKES_KEY = 'dump_supple_intakes_v1';
 const SUPPLE_ROUTINES_KEY = 'dump_supple_routines_v1';
 const SUPPLE_DISMISSED_AUTO_KEY = 'dump_supple_dismissed_auto_routines_v1';
-const SUPPLE_AUTO_ROUTINE_MAX = 4;
+const SUPPLE_AUTO_ROUTINE_MIN_COUNT = 2;
 const SUPPLE_UPDATED_AT_KEY = 'dump_supple_updated_at';
 const SUPPLE_DIRTY_KEY = 'dump_supple_dirty';
 const SUPPLE_CLOUD_FOLDER = '__SYSTEM__';
@@ -255,6 +255,7 @@ var suppleIntakes = loadSuppleIntakes();
 var suppleRoutines = loadSuppleRoutines();
 var suppleDismissedAutoRoutines = loadSuppleDismissedAutoRoutines();
 var suppleIntakePicks = [];
+var suppleRoutineCreatePicks = [];
 var suppleChartPeriod = 7;
 var suppleChartInstance = null;
 var suppleHtml5QrScanner = null;
@@ -489,6 +490,24 @@ function closeSuppleRoutinesModal() {
   hideSuppleSheetModal('modal-supple-routines');
 }
 
+function openSuppleRoutineCreateModal() {
+  suppleRoutineCreatePicks = [];
+  const nameEl = document.getElementById('supple-routine-create-name');
+  if (nameEl) nameEl.value = '';
+  const timingEl = document.getElementById('supple-routine-create-timing');
+  if (timingEl) timingEl.value = '夜';
+  closeSuppleRoutinesModal();
+  renderSuppleRoutineCreatePickList();
+  showSuppleSheetModal('modal-supple-routine-create');
+}
+
+function closeSuppleRoutineCreateModal(opts = {}) {
+  hideSuppleSheetModal('modal-supple-routine-create');
+  if (opts.returnToList !== false) {
+    openSuppleRoutinesModal();
+  }
+}
+
 function openSuppleStockModal() {
   renderSuppleMasterList();
   showSuppleSheetModal('modal-supple-stock');
@@ -507,6 +526,7 @@ function syncSuppleFabVisibility() {
     'modal-supple-master',
     'modal-supple-scanner',
     'modal-supple-routines',
+    'modal-supple-routine-create',
     'modal-supple-stock'
   ].some((id) => {
     const el = document.getElementById(id);
@@ -547,6 +567,7 @@ function renderSuppleAll() {
   renderSuppleMasterList();
   renderSuppleHistory();
   renderSuppleDropdownList();
+  renderSuppleRoutineCreatePickList();
 }
 
 function setSuppleChartPeriod(days) {
@@ -925,20 +946,16 @@ function collectSuppleHistoryRoutineCandidates() {
     }
   });
 
-  return Array.from(comboMap.values()).sort((a, b) => {
-    const aRep = a.count >= 2 ? 1 : 0;
-    const bRep = b.count >= 2 ? 1 : 0;
-    if (aRep !== bRep) return bRep - aRep;
-    if (a.count !== b.count) return b.count - a.count;
-    const aMulti = a.items.length >= 2 ? 1 : 0;
-    const bMulti = b.items.length >= 2 ? 1 : 0;
-    if (aMulti !== bMulti) return bMulti - aMulti;
-    const dCmp = String(b.lastDate).localeCompare(String(a.lastDate));
-    if (dCmp !== 0) return dCmp;
-    const tCmp = String(b.lastCreatedAt).localeCompare(String(a.lastCreatedAt));
-    if (tCmp !== 0) return tCmp;
-    return b.items.length - a.items.length;
-  });
+  return Array.from(comboMap.values())
+    .filter((c) => c.count >= SUPPLE_AUTO_ROUTINE_MIN_COUNT)
+    .sort((a, b) => {
+      if (a.count !== b.count) return b.count - a.count;
+      const dCmp = String(b.lastDate).localeCompare(String(a.lastDate));
+      if (dCmp !== 0) return dCmp;
+      const tCmp = String(b.lastCreatedAt).localeCompare(String(a.lastCreatedAt));
+      if (tCmp !== 0) return tCmp;
+      return b.items.length - a.items.length;
+    });
 }
 
 function buildSuppleAutoRoutines() {
@@ -951,28 +968,17 @@ function buildSuppleAutoRoutines() {
       .filter(Boolean)
   );
   const dismissedSigs = new Set(Array.isArray(suppleDismissedAutoRoutines) ? suppleDismissedAutoRoutines : []);
+  const seenSigs = new Set();
 
   const selected = [];
-  const timingAcceptedCount = new Map();
-  const timingHasStrong = new Set();
-
   for (let i = 0; i < candidates.length; i++) {
-    if (selected.length >= SUPPLE_AUTO_ROUTINE_MAX) break;
     const c = candidates[i];
-    if (manualSigs.has(c.signature) || dismissedSigs.has(c.signature)) {
-      if (c.count >= 2 || c.items.length >= 2) timingHasStrong.add(c.timing);
+    if (c.count < SUPPLE_AUTO_ROUTINE_MIN_COUNT) continue;
+    if (!c.signature || manualSigs.has(c.signature) || dismissedSigs.has(c.signature) || seenSigs.has(c.signature)) {
       continue;
     }
-    const countForTiming = timingAcceptedCount.get(c.timing) || 0;
-    if (countForTiming >= 2) continue;
-    // 同じタイミングで既に複数種または複数回のセットがある場合は、1回だけの単発断片を出さない
-    if (c.count === 1 && c.items.length === 1 && timingHasStrong.has(c.timing)) continue;
-
+    seenSigs.add(c.signature);
     selected.push(c);
-    timingAcceptedCount.set(c.timing, countForTiming + 1);
-    if (c.count >= 2 || c.items.length >= 2) {
-      timingHasStrong.add(c.timing);
-    }
   }
 
   return selected.map((c) => ({
@@ -1060,9 +1066,23 @@ function suppleRoutineThumbsHtml(items, size) {
 }
 
 function getAllSuppleRoutines() {
-  const manual = (Array.isArray(suppleRoutines) ? suppleRoutines : []).map((r) => ({ ...r, isAuto: false }));
-  const auto = buildSuppleAutoRoutines();
-  return manual.concat(auto);
+  const seenSigs = new Set();
+  const result = [];
+  (Array.isArray(suppleRoutines) ? suppleRoutines : []).forEach((r) => {
+    const sig = suppleRoutineSignature(r && r.timing, r && r.items);
+    if (sig) {
+      if (seenSigs.has(sig)) return;
+      seenSigs.add(sig);
+    }
+    result.push({ ...r, isAuto: false });
+  });
+  buildSuppleAutoRoutines().forEach((r) => {
+    const sig = r && r.signature ? r.signature : suppleRoutineSignature(r && r.timing, r && r.items);
+    if (!sig || seenSigs.has(sig)) return;
+    seenSigs.add(sig);
+    result.push(r);
+  });
+  return result;
 }
 
 function findSuppleRoutineById(routineId) {
@@ -1074,7 +1094,12 @@ function findSuppleRoutineById(routineId) {
 function hasDismissedSuppleAutoRoutinesInHistory() {
   if (!Array.isArray(suppleDismissedAutoRoutines) || !suppleDismissedAutoRoutines.length) return false;
   const dismissed = new Set(suppleDismissedAutoRoutines);
-  return collectSuppleHistoryRoutineCandidates().some((c) => dismissed.has(c.signature));
+  const manualSigs = new Set(
+    (Array.isArray(suppleRoutines) ? suppleRoutines : [])
+      .map((r) => suppleRoutineSignature(r.timing, r.items))
+      .filter(Boolean)
+  );
+  return collectSuppleHistoryRoutineCandidates().some((c) => !manualSigs.has(c.signature) && dismissed.has(c.signature));
 }
 
 function restoreSuppleDismissedAutoRoutines() {
@@ -1090,7 +1115,7 @@ function renderSuppleRoutines() {
   if (container) {
     if (!allRoutines.length) {
       container.innerHTML =
-        '<p class="text-[11px] text-slate-400 font-medium sm:col-span-2">摂取履歴からよく飲む組み合わせを自動で作成します（手動登録は「＋ 選んで作成」→「⭐ この選択をセット保存」）</p>'
+        '<p class="text-[11px] text-slate-400 font-medium sm:col-span-2">過去の記録で2回以上同じ組み合わせがあると自動で追加されます（手動登録は右上の「＋ 選んで作成」から作成できます）</p>'
         + (hasDismissed
           ? '<button type="button" onclick="restoreSuppleDismissedAutoRoutines()" class="text-[11px] font-bold text-cyan-300 hover:text-cyan-200 underline sm:col-span-2 text-left">↺ 非表示の自動セットを戻す</button>'
           : '');
@@ -1131,29 +1156,6 @@ function renderSuppleRoutines() {
       container.innerHTML = chipsHtml + restoreHtml;
     }
   }
-}
-
-function saveCurrentSuppleRoutine() {
-  const picks = currentSuppleIntakePicks();
-  if (!picks.length) {
-    alert('セットにするサプリを1つ以上選択してください');
-    return;
-  }
-  const timingEl = document.getElementById('supple-input-timing');
-  const timing = timingEl ? timingEl.value : '夜';
-  const nameInput = prompt('クイックセットの名前を入力してください。\n空欄のままOKすると、日付で表示します。', '');
-  if (nameInput === null) return;
-  const routine = {
-    id: 'routine_' + Date.now(),
-    name: String(nameInput).trim().slice(0, 40),
-    timing,
-    items: picks.map((p) => ({ suppleId: p.id, qty: p.qty })),
-    createdAt: new Date().toISOString()
-  };
-  suppleRoutines.push(routine);
-  saveSuppleRoutines(suppleRoutines);
-  renderSuppleRoutines();
-  alert('「' + suppleRoutineDisplayName(routine) + '」をクイックセットに保存しました');
 }
 
 function runSuppleRoutine(routineId) {
@@ -1219,7 +1221,7 @@ function deleteSuppleRoutine(routineId, ev) {
   renderSuppleRoutines();
 }
 
-// 摂取履歴の描画（編集・削除ボタン付き）
+// 摂取履歴の描画（日付 → 時間別セッション）
 function renderSuppleHistory() {
   const container = document.getElementById('supple-history-container');
   if (!container) return;
@@ -1263,54 +1265,84 @@ function renderSuppleHistory() {
       badgeHtml = '<span class="text-[9px] font-semibold px-1.5 py-0.2 rounded-sm bg-slate-800 text-slate-300">昨日</span>';
     }
 
+    const byTime = {};
+    const timeOrder = [];
+    items.forEach((item) => {
+      const t = formatSuppleTimeLabel(intakeTimeOf(item)) || '--:--';
+      if (!byTime[t]) {
+        byTime[t] = [];
+        timeOrder.push(t);
+      }
+      byTime[t].push(item);
+    });
+
     const dateGroupEl = document.createElement('div');
-    dateGroupEl.className = 'bg-[#0b1021]/80 rounded-2xl p-3 sm:p-4 border border-cyan-900/40 space-y-2';
+    dateGroupEl.className = 'bg-[#0b1021]/80 rounded-2xl p-3 sm:p-4 border border-cyan-900/40 space-y-2.5';
     dateGroupEl.innerHTML = `
       <div class="flex items-center justify-between pb-1.5 border-b border-cyan-950">
         <div class="flex items-center gap-2">
           <span class="font-extrabold text-cyan-50 text-xs sm:text-sm">${dateLabel}</span>
           ${badgeHtml}
         </div>
-        <span class="text-[10px] font-semibold text-slate-400">${items.length} 回</span>
+        <span class="text-[10px] font-semibold text-slate-400">${timeOrder.length} 回・${items.length} 種</span>
       </div>
-      <div class="flex flex-wrap gap-2 pt-1" data-supple-chips="1"></div>
+      <div class="space-y-2.5 pt-0.5" data-supple-time-sessions="1"></div>
     `;
 
     container.appendChild(dateGroupEl);
-    const chipsContainer = dateGroupEl.querySelector('[data-supple-chips]');
+    const sessionsContainer = dateGroupEl.querySelector('[data-supple-time-sessions]');
 
-    items.forEach(item => {
-      const s = suppleMasters.find(m => m.id === item.suppleId) || { name: '削除されたサプリ', category: 'その他', photo: 'preset_capsule' };
-      const chip = document.createElement('div');
-      chip.className = 'group inline-flex items-center gap-2 pl-2 pr-1.5 py-1 rounded-xl bg-slate-900/90 border border-cyan-900/50 hover:border-cyan-500 transition-all text-xs';
-
-      const thumb = getSupplePhotoThumbHtml(s.photo, 22);
-      const cat = SUPPLE_CATEGORIES.find(c => c.name === s.category) || SUPPLE_CATEGORIES[5];
-      const metaParts = [];
-      const timeLabel = formatSuppleTimeLabel(intakeTimeOf(item));
-      if (timeLabel) metaParts.push(timeLabel);
-      metaParts.push(intakeQtyOf(item) + '個');
-      if (item.timing) metaParts.push(escapeHtml(item.timing));
-      if (item.note) metaParts.push(escapeHtml(item.note));
-
-      chip.innerHTML = `
-        <div class="flex items-center gap-2 cursor-pointer" onclick="openSuppleEditModal('${escapeHtml(item.id)}')" title="クリックして編集">
-          ${thumb}
-          <div class="flex flex-col text-left">
-            <div class="flex items-center gap-1">
-              <span class="font-bold text-slate-100 hover:text-cyan-300 transition-colors">${escapeHtml(s.name)}</span>
-              <span class="w-1.5 h-1.5 rounded-full" style="background-color: ${cat.dot};"></span>
-            </div>
-            <span class="text-[9px] text-slate-400">${metaParts.join('・')}</span>
+    timeOrder.forEach((timeLabel) => {
+      const sessionItems = byTime[timeLabel];
+      const timingSet = [];
+      sessionItems.forEach((it) => {
+        const tm = String(it.timing || '').trim();
+        if (tm && !timingSet.includes(tm)) timingSet.push(tm);
+      });
+      const sessionEl = document.createElement('div');
+      sessionEl.className = 'rounded-xl border border-cyan-900/40 bg-black/25 overflow-hidden';
+      sessionEl.innerHTML = `
+        <div class="flex items-center justify-between gap-2 px-2.5 py-1.5 border-b border-cyan-950/80 bg-cyan-950/30">
+          <div class="flex items-center gap-2 min-w-0">
+            <span class="shrink-0 inline-flex items-center justify-center min-w-[3.2rem] px-1.5 py-0.5 rounded-lg bg-cyan-900/70 border border-cyan-600/40 text-[12px] font-extrabold text-cyan-200 tabular-nums">${escapeHtml(timeLabel)}</span>
+            ${timingSet.length ? '<span class="text-[10px] font-bold text-slate-400 truncate">' + timingSet.map(escapeHtml).join('・') + '</span>' : ''}
           </div>
+          <span class="text-[10px] font-semibold text-slate-500 shrink-0">${sessionItems.length} 種</span>
         </div>
-        <!-- アクションボタン（編集 ＆ 削除） -->
-        <div class="flex items-center gap-0.5 ml-1 pl-1 border-l border-slate-800">
-          <button type="button" onclick="openSuppleEditModal('${escapeHtml(item.id)}', event)" class="p-1 rounded-lg text-slate-400 hover:text-cyan-300 hover:bg-slate-800 text-xs transition" title="この記録を編集">✎</button>
-          <button type="button" onclick="deleteSuppleIntake('${escapeHtml(item.id)}', event)" class="p-1 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-slate-800 text-xs transition" title="この記録を削除">✕</button>
-        </div>
+        <div class="flex flex-col gap-1 p-1.5" data-supple-chips="1"></div>
       `;
-      chipsContainer.appendChild(chip);
+      sessionsContainer.appendChild(sessionEl);
+      const chipsContainer = sessionEl.querySelector('[data-supple-chips]');
+
+      sessionItems.forEach((item) => {
+        const s = suppleMasters.find(m => m.id === item.suppleId) || { name: '削除されたサプリ', category: 'その他', photo: 'preset_capsule' };
+        const chip = document.createElement('div');
+        chip.className = 'group flex items-center gap-2 w-full pl-2 pr-1.5 py-1.5 rounded-lg bg-slate-900/90 border border-cyan-900/40 hover:border-cyan-500 transition-all text-xs';
+
+        const thumb = getSupplePhotoThumbHtml(s.photo, 22);
+        const cat = SUPPLE_CATEGORIES.find(c => c.name === s.category) || SUPPLE_CATEGORIES[5];
+        const metaParts = [];
+        metaParts.push(intakeQtyOf(item) + '個');
+        if (item.note) metaParts.push(escapeHtml(item.note));
+
+        chip.innerHTML = `
+          <div class="flex items-center gap-2 min-w-0 flex-1 cursor-pointer" onclick="openSuppleEditModal('${escapeHtml(item.id)}')" title="クリックして編集">
+            ${thumb}
+            <div class="flex flex-col text-left min-w-0">
+              <div class="flex items-center gap-1 min-w-0">
+                <span class="font-bold text-slate-100 hover:text-cyan-300 transition-colors truncate">${escapeHtml(s.name)}</span>
+                <span class="w-1.5 h-1.5 rounded-full shrink-0" style="background-color: ${cat.dot};"></span>
+              </div>
+              <span class="text-[9px] text-slate-400 truncate">${metaParts.join('・')}</span>
+            </div>
+          </div>
+          <div class="flex items-center gap-0.5 ml-1 pl-1 border-l border-slate-800 shrink-0">
+            <button type="button" onclick="openSuppleEditModal('${escapeHtml(item.id)}', event)" class="p-1 rounded-lg text-slate-400 hover:text-cyan-300 hover:bg-slate-800 text-xs transition" title="この記録を編集">✎</button>
+            <button type="button" onclick="deleteSuppleIntake('${escapeHtml(item.id)}', event)" class="p-1 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-slate-800 text-xs transition" title="この記録を削除">✕</button>
+          </div>
+        `;
+        chipsContainer.appendChild(chip);
+      });
     });
   });
 }
@@ -1421,12 +1453,14 @@ function closeSuppleAllModals() {
   closeSuppleMasterModal();
   closeSupplementBarcodeScanner();
   closeSuppleRoutinesModal();
+  closeSuppleRoutineCreateModal({ returnToList: false });
   closeSuppleStockModal();
   [
     'modal-supple-intake',
     'modal-supple-master',
     'modal-supple-scanner',
     'modal-supple-routines',
+    'modal-supple-routine-create',
     'modal-supple-stock'
   ].forEach(id => {
     const el = document.getElementById(id);
@@ -1459,10 +1493,18 @@ function deleteCurrentEditingIntake() {
 }
 
 // 登録または更新の送信
-function currentSuppleIntakePicks() {
-  return suppleIntakePicks
+function sanitizeSupplePicks(picks) {
+  return (Array.isArray(picks) ? picks : [])
     .map((p) => ({ id: p.id, qty: Math.max(1, Math.min(99, parseInt(p.qty, 10) || 1)) }))
     .filter((p) => suppleMasters.some((m) => m.id === p.id));
+}
+
+function currentSuppleIntakePicks() {
+  return sanitizeSupplePicks(suppleIntakePicks);
+}
+
+function currentSuppleRoutineCreatePicks() {
+  return sanitizeSupplePicks(suppleRoutineCreatePicks);
 }
 
 function submitSuppleIntake() {
@@ -1532,13 +1574,10 @@ function submitSuppleIntake() {
   renderSuppleAll();
 }
 
-function renderSuppleDropdownList() {
-  const menu = document.getElementById('supple-pick-list');
-  const summary = document.getElementById('supple-pick-summary');
-  const idInput = document.getElementById('supple-selected-id');
+function renderSuppleMultiPicker({ menuId, summaryId, picks, toggleFn, qtyFn }) {
+  const menu = document.getElementById(menuId);
+  const summary = document.getElementById(summaryId);
   if (!menu) return;
-  suppleIntakePicks = currentSuppleIntakePicks();
-  if (idInput) idInput.value = suppleIntakePicks.length ? suppleIntakePicks[0].id : '';
 
   if (!suppleMasters.length) {
     menu.innerHTML = '<div class="text-xs text-slate-500 text-center py-4">登録されたサプリはまだありません</div>';
@@ -1547,7 +1586,7 @@ function renderSuppleDropdownList() {
   }
 
   menu.innerHTML = suppleMasters.map((s) => {
-    const pick = suppleIntakePicks.find((p) => p.id === s.id);
+    const pick = picks.find((p) => p.id === s.id);
     const on = !!pick;
     const qty = pick ? pick.qty : 1;
     const thumb = getSupplePhotoThumbHtml(s.photo, 28);
@@ -1555,7 +1594,7 @@ function renderSuppleDropdownList() {
     const hasStock = typeof s.stock === 'number' && Number.isFinite(s.stock);
     return `
       <div class="flex items-center gap-1.5 px-2 py-2 rounded-xl ${on ? 'bg-emerald-950/40 border border-emerald-600/40' : 'hover:bg-slate-800/70 border border-transparent'}">
-        <button type="button" onclick="toggleSuppleIntakePick('${escapeHtml(s.id)}')" class="flex-1 min-w-0 flex items-center gap-2 text-left">
+        <button type="button" onclick="${toggleFn}('${escapeHtml(s.id)}')" class="flex-1 min-w-0 flex items-center gap-2 text-left">
           <span class="w-4 h-4 rounded border ${on ? 'bg-emerald-500 border-emerald-400 text-white' : 'border-slate-500 text-transparent'} flex items-center justify-center text-[10px] font-black shrink-0">${on ? '✓' : ''}</span>
           ${thumb}
           <span class="min-w-0">
@@ -1567,9 +1606,9 @@ function renderSuppleDropdownList() {
           </span>
         </button>
         <div class="flex items-center gap-1 shrink-0 ${on ? '' : 'opacity-40 pointer-events-none'}">
-          <button type="button" onclick="changeSuppleIntakeQty('${escapeHtml(s.id)}', -1, event)" class="w-6 h-6 rounded-lg bg-slate-800 border border-slate-600 text-slate-100 text-sm font-black" aria-label="個数を減らす">−</button>
+          <button type="button" onclick="${qtyFn}('${escapeHtml(s.id)}', -1, event)" class="w-6 h-6 rounded-lg bg-slate-800 border border-slate-600 text-slate-100 text-sm font-black" aria-label="個数を減らす">−</button>
           <span class="w-6 text-center text-xs font-black text-cyan-100">${qty}</span>
-          <button type="button" onclick="changeSuppleIntakeQty('${escapeHtml(s.id)}', 1, event)" class="w-6 h-6 rounded-lg bg-slate-800 border border-slate-600 text-slate-100 text-sm font-black" aria-label="個数を増やす">＋</button>
+          <button type="button" onclick="${qtyFn}('${escapeHtml(s.id)}', 1, event)" class="w-6 h-6 rounded-lg bg-slate-800 border border-slate-600 text-slate-100 text-sm font-black" aria-label="個数を増やす">＋</button>
         </div>
         <button type="button" onclick="event.stopPropagation(); openSuppleMasterModal('${escapeHtml(s.id)}')" class="w-7 h-7 rounded-lg text-cyan-300 hover:bg-slate-800 text-xs shrink-0" title="このサプリを編集" aria-label="このサプリを編集">✎</button>
         <button type="button" onclick="deleteSuppleMasterFromPicker('${escapeHtml(s.id)}', event)" class="w-7 h-7 rounded-lg text-rose-400 hover:text-rose-200 hover:bg-rose-950/50 text-xs shrink-0" title="このサプリを削除" aria-label="このサプリを削除">🗑</button>
@@ -1578,28 +1617,108 @@ function renderSuppleDropdownList() {
   }).join('');
 
   if (summary) {
-    if (!suppleIntakePicks.length) {
+    if (!picks.length) {
       summary.textContent = 'サプリをタップして選び、個数を指定できます';
     } else {
-      const total = suppleIntakePicks.reduce((sum, p) => sum + p.qty, 0);
-      summary.textContent = suppleIntakePicks.length + '種を選択（合計 ' + total + '個）';
+      const total = picks.reduce((sum, p) => sum + p.qty, 0);
+      summary.textContent = picks.length + '種を選択（合計 ' + total + '個）';
     }
   }
 }
 
+function toggleSupplePickInList(picks, suppleId) {
+  const idx = picks.findIndex((p) => p.id === suppleId);
+  if (idx >= 0) picks.splice(idx, 1);
+  else picks.push({ id: suppleId, qty: 1 });
+}
+
+function changeSuppleQtyInList(picks, suppleId, delta, ev) {
+  if (ev) ev.stopPropagation();
+  const pick = picks.find((p) => p.id === suppleId);
+  if (!pick) return;
+  pick.qty = Math.max(1, Math.min(99, (parseInt(pick.qty, 10) || 1) + delta));
+}
+
+function renderSuppleDropdownList() {
+  suppleIntakePicks = currentSuppleIntakePicks();
+  const idInput = document.getElementById('supple-selected-id');
+  if (idInput) idInput.value = suppleIntakePicks.length ? suppleIntakePicks[0].id : '';
+  renderSuppleMultiPicker({
+    menuId: 'supple-pick-list',
+    summaryId: 'supple-pick-summary',
+    picks: suppleIntakePicks,
+    toggleFn: 'toggleSuppleIntakePick',
+    qtyFn: 'changeSuppleIntakeQty'
+  });
+}
+
 function toggleSuppleIntakePick(suppleId) {
-  const idx = suppleIntakePicks.findIndex((p) => p.id === suppleId);
-  if (idx >= 0) suppleIntakePicks.splice(idx, 1);
-  else suppleIntakePicks.push({ id: suppleId, qty: 1 });
+  toggleSupplePickInList(suppleIntakePicks, suppleId);
   renderSuppleDropdownList();
 }
 
 function changeSuppleIntakeQty(suppleId, delta, ev) {
-  if (ev) ev.stopPropagation();
-  const pick = suppleIntakePicks.find((p) => p.id === suppleId);
-  if (!pick) return;
-  pick.qty = Math.max(1, Math.min(99, (parseInt(pick.qty, 10) || 1) + delta));
+  changeSuppleQtyInList(suppleIntakePicks, suppleId, delta, ev);
   renderSuppleDropdownList();
+}
+
+function renderSuppleRoutineCreatePickList() {
+  suppleRoutineCreatePicks = currentSuppleRoutineCreatePicks();
+  renderSuppleMultiPicker({
+    menuId: 'supple-routine-pick-list',
+    summaryId: 'supple-routine-pick-summary',
+    picks: suppleRoutineCreatePicks,
+    toggleFn: 'toggleSuppleRoutineCreatePick',
+    qtyFn: 'changeSuppleRoutineCreateQty'
+  });
+}
+
+function toggleSuppleRoutineCreatePick(suppleId) {
+  toggleSupplePickInList(suppleRoutineCreatePicks, suppleId);
+  renderSuppleRoutineCreatePickList();
+}
+
+function changeSuppleRoutineCreateQty(suppleId, delta, ev) {
+  changeSuppleQtyInList(suppleRoutineCreatePicks, suppleId, delta, ev);
+  renderSuppleRoutineCreatePickList();
+}
+
+/**
+ * クイックセット専用作成モーダルからセットを保存する（摂取記録や在庫更新は行わない）。
+ */
+function submitSuppleRoutineCreate() {
+  const picks = currentSuppleRoutineCreatePicks();
+  if (!picks.length) {
+    alert('セットにするサプリを1つ以上選択してください');
+    return;
+  }
+  const nameEl = document.getElementById('supple-routine-create-name');
+  const timingEl = document.getElementById('supple-routine-create-timing');
+  const name = nameEl ? String(nameEl.value || '').trim().slice(0, 40) : '';
+  const timing = timingEl ? (timingEl.value || '夜') : '夜';
+  const normalizedItems = normalizeSuppleRoutineItems(picks.map((p) => ({ suppleId: p.id, qty: p.qty })));
+  const sig = suppleRoutineSignature(timing, normalizedItems);
+  const exists = (Array.isArray(suppleRoutines) ? suppleRoutines : []).some((r) => {
+    return sig && suppleRoutineSignature(r && r.timing, r && r.items) === sig;
+  });
+  if (exists) {
+    alert('同じ組み合わせのクイックセットがすでに登録されています');
+    return;
+  }
+  const routine = {
+    id: 'routine_' + Date.now(),
+    name,
+    timing,
+    items: normalizedItems,
+    createdAt: new Date().toISOString()
+  };
+  suppleRoutines.push(routine);
+  saveSuppleRoutines(suppleRoutines);
+  closeSuppleRoutineCreateModal({ returnToList: false });
+  openSuppleRoutinesModal();
+  if (typeof setSuppleSyncStatus === 'function') {
+    setSuppleSyncStatus('「' + suppleRoutineDisplayName(routine) + '」を作成しました（未記録）', 'saved');
+  }
 }
 
 function deleteSuppleMasterFromPicker(suppleId, ev) {
@@ -1610,12 +1729,22 @@ function deleteSuppleMasterFromPicker(suppleId, ev) {
   suppleMasters = suppleMasters.filter((m) => m.id !== suppleId);
   saveSuppleMasters(suppleMasters);
   suppleIntakePicks = suppleIntakePicks.filter((p) => p.id !== suppleId);
+  suppleRoutineCreatePicks = suppleRoutineCreatePicks.filter((p) => p.id !== suppleId);
   renderSuppleAll();
 }
 
 function selectSuppleForIntake(suppleId) {
   const s = suppleMasters.find(m => m.id === suppleId);
   if (!s) return;
+  const routineCreateModal = document.getElementById('modal-supple-routine-create');
+  const isRoutineCreateOpen = !!(routineCreateModal && !routineCreateModal.classList.contains('hidden'));
+  if (isRoutineCreateOpen) {
+    if (!suppleRoutineCreatePicks.some((p) => p.id === s.id)) {
+      suppleRoutineCreatePicks.push({ id: s.id, qty: 1 });
+    }
+    renderSuppleRoutineCreatePickList();
+    return;
+  }
   if (!suppleIntakePicks.some((p) => p.id === s.id)) {
     suppleIntakePicks.push({ id: s.id, qty: 1 });
   }

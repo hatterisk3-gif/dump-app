@@ -469,6 +469,14 @@
       } catch (_) { }
     });
     var bootOnce = false;
+    window.__syncBootLayoutAfterTailwind = function () {
+      try {
+        if (typeof getCaptureNavReservePx === 'function') getCaptureNavReservePx._cache = null;
+        if (typeof syncCaptureOverlayViewport === 'function' && typeof isCaptureOverlayOpen === 'function' && isCaptureOverlayOpen()) {
+          syncCaptureOverlayViewport();
+        }
+      } catch (_) { }
+    };
     function runBootInit() {
       if (bootOnce) return;
       bootOnce = true;
@@ -486,39 +494,33 @@
       } catch (err) {
         console.error('boot deep-link init failed', err);
       }
-      // スプラッシュ描画フレームに譲ってから初期タブ構築を実行
+      // 演出再生前に初期タブ構築と端末内履歴の初期描画を済ませる（演出中のメインスレッド停止を防ぐ）
       requestAnimationFrame(function () {
         try {
           switchTab('memo-mode', {
             skipHelp: true,
             skipAutoFocus: true,
             skipHistoryCloudSync: true,
-            skipHistoryPaint: true
+            skipHistoryPaint: true,
+            isBoot: true
           });
           toggleDirectDestinationUI();
           if (typeof restoreLiveInputDraftSync === 'function') restoreLiveInputDraftSync();
           if (typeof bindInputContentHistoryLock === 'function') bindInputContentHistoryLock();
           if (typeof bindInputContentEditorKeys === 'function') bindInputContentEditorKeys();
           if (typeof bindDumpComposeImageUi === 'function') bindDumpComposeImageUi();
+          if (typeof loadHistoryTombstones === 'function') loadHistoryTombstones();
+          if (typeof loadInputHistoryResurrectedKeys === 'function') loadInputHistoryResurrectedKeys();
+          if (typeof purgeCorruptLocalInputHistory === 'function') purgeCorruptLocalInputHistory();
+          var inputMode = document.getElementById('input-mode');
+          if (inputMode && inputMode.classList.contains('active') && typeof renderInputTabHistory === 'function') {
+            renderInputTabHistory({ skipCloudSync: true, skipDupSchedule: true });
+          }
         } catch (err) {
           console.error('boot init failed', err);
         } finally {
           finishBootInit();
         }
-        // スプラッシュを閉じ始めてから、端末内の登録チェックだけ先に描く
-        setTimeout(function () {
-          try {
-            if (typeof loadHistoryTombstones === 'function') loadHistoryTombstones();
-            if (typeof loadInputHistoryResurrectedKeys === 'function') loadInputHistoryResurrectedKeys();
-            if (typeof purgeCorruptLocalInputHistory === 'function') purgeCorruptLocalInputHistory();
-            var inputMode = document.getElementById('input-mode');
-            if (inputMode && inputMode.classList.contains('active') && typeof renderInputTabHistory === 'function') {
-              renderInputTabHistory({ skipCloudSync: true, skipDupSchedule: true });
-            }
-          } catch (e) {
-            console.error('boot history paint failed', e);
-          }
-        }, 0);
       });
 
       const schedulePostSplash = typeof window.__afterBootSplash === 'function'
@@ -22186,7 +22188,8 @@
           quickFocus: !opts.skipAutoFocus,
           skipAutoFocus: !!opts.skipAutoFocus,
           skipHistoryCloudSync: !!opts.skipHistoryCloudSync,
-          skipHistoryPaint: !!opts.skipHistoryPaint
+          skipHistoryPaint: !!opts.skipHistoryPaint,
+          isBoot: !!opts.isBoot
         });
       }
     }
@@ -32629,7 +32632,7 @@
           if (typeof closeSuppleAllModals === 'function') {
             closeSuppleAllModals();
           } else {
-            ['modal-supple-intake', 'modal-supple-master', 'modal-supple-scanner', 'modal-supple-routines', 'modal-supple-stock'].forEach(id => {
+            ['modal-supple-intake', 'modal-supple-master', 'modal-supple-scanner', 'modal-supple-routines', 'modal-supple-routine-create', 'modal-supple-stock'].forEach(id => {
               const el = document.getElementById(id);
               if (el) {
                 el.classList.add('hidden');
@@ -32780,7 +32783,8 @@
           ensureInputTopPreferenceApplied({
             skipAutoFocus: !!(options && options.skipAutoFocus),
             skipHistoryCloudSync: !!(options && options.skipHistoryCloudSync),
-            skipHistoryPaint: !!(options && options.skipHistoryPaint)
+            skipHistoryPaint: !!(options && options.skipHistoryPaint),
+            isBoot: !!(options && options.isBoot)
           });
         }
         // 他のタブで編集した分は、入力タブを開いたときにまとめて描く
@@ -36587,11 +36591,24 @@
         }
       }
       // 既にキュー済みの保存は再表示しない（「未同期を送信中」が長く見えるのを防ぐ）
-      if (typeof resumePendingInboxWrites === 'function') {
+      if (!opts.isBoot && typeof resumePendingInboxWrites === 'function') {
         resumePendingInboxWrites({ silent: true });
       }
       syncInputTabHistoryLock();
       updateSkipInputTopUI();
+      if (opts.isBoot) {
+        revealInputCaret(input);
+        const afterBoot = typeof window.__afterBootSplash === 'function' ? window.__afterBootSplash : null;
+        if (afterBoot) {
+          afterBoot(() => {
+            getCaptureNavReservePx._cache = null;
+            syncCaptureOverlayViewport();
+            ensureSubmitInboxReady({ force: true, reason: 'open_capture_post_boot' });
+            revealInputCaret(input);
+          });
+        }
+        return;
+      }
       setTimeout(() => {
         syncCaptureOverlayViewport();
         ensureSubmitInboxReady({ force: true, reason: 'open_capture_settle' });
@@ -40868,7 +40885,6 @@
     const GANTT_DIRTY_KEY = 'gantt_dirty';
     const GANTT_VIEW_DAYS = 21;
     const GANTT_DAY_W = 36;
-    const GANTT_LABEL_W = 108;
     const GANTT_COLORS = ['#22d3ee', '#34d399', '#a78bfa', '#fbbf24', '#fb7185', '#60a5fa'];
 
     let ganttTasks = [];
@@ -41288,7 +41304,7 @@
       const visStart = Math.max(0, Math.min(GANTT_VIEW_DAYS - 1, newStartOff));
       const visEnd = Math.max(visStart, Math.min(GANTT_VIEW_DAYS - 1, newEndOff));
       if (drag.barEl) {
-        const left = GANTT_LABEL_W + visStart * GANTT_DAY_W + 3;
+        const left = visStart * GANTT_DAY_W + 3;
         const w = Math.max(GANTT_DAY_W - 6, (visEnd - visStart + 1) * GANTT_DAY_W - 6);
         drag.barEl.style.left = left + 'px';
         drag.barEl.style.width = w + 'px';
@@ -41419,7 +41435,7 @@
         labelEl.textContent = formatJaDateLabel(ganttViewStart) + ' 〜 ' + formatJaDateLabel(viewEnd);
       }
       const today = ganttTodayStr();
-      const width = GANTT_LABEL_W + days.length * GANTT_DAY_W;
+      const width = days.length * GANTT_DAY_W;
       const headCells = days.map((d) => {
         const dt = ganttParseDate(d);
         const isToday = d === today;
@@ -41435,26 +41451,29 @@
 
       const sorted = normalizeGanttTasks(ganttTasks);
       const taskById = new Map(sorted.map((t) => [t.id, t]));
+      const visibleTasks = sorted.filter((task) => {
+        const startOff = ganttDiffDays(ganttViewStart, task.start);
+        const endOff = ganttDiffDays(ganttViewStart, task.end);
+        return endOff >= 0 && startOff < GANTT_VIEW_DAYS;
+      });
       let body = '';
       if (!sorted.length) {
         body = '<div class="gantt-empty">タスクがありません。下のフォームから追加できます。</div>';
+      } else if (!visibleTasks.length) {
+        body = '<div class="gantt-empty">この表示期間に該当するタスクはありません（‹ › で期間を移動できます）</div>';
       } else {
-        body = sorted.map((task) => {
+        body = visibleTasks.map((task) => {
           const startOff = ganttDiffDays(ganttViewStart, task.start);
           const endOff = ganttDiffDays(ganttViewStart, task.end);
           const barStart = Math.max(0, startOff);
           const barEnd = Math.min(GANTT_VIEW_DAYS - 1, endOff);
-          const visible = barEnd >= 0 && barStart < GANTT_VIEW_DAYS;
-          let barHtml = '';
-          if (visible) {
-            const left = GANTT_LABEL_W + barStart * GANTT_DAY_W + 3;
-            const w = Math.max(GANTT_DAY_W - 6, (barEnd - barStart + 1) * GANTT_DAY_W - 6);
-            barHtml = '<button type="button" class="gantt-bar' + (task.done ? ' is-done' : '')
-              + '" style="left:' + left + 'px;width:' + w + 'px;background:' + task.color
-              + '" data-id="' + escapeHtmlText(task.id) + '" title="'
-              + escapeHtmlText(task.title + '（' + task.start + '〜' + task.end + '）') + '">'
-              + escapeHtmlText(task.title) + '</button>';
-          }
+          const left = barStart * GANTT_DAY_W + 3;
+          const w = Math.max(GANTT_DAY_W - 6, (barEnd - barStart + 1) * GANTT_DAY_W - 6);
+          const barHtml = '<button type="button" class="gantt-bar' + (task.done ? ' is-done' : '')
+            + '" style="left:' + left + 'px;width:' + w + 'px;background:' + task.color
+            + '" data-id="' + escapeHtmlText(task.id) + '" title="'
+            + escapeHtmlText(task.title + '（' + task.start + '〜' + task.end + '）') + '">'
+            + escapeHtmlText(task.title) + '</button>';
           const grid = days.map((d) => {
             let cls = 'gantt-day-cell';
             if (d === today) cls += ' is-today';
@@ -41462,8 +41481,6 @@
           }).join('');
           return '<div class="gantt-row' + (task.done ? ' is-done' : '') + '" data-id="'
             + escapeHtmlText(task.id) + '">'
-            + '<button type="button" class="gantt-row-label" data-id="' + escapeHtmlText(task.id) + '">'
-            + escapeHtmlText(task.title) + '</button>'
             + '<div class="gantt-row-track" style="width:' + (days.length * GANTT_DAY_W) + 'px">' + grid + '</div>'
             + barHtml + '</div>';
         }).join('');
@@ -41471,16 +41488,8 @@
 
       chart.style.minWidth = width + 'px';
       chart.innerHTML = '<div class="gantt-head" style="width:' + width + 'px">'
-        + '<div class="gantt-corner" style="width:' + GANTT_LABEL_W + 'px">タスク</div>'
         + headCells + '</div><div class="gantt-body">' + body + '</div>';
 
-      chart.querySelectorAll('.gantt-row-label').forEach((el) => {
-        el.addEventListener('click', (ev) => {
-          ev.preventDefault();
-          const id = el.getAttribute('data-id');
-          if (id) focusGanttTaskInList(id);
-        });
-      });
       chart.querySelectorAll('.gantt-bar').forEach((el) => {
         const id = el.getAttribute('data-id');
         const task = id ? taskById.get(id) : null;
@@ -50014,9 +50023,6 @@
     }
     // Call when DOM loads
     document.addEventListener('DOMContentLoaded', () => {
-      const lightweightMode = localStorage.getItem('setting_lightweight_mode') === 'true';
-      applyLightweightMode(lightweightMode);
-      applyColorTheme(getColorTheme());
       updateCaptureOverlayDateHeading(true);
       setInterval(() => updateCaptureOverlayDateHeading(), 60 * 1000);
       // 廃止タブが残っていたら退避／フォルダ直接保存設定を無効化
@@ -50032,17 +50038,20 @@
       if (typeof restoreLiveInputDraftSync === 'function') restoreLiveInputDraftSync();
       bindInputContentHistoryLock();
       if (typeof bindDumpComposeImageUi === 'function') bindDumpComposeImageUi();
-      if (typeof restoreLiveInputDraftFromCacheStorage === 'function') {
-        void restoreLiveInputDraftFromCacheStorage();
-      }
       syncInputTabHistoryLock();
 
       const afterSplash = typeof window.__afterBootSplash === 'function'
         ? window.__afterBootSplash
         : function (fn) { setTimeout(fn, 0); };
 
-      // 起動アニメーションの突っかかりを防ぐため、初期表示に不要なバインド・掃除はスプラッシュ完了後に分割実行
+      // 起動アニメーションの突っかかりを防ぐため、初期表示に不要なバインド・UI同期・掃除はスプラッシュ完了後に分割実行
       afterSplash(() => {
+        const lightweightMode = localStorage.getItem('setting_lightweight_mode') === 'true';
+        applyLightweightMode(lightweightMode);
+        applyColorTheme(getColorTheme());
+        if (typeof restoreLiveInputDraftFromCacheStorage === 'function') {
+          void restoreLiveInputDraftFromCacheStorage();
+        }
         bindSimilarThresholdControls();
         renderAppBuildTag();
         updateSkipInputTopUI();

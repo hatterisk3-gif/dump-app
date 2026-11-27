@@ -37,10 +37,25 @@
       background: #030509;
     }
 
+    html.theme-light,
+    html.theme-light body {
+      background: #e8eef5;
+    }
+
+    html.theme-soft,
+    html.theme-soft body {
+      background: #17130f;
+    }
+
+    html.theme-soft-light,
+    html.theme-soft-light body {
+      background: #f7f3ec;
+    }
+
     #boot-splash {
       position: fixed;
       inset: 0;
-      z-index: 100000;
+      z-index: 2147483647;
       background: #030509;
       display: flex;
       flex-direction: column;
@@ -51,7 +66,19 @@
       will-change: opacity, transform;
       transform: translateZ(0);
       backface-visibility: hidden;
-      contain: strict;
+      contain: layout style paint;
+    }
+
+    html.theme-light #boot-splash {
+      background: radial-gradient(circle at 50% 42%, #dbeafe 0%, #e8eef5 72%);
+    }
+
+    html.theme-soft #boot-splash {
+      background: radial-gradient(circle at 50% 42%, #2f261d 0%, #17130f 72%);
+    }
+
+    html.theme-soft-light #boot-splash {
+      background: radial-gradient(circle at 50% 42%, #f3e6d0 0%, #f7f3ec 72%);
     }
 
     #boot-splash.splash-out {
@@ -76,22 +103,19 @@
       font-family: ui-sans-serif, system-ui, sans-serif;
     }
 
-    html:not(.boot-surface-ready) #space-background,
-    html:not(.boot-surface-ready) .tab-content,
-    html:not(.boot-surface-ready) #app-bottom-nav,
-    html:not(.boot-surface-ready) #memo-sub-nav {
+    html:not(.boot-surface-ready) body > :not(#boot-splash) {
       visibility: hidden !important;
+      opacity: 0 !important;
       pointer-events: none !important;
     }
 
-    html:not(.ui-ready) #space-background,
-    html:not(.ui-ready) #space-background *,
-    html:not(.ui-ready) .tab-content {
+    html:not(.ui-ready) body > :not(#boot-splash),
+    html:not(.ui-ready) body > :not(#boot-splash) * {
       animation-play-state: paused !important;
     }
   </style>
   <script>
-    window.__DUMP_BUILD__ = 'v469';
+    window.__DUMP_BUILD__ = 'v474';
     // かつてここで「既知の最新ビルドより古い＝巻き戻り」と判定し、キャッシュ全消し＋SW登録解除を
     // していたが、その直後はオフライン用の控えが無く、ネットワークが不調だと起動不能になった。
     // 判定値(dump_known_good_build)は下がらない一方通行のため、一度ずれると毎回自己破壊を繰り返す。
@@ -2316,7 +2340,7 @@
     #boot-splash {
       position: fixed;
       inset: 0;
-      z-index: 100000;
+      z-index: 2147483647;
       background: #030509;
       display: flex;
       flex-direction: column;
@@ -2785,6 +2809,10 @@
     }
 
     .pause-animations #fortune-mode *,
+    .pause-animations #boot-splash,
+    .pause-animations #boot-splash *,
+    .pause-animations #boot-splash *::before,
+    .pause-animations #boot-splash *::after,
     .pause-animations #boot-splash-preview-overlay,
     .pause-animations #boot-splash-preview-overlay *,
     .pause-animations #boot-splash-preview-overlay *::before,
@@ -4407,11 +4435,13 @@
     body:has(#modal-supple-master:not(.hidden)) #supple-fab-add,
     body:has(#modal-supple-scanner:not(.hidden)) #supple-fab-add,
     body:has(#modal-supple-routines:not(.hidden)) #supple-fab-add,
+    body:has(#modal-supple-routine-create:not(.hidden)) #supple-fab-add,
     body:has(#modal-supple-stock:not(.hidden)) #supple-fab-add,
     body:has(#modal-supple-intake:not(.hidden)) #app-bottom-nav,
     body:has(#modal-supple-master:not(.hidden)) #app-bottom-nav,
     body:has(#modal-supple-scanner:not(.hidden)) #app-bottom-nav,
     body:has(#modal-supple-routines:not(.hidden)) #app-bottom-nav,
+    body:has(#modal-supple-routine-create:not(.hidden)) #app-bottom-nav,
     body:has(#modal-supple-stock:not(.hidden)) #app-bottom-nav,
     html.supple-modal-open #supple-fab-add,
     body.supple-modal-open #supple-fab-add,
@@ -4425,6 +4455,7 @@
     #modal-supple-master.hidden,
     #modal-supple-scanner.hidden,
     #modal-supple-routines.hidden,
+    #modal-supple-routine-create.hidden,
     #modal-supple-stock.hidden {
       display: none !important;
     }
@@ -4434,6 +4465,7 @@
     body:not(:has(#supplement-mode.active)) #modal-supple-master,
     body:not(:has(#supplement-mode.active)) #modal-supple-scanner,
     body:not(:has(#supplement-mode.active)) #modal-supple-routines,
+    body:not(:has(#supplement-mode.active)) #modal-supple-routine-create,
     body:not(:has(#supplement-mode.active)) #modal-supple-stock {
       display: none !important;
     }
@@ -4442,6 +4474,7 @@
     #modal-supple-intake,
     #modal-supple-master,
     #modal-supple-routines,
+    #modal-supple-routine-create,
     #modal-supple-stock {
       position: fixed;
       inset: 0;
@@ -4450,6 +4483,7 @@
     #modal-supple-intake>div,
     #modal-supple-master>div,
     #modal-supple-routines>div,
+    #modal-supple-routine-create>div,
     #modal-supple-stock>div {
       display: flex !important;
       flex-direction: column !important;
@@ -4462,6 +4496,7 @@
       #modal-supple-intake,
       #modal-supple-master,
       #modal-supple-routines,
+      #modal-supple-routine-create,
       #modal-supple-stock {
         top: 0 !important;
         right: 0 !important;
@@ -4475,6 +4510,7 @@
       #modal-supple-intake>div,
       #modal-supple-master>div,
       #modal-supple-routines>div,
+      #modal-supple-routine-create>div,
       #modal-supple-stock>div {
         height: 100% !important;
         max-height: 100% !important;
@@ -6476,17 +6512,6 @@
       z-index: 2;
     }
 
-    .gantt-corner {
-      flex-shrink: 0;
-      display: flex;
-      align-items: center;
-      padding: 0 0.5rem;
-      font-size: 10px;
-      font-weight: 800;
-      color: rgba(103, 232, 249, 0.85);
-      border-right: 1px solid rgba(8, 145, 178, 0.3);
-    }
-
     .gantt-day-head {
       flex-shrink: 0;
       display: flex;
@@ -6534,23 +6559,6 @@
 
     .gantt-row.is-done {
       opacity: 0.55;
-    }
-
-    .gantt-row-label {
-      flex-shrink: 0;
-      width: 108px;
-      display: flex;
-      align-items: center;
-      padding: 0 0.45rem;
-      font-size: 10px;
-      font-weight: 800;
-      color: #ecfeff;
-      text-align: left;
-      border-right: 1px solid rgba(8, 145, 178, 0.25);
-      background: rgba(8, 47, 73, 0.35);
-      overflow: hidden;
-      white-space: nowrap;
-      text-overflow: ellipsis;
     }
 
     .gantt-row-track {
@@ -6735,13 +6743,8 @@
       border-color: rgba(8, 145, 178, 0.25);
     }
 
-    html.theme-light .gantt-head,
-    html.theme-light .gantt-row-label {
+    html.theme-light .gantt-head {
       background: rgba(236, 254, 255, 0.9);
-    }
-
-    html.theme-light .gantt-row-label {
-      color: #0e7490;
     }
 
     html.theme-light .gantt-list-item {
@@ -6797,18 +6800,18 @@
       var hardRemoved = false;
       var readyToDismiss = false;
       var bootLayoutReady = false;
-      var revealDeadline = Date.now() + 3200;
+      var revealDeadline = Date.now() + 5000;
       var s0 = document.getElementById('boot-splash');
 
       // 各演出が完結するまでの時間（ミリ秒）
       var splashDurations = {
-        'cyber-ring': 720,
-        'neon-glitch': 860,
-        'terminal-boot': 980,
-        'ripple-warp': 780,
-        'zoom-through': 900,
-        'daily-insight': 1500,
-        'minimal-bar': 640,
+        'cyber-ring': 950,
+        'neon-glitch': 1100,
+        'terminal-boot': 1250,
+        'ripple-warp': 1050,
+        'zoom-through': 1450,
+        'daily-insight': 1650,
+        'minimal-bar': 1050,
         'instant': 0
       };
 
@@ -6966,14 +6969,17 @@
         afterSplashQueue.push(fn);
       };
 
-      // 即時起動／再表示スキップでも黒カバーは残し、レイアウト準備後に消す
-      // （早めに外すと Tailwind 未適用の生HTMLが一瞬見えて画面が乱れる）
-      if (currentSplashStyle === 'instant' || skipRepeatSplash) {
-        if (s0) s0.innerHTML = '';
-      } else if (s0) {
-        try { sessionStorage.setItem('dump_splash_at', String(Date.now())); } catch (e) { }
-        window.__renderSplashContent(s0, currentSplashStyle);
-      }
+      var styleDuration = splashDurations[currentSplashStyle];
+      if (styleDuration === undefined) styleDuration = 1000;
+      var isInstantSplash = (currentSplashStyle === 'instant' || skipRepeatSplash);
+      var splashAnimStarted = isInstantSplash;
+      var splashStartPending = false;
+      var minShowUntil = 0;
+      var splashStartFallbackTimer = null;
+
+      // 即時起動／再表示スキップでも、また通常演出でも、初期ロード中は単色カバーを保ち
+      // ロード完了・メインスレッド解放後に演出を再生する（デモ再生と同等の滑らかさを維持）
+      if (s0) s0.innerHTML = '';
 
       var twReadyCached = false;
       function utilitiesReady() {
@@ -6990,6 +6996,12 @@
           }
           var ready = window.getComputedStyle(probe).position === 'fixed';
           if (ready) {
+            var nav = document.getElementById('app-bottom-nav');
+            if (nav && window.getComputedStyle(nav).position !== 'fixed') {
+              ready = false;
+            }
+          }
+          if (ready) {
             twReadyCached = true;
             if (probe.parentNode) probe.parentNode.removeChild(probe);
           }
@@ -6997,6 +7009,50 @@
         } catch (e) {
           return true;
         }
+      }
+
+      function syncBootLayoutOnce() {
+        if (typeof window.__syncBootLayoutAfterTailwind === 'function') {
+          try { window.__syncBootLayoutAfterTailwind(); } catch (_) { }
+        }
+      }
+
+      function startSplashAnimation() {
+        if (splashAnimStarted || hardRemoved) return;
+        splashAnimStarted = true;
+        splashStartPending = false;
+        if (splashStartFallbackTimer) {
+          clearTimeout(splashStartFallbackTimer);
+          splashStartFallbackTimer = null;
+        }
+        syncBootLayoutOnce();
+        var s = document.getElementById('boot-splash');
+        if (s) {
+          try { sessionStorage.setItem('dump_splash_at', String(Date.now())); } catch (e) { }
+          window.__renderSplashContent(s, currentSplashStyle);
+          void s.offsetWidth;
+        }
+        minShowUntil = Date.now() + styleDuration;
+        setTimeout(function () { scheduleReveal(false); }, styleDuration);
+      }
+
+      function tryStartSplashAnimation(forceStart) {
+        if (splashAnimStarted || hardRemoved) return;
+        if (!forceStart && (!bootLayoutReady || !utilitiesReady())) {
+          setTimeout(function () { tryStartSplashAnimation(false); }, 50);
+          return;
+        }
+        if (splashStartPending && !forceStart) return;
+        splashStartPending = true;
+        requestAnimationFrame(function () {
+          requestAnimationFrame(startSplashAnimation);
+        });
+      }
+
+      if (!isInstantSplash) {
+        splashStartFallbackTimer = setTimeout(function () {
+          tryStartSplashAnimation(true);
+        }, 900);
       }
 
       var fadingStarted = false;
@@ -7035,25 +7091,26 @@
 
       function revealBootSurface() {
         if (hardRemoved) return;
+        syncBootLayoutOnce();
         // 即時起動・再表示スキップはフェードせず、準備完了後に真っ黒から直行
-        if (currentSplashStyle === 'instant' || skipRepeatSplash) {
+        if (isInstantSplash) {
           removeSplashNow();
           return;
         }
         smoothFadeSplash();
       }
 
-      var styleDuration = splashDurations[currentSplashStyle];
-      if (styleDuration === undefined) styleDuration = 1000;
-      var minShowUntil = Date.now() + styleDuration;
-
       function scheduleReveal(force) {
         if (hardRemoved || fadingStarted) return;
+        if (!force && !splashAnimStarted) {
+          tryStartSplashAnimation(false);
+          return;
+        }
         var timedOut = Date.now() >= revealDeadline;
         var durationLeft = minShowUntil - Date.now();
         // 演出の所定時間が終わるまで待機し、演出のブツ切りを防ぐ
         if (!force && !timedOut && (durationLeft > 0 || !bootLayoutReady || !utilitiesReady())) {
-          var waitTime = Math.max(80, durationLeft > 0 ? durationLeft : 80);
+          var waitTime = Math.max(50, durationLeft > 0 ? durationLeft : 50);
           setTimeout(function () { scheduleReveal(false); }, waitTime);
           return;
         }
@@ -7088,7 +7145,7 @@
       function dismissBootSplash(force) {
         if (!force && !readyToDismiss) return;
         if (hardRemoved) return;
-        if (!force && Date.now() < minShowUntil) {
+        if (!force && (!splashAnimStarted || Date.now() < minShowUntil)) {
           scheduleReveal(false);
           return;
         }
@@ -7104,7 +7161,11 @@
       window.__bootSplashReady = function () {
         bootLayoutReady = true;
         readyToDismiss = true;
-        scheduleReveal(false);
+        if (isInstantSplash || splashAnimStarted) {
+          scheduleReveal(false);
+        } else {
+          tryStartSplashAnimation(false);
+        }
       };
 
       // タップで強制スキップ（急いでいるときの即座消去）
@@ -7127,13 +7188,17 @@
       });
       window.addEventListener('load', function () {
         readyToDismiss = true;
-        scheduleReveal(false);
+        if (isInstantSplash || splashAnimStarted) {
+          scheduleReveal(false);
+        } else {
+          tryStartSplashAnimation(false);
+        }
       });
       // 最終安全弁のみ（配置が終わる前には消さない）
       setTimeout(function () {
         readyToDismiss = true;
         scheduleReveal(true);
-      }, 2800);
+      }, 4500);
     })();
   </script>
   <!-- Global Loader -->
@@ -13048,7 +13113,7 @@
     <div id="supple-fab-actions">
       <button type="button" onclick="openSuppleStockModal()"
         class="flex items-center gap-2 pl-3 pr-2 py-2 rounded-full bg-[#0b1021]/95 border border-cyan-700/60 text-cyan-50 shadow-lg shadow-black/40 active:scale-95 transition">
-        <span class="text-[11px] font-extrabold whitespace-nowrap">登録サプリ・在庫</span>
+        <span class="text-[11px] font-extrabold whitespace-nowrap">登録サプリ・在庫確認</span>
         <span
           class="w-10 h-10 rounded-full bg-cyan-900/80 border border-cyan-600/50 text-base flex items-center justify-center">📦</span>
       </button>
@@ -13132,7 +13197,7 @@
       </div>
       <div class="flex-1 min-h-0 p-5 space-y-3 overflow-y-auto">
         <div class="flex justify-end">
-          <button type="button" onclick="closeSuppleRoutinesModal(); openSuppleIntakeModal()"
+          <button type="button" onclick="openSuppleRoutineCreateModal()"
             class="shrink-0 whitespace-nowrap text-[11px] font-bold text-emerald-300 hover:text-emerald-200 px-2.5 py-1.5 rounded-lg bg-emerald-950/40 border border-emerald-700/50 transition active:scale-95">
             ＋ 選んで作成
           </button>
@@ -13144,6 +13209,73 @@
         <button type="button" onclick="closeSuppleRoutinesModal()"
           class="w-full py-2.5 px-3 rounded-xl bg-slate-800 border border-slate-700 text-slate-300 text-xs font-bold hover:bg-slate-700 transition-colors">
           閉じる
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== ◯ クイックセット専用作成モーダル（記録しない） ===== -->
+  <div id="modal-supple-routine-create"
+    class="fixed inset-0 hidden bg-black/85 backdrop-blur-sm flex-col justify-start sm:justify-center items-center p-0 sm:p-4 w-full h-full"
+    style="z-index: 10000; display: none;">
+    <div
+      class="bg-[#0b1021] w-full max-w-xl h-full sm:h-auto sm:max-h-[92vh] min-h-0 rounded-none sm:rounded-3xl shadow-2xl border-0 sm:border border-amber-800/50 flex flex-col overflow-hidden text-slate-100">
+      <div
+        class="px-5 pt-[calc(1.2rem+env(safe-area-inset-top,0px))] pb-3.5 border-b border-amber-900/40 flex items-center justify-between gap-3 bg-[#070a14]/95 shrink-0">
+        <div class="flex items-center gap-2.5 min-w-0">
+          <div
+            class="w-8 h-8 rounded-xl bg-amber-950 text-amber-300 border border-amber-700/50 flex items-center justify-center text-sm font-bold">
+            ⭐
+          </div>
+          <div class="min-w-0">
+            <h3 class="font-extrabold text-amber-50 text-base truncate">クイックセットを作成</h3>
+            <p class="text-[11px] text-amber-300/80">セットのみ作成（摂取記録・在庫消費はしません）</p>
+          </div>
+        </div>
+        <button type="button" onclick="closeSuppleRoutineCreateModal()"
+          class="w-8 h-8 rounded-full bg-slate-800 text-slate-400 hover:text-white flex items-center justify-center transition-colors">✕</button>
+      </div>
+      <div class="flex-1 min-h-0 p-5 space-y-4 overflow-y-auto">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label for="supple-routine-create-name" class="block text-xs font-bold text-amber-200 mb-1.5">🏷️ セット名（任意）</label>
+            <input type="text" id="supple-routine-create-name" maxlength="40" placeholder="空欄なら日付で表示"
+              class="w-full px-3 py-2.5 rounded-2xl bg-black/40 border border-amber-800/50 text-white text-sm font-semibold placeholder-slate-500 focus:outline-hidden focus:border-amber-400 transition-all" />
+          </div>
+          <div>
+            <label for="supple-routine-create-timing" class="block text-xs font-bold text-amber-200 mb-1.5">🕒 タイミング</label>
+            <select id="supple-routine-create-timing"
+              class="w-full px-3 py-2.5 rounded-2xl bg-black/40 border border-amber-800/50 text-sm font-bold text-amber-100 focus:outline-hidden focus:border-amber-400">
+              <option value="朝">朝食後</option>
+              <option value="昼">昼食後</option>
+              <option value="夜" selected>夕食後 / 就寝前</option>
+              <option value="運動前後">運動前後</option>
+              <option value="随時">随時</option>
+            </select>
+          </div>
+        </div>
+        <div>
+          <div class="flex items-center justify-between gap-2 mb-1.5">
+            <label class="min-w-0 text-xs font-bold text-amber-200 leading-tight">📦 セットに含めるサプリを選択</label>
+            <button type="button" onclick="openSuppleMasterModal()"
+              class="shrink-0 whitespace-nowrap inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl border border-dashed border-emerald-500/60 bg-emerald-950/30 hover:bg-emerald-900/40 text-emerald-300 text-[11px] font-extrabold transition active:scale-[0.98]">
+              <span class="text-sm leading-none">＋</span><span>新規登録</span>
+            </button>
+          </div>
+          <div id="supple-routine-pick-list"
+            class="max-h-72 overflow-y-auto space-y-1 rounded-2xl border border-amber-800/50 bg-black/30 p-1.5"></div>
+          <p id="supple-routine-pick-summary" class="text-[11px] text-slate-400 font-bold mt-1.5"></p>
+        </div>
+      </div>
+      <div
+        class="px-5 pt-3.5 pb-[calc(1.5rem+env(safe-area-inset-bottom,0px))] border-t border-amber-900/40 bg-[#070a14]/95 flex items-center gap-2.5 shrink-0">
+        <button type="button" onclick="closeSuppleRoutineCreateModal()"
+          class="flex-1 py-2.5 px-3 rounded-xl bg-slate-800 border border-slate-700 text-slate-300 text-xs font-bold hover:bg-slate-700 transition-colors">
+          戻る
+        </button>
+        <button type="button" id="supple-btn-submit-routine-create" onclick="submitSuppleRoutineCreate()"
+          class="flex-1 min-w-[9rem] py-2.5 px-4 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-extrabold shadow-lg shadow-amber-500/20 active:scale-[0.99] transition-all flex items-center justify-center gap-1.5">
+          ⭐ セットを作成する
         </button>
       </div>
     </div>
@@ -13264,13 +13396,6 @@
             <input type="text" id="supple-input-note" placeholder="例: 食後、多めの水で"
               class="flex-1 px-3.5 py-2 rounded-xl bg-black/40 border border-cyan-800/60 text-xs text-white placeholder-slate-500 focus:outline-hidden focus:border-cyan-400" />
           </div>
-        </div>
-
-        <div>
-          <button type="button" id="supple-btn-save-routine" onclick="saveCurrentSuppleRoutine()"
-            class="w-full py-3 px-4 rounded-2xl bg-amber-950/60 border border-amber-600/50 text-amber-200 hover:bg-amber-900/60 text-xs sm:text-sm font-extrabold active:scale-[0.99] transition-all whitespace-nowrap">
-            ⭐ この選択をセット保存
-          </button>
         </div>
 
       </div>

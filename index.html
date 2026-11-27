@@ -91,7 +91,7 @@
     }
   </style>
   <script>
-    window.__DUMP_BUILD__ = 'v466';
+    window.__DUMP_BUILD__ = 'v467';
     // かつてここで「既知の最新ビルドより古い＝巻き戻り」と判定し、キャッシュ全消し＋SW登録解除を
     // していたが、その直後はオフライン用の控えが無く、ネットワークが不調だと起動不能になった。
     // 判定値(dump_known_good_build)は下がらない一方通行のため、一度ずれると毎回自己破壊を繰り返す。
@@ -3664,27 +3664,6 @@
       gap: 0.85rem;
     }
 
-    .fortune-home-profile-link {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      margin-top: 0.15rem;
-      padding: 0.55rem 0.9rem;
-      border: 1px solid rgba(56, 189, 248, 0.35);
-      background: rgba(8, 47, 73, 0.35);
-      color: #bae6fd;
-      font-size: 0.72rem;
-      font-weight: 700;
-      letter-spacing: 0.04em;
-      border-radius: 0.65rem;
-      transition: border-color 0.15s ease, background 0.15s ease;
-      animation: fortune-home-rise 0.7s ease-out 0.38s both;
-    }
-
-    .fortune-home-profile-link:active {
-      transform: scale(0.98);
-    }
-
     /* ミチシルベ：生年月日・出生時間ドラムピッカー（ホイールピッカー） */
     .fortune-slider-card {
       position: relative;
@@ -3848,8 +3827,7 @@
       .fortune-home-lead,
       .fortune-home-kanshi,
       .fortune-home-status,
-      .fortune-home-cta,
-      .fortune-home-profile-link {
+      .fortune-home-cta {
         animation: none;
       }
     }
@@ -8107,27 +8085,7 @@
                 </div>
               </div>
 
-              <!-- 2. 名前（タップで専用ポップアップ） -->
-              <div id="fortune-home-name-wrap" class="w-full">
-                <button type="button" id="fortune-home-name-btn" onclick="openFortuneProfileModal()"
-                  class="w-full flex items-center justify-between p-3.5 bg-gradient-to-r from-sky-950/70 via-indigo-950/60 to-slate-950/80 border border-sky-600/40 hover:border-sky-400 rounded-2xl shadow-[0_4px_16px_rgba(2,6,23,0.4)] transition active:scale-[0.99] group text-left">
-                  <div class="flex items-center gap-3 min-w-0">
-                    <span class="text-xl flex-shrink-0">👤</span>
-                    <div class="min-w-0">
-                      <div class="text-[10px] text-sky-400/80 font-extrabold tracking-wider">対象プロファイル</div>
-                      <div id="fortune-home-name-text" class="text-sm sm:text-base font-extrabold text-white truncate">
-                        （未設定 - タップして登録・履歴選択）</div>
-                      <div id="fortune-home-birth-text" class="hidden text-[11px] font-mono font-bold text-sky-300/90 truncate mt-0.5"></div>
-                    </div>
-                  </div>
-                  <span
-                    class="text-xs px-2.5 py-1 rounded-lg bg-sky-900/60 group-hover:bg-sky-800/80 text-sky-200 border border-sky-500/40 font-bold shrink-0 transition">
-                    登録 / 履歴 ✎
-                  </span>
-                </button>
-              </div>
-
-              <!-- 3. 各占い項目 -->
+              <!-- 鑑定メニュー（対象プロファイルはヘッダーから切替） -->
               <div class="fortune-home-cta" role="navigation" aria-label="鑑定メニュー">
                 <button type="button" class="fortune-hub-btn fortune-hub-unified" data-fortune-key="unified"
                   aria-pressed="false" onclick="openFortuneFeature('unified')">

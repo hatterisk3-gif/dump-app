@@ -8519,34 +8519,8 @@
     }
 
     function updateFortuneNameDisplay() {
-      const nameEl = document.getElementById('fortune-home-name-text');
-      const birthEl = document.getElementById('fortune-home-birth-text');
       const headerName = document.getElementById('fortune-header-profile-name');
       const currentName = (fortuneActiveInput.name || '').trim();
-
-      if (nameEl) {
-        if (currentName) {
-          nameEl.textContent = `👤 ${currentName}`;
-          nameEl.className = 'text-sm sm:text-base font-extrabold text-sky-200 truncate';
-        } else {
-          nameEl.textContent = '（名前未設定 - タップして登録・履歴選択）';
-          nameEl.className = 'text-xs sm:text-sm font-bold text-slate-400 truncate';
-        }
-      }
-      if (birthEl) {
-        if (currentName || fortuneActiveInput.profileId) {
-          const dateText = `${fortuneActiveInput.year}-${String(fortuneActiveInput.month).padStart(2, '0')}-${String(fortuneActiveInput.day).padStart(2, '0')}`;
-          const timeText = fortuneActiveInput.unknownTime
-            ? '時間不明'
-            : `${String(fortuneActiveInput.hour).padStart(2, '0')}:${String(fortuneActiveInput.minute).padStart(2, '0')}`;
-          const genderText = fortuneActiveInput.gender === 'female' ? '女性' : '男性';
-          birthEl.textContent = `📅 ${dateText} ${timeText}・${genderText}`;
-          birthEl.classList.remove('hidden');
-        } else {
-          birthEl.textContent = '';
-          birthEl.classList.add('hidden');
-        }
-      }
       if (headerName) {
         headerName.textContent = currentName || '未設定';
       }

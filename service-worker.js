@@ -1,4 +1,4 @@
-const CACHE_NAME = 'dump-app-v466';
+const CACHE_NAME = 'dump-app-v467';
 const PENDING_WRITES_CACHE = 'dump-pending-writes-v1';
 const PENDING_WRITES_CACHE_URL = './__pending_inbox_writes.json';
 const LIVE_INPUT_DRAFT_CACHE = 'dump-input-draft-v1';

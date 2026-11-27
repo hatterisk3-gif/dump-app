@@ -91,7 +91,7 @@
     }
   </style>
   <script>
-    window.__DUMP_BUILD__ = 'v467';
+    window.__DUMP_BUILD__ = 'v469';
     // かつてここで「既知の最新ビルドより古い＝巻き戻り」と判定し、キャッシュ全消し＋SW登録解除を
     // していたが、その直後はオフライン用の控えが無く、ネットワークが不調だと起動不能になった。
     // 判定値(dump_known_good_build)は下がらない一方通行のため、一度ずれると毎回自己破壊を繰り返す。
@@ -4372,7 +4372,7 @@
       display: none;
       position: fixed;
       inset: 0;
-      z-index: 54;
+      z-index: 0;
       background: rgba(2, 6, 23, 0.45);
       backdrop-filter: blur(2px);
     }
@@ -4386,16 +4386,17 @@
       flex-direction: column;
       align-items: flex-end;
       gap: 0.55rem;
+      position: relative;
+      z-index: 2;
     }
 
     #supple-fab-add.supple-fab-open #supple-fab-actions {
       display: flex;
     }
 
-    #supple-fab-actions,
     #supple-fab-main {
       position: relative;
-      z-index: 1;
+      z-index: 2;
     }
 
     #supple-fab-add.supple-fab-open #supple-fab-main-icon {
@@ -13207,7 +13208,7 @@
           </div>
           <div>
             <h3 id="supple-modal-title" class="font-extrabold text-cyan-50 text-base">摂取したサプリの記録</h3>
-            <p id="supple-modal-subtitle" class="text-[11px] text-cyan-400/80">日付とサプリを選んで登録します</p>
+            <p id="supple-modal-subtitle" class="text-[11px] text-cyan-400/80">日時とサプリを選んで登録します</p>
           </div>
         </div>
         <button type="button" onclick="closeSuppleIntakeModal()"
@@ -13219,11 +13220,18 @@
         <!-- 編集中のID保持 hidden -->
         <input type="hidden" id="supple-edit-intake-id" value="" />
 
-        <!-- 1. 日付 -->
-        <div>
-          <label class="block text-xs font-bold text-cyan-200 mb-1.5">📅 摂取した日付</label>
-          <input type="date" id="supple-input-date"
-            class="w-full px-4 py-2.5 rounded-2xl bg-black/40 border border-cyan-800/60 text-white text-sm font-semibold focus:outline-hidden focus:border-cyan-400 transition-all" />
+        <!-- 1. 日付・時刻 -->
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-bold text-cyan-200 mb-1.5">📅 摂取した日付</label>
+            <input type="date" id="supple-input-date"
+              class="w-full px-3 py-2.5 rounded-2xl bg-black/40 border border-cyan-800/60 text-white text-sm font-semibold focus:outline-hidden focus:border-cyan-400 transition-all" />
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-cyan-200 mb-1.5">🕐 摂取した時刻</label>
+            <input type="time" id="supple-input-time"
+              class="w-full px-3 py-2.5 rounded-2xl bg-black/40 border border-cyan-800/60 text-white text-sm font-semibold focus:outline-hidden focus:border-cyan-400 transition-all" />
+          </div>
         </div>
 
         <!-- 2. サプリ選択（複数・個数・削除） -->

@@ -57,6 +57,43 @@ function getSuppleTodayStr(offsetDays = 0) {
   return y + '-' + m + '-' + day;
 }
 
+function getSuppleNowTimeStr() {
+  const d = new Date();
+  return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+}
+
+function normalizeSuppleTime(value) {
+  const raw = String(value || '').trim();
+  const m = raw.match(/^(\d{1,2}):(\d{2})(?::\d{2})?$/);
+  if (!m) return '';
+  const hh = Math.max(0, Math.min(23, parseInt(m[1], 10)));
+  const mm = Math.max(0, Math.min(59, parseInt(m[2], 10)));
+  if (!Number.isFinite(hh) || !Number.isFinite(mm)) return '';
+  return String(hh).padStart(2, '0') + ':' + String(mm).padStart(2, '0');
+}
+
+function intakeTimeOf(item) {
+  const direct = normalizeSuppleTime(item && item.time);
+  if (direct) return direct;
+  const created = item && item.createdAt ? new Date(item.createdAt) : null;
+  if (created && !Number.isNaN(created.getTime())) {
+    return String(created.getHours()).padStart(2, '0') + ':' + String(created.getMinutes()).padStart(2, '0');
+  }
+  return '';
+}
+
+function formatSuppleTimeLabel(timeStr) {
+  const t = normalizeSuppleTime(timeStr);
+  return t || '';
+}
+
+function suppleIntakeSortKey(item) {
+  const date = String((item && item.date) || '');
+  const time = intakeTimeOf(item) || '00:00';
+  const created = String((item && item.createdAt) || '');
+  return date + 'T' + time + '|' + created;
+}
+
 function setSuppleSyncStatus(text, tone = 'normal') {
   const el = document.getElementById('supple-sync-status');
   if (!el) return;
@@ -1139,6 +1176,7 @@ function runSuppleRoutine(routineId) {
     return;
   }
   const today = getSuppleTodayStr(0);
+  const nowTime = getSuppleNowTimeStr();
   const now = Date.now();
   let stockUpdated = false;
   validItems.forEach((it, i) => {
@@ -1146,6 +1184,7 @@ function runSuppleRoutine(routineId) {
     suppleIntakes.push({
       id: 'intake_' + now + '_' + i,
       date: today,
+      time: nowTime,
       suppleId: it.suppleId,
       qty,
       timing: r.timing || '随時',
@@ -1197,7 +1236,11 @@ function renderSuppleHistory() {
   }
 
   const grouped = {};
-  const sorted = [...suppleIntakes].sort((a, b) => new Date(b.date) - new Date(a.date) || new Date(b.createdAt) - new Date(a.createdAt));
+  const sorted = [...suppleIntakes].sort((a, b) => {
+    const ka = suppleIntakeSortKey(a);
+    const kb = suppleIntakeSortKey(b);
+    return ka < kb ? 1 : ka > kb ? -1 : 0;
+  });
   sorted.forEach(item => {
     if (!grouped[item.date]) grouped[item.date] = [];
     grouped[item.date].push(item);
@@ -1243,6 +1286,12 @@ function renderSuppleHistory() {
 
       const thumb = getSupplePhotoThumbHtml(s.photo, 22);
       const cat = SUPPLE_CATEGORIES.find(c => c.name === s.category) || SUPPLE_CATEGORIES[5];
+      const metaParts = [];
+      const timeLabel = formatSuppleTimeLabel(intakeTimeOf(item));
+      if (timeLabel) metaParts.push(timeLabel);
+      metaParts.push(intakeQtyOf(item) + '個');
+      if (item.timing) metaParts.push(escapeHtml(item.timing));
+      if (item.note) metaParts.push(escapeHtml(item.note));
 
       chip.innerHTML = `
         <div class="flex items-center gap-2 cursor-pointer" onclick="openSuppleEditModal('${escapeHtml(item.id)}')" title="クリックして編集">
@@ -1252,7 +1301,7 @@ function renderSuppleHistory() {
               <span class="font-bold text-slate-100 hover:text-cyan-300 transition-colors">${escapeHtml(s.name)}</span>
               <span class="w-1.5 h-1.5 rounded-full" style="background-color: ${cat.dot};"></span>
             </div>
-            <span class="text-[9px] text-slate-400">${intakeQtyOf(item)}個${item.timing ? '・' + escapeHtml(item.timing) : ''}${item.note ? '・' + escapeHtml(item.note) : ''}</span>
+            <span class="text-[9px] text-slate-400">${metaParts.join('・')}</span>
           </div>
         </div>
         <!-- アクションボタン（編集 ＆ 削除） -->
@@ -1307,13 +1356,15 @@ function setSuppleSubmitLabel(label) {
 function openSuppleIntakeModal() {
   document.getElementById('supple-edit-intake-id').value = '';
   document.getElementById('supple-modal-title').textContent = '摂取したサプリの記録';
-  document.getElementById('supple-modal-subtitle').textContent = '日付とサプリを選んで登録します';
+  document.getElementById('supple-modal-subtitle').textContent = '日時とサプリを選んで登録します';
   setSuppleSubmitLabel('✓ 登録する');
   document.getElementById('supple-btn-delete-record').classList.add('hidden');
 
   const dateEl = document.getElementById('supple-input-date');
+  const timeEl = document.getElementById('supple-input-time');
   const noteEl = document.getElementById('supple-input-note');
   if (dateEl) dateEl.value = getSuppleTodayStr(0);
+  if (timeEl) timeEl.value = getSuppleNowTimeStr();
   if (noteEl) noteEl.value = '';
 
   suppleIntakePicks = [];
@@ -1336,15 +1387,17 @@ function openSuppleEditModal(intakeId, ev) {
 
   document.getElementById('supple-edit-intake-id').value = item.id;
   document.getElementById('supple-modal-title').textContent = '摂取記録の編集';
-  document.getElementById('supple-modal-subtitle').textContent = '日付・サプリ・メモを変更できます';
+  document.getElementById('supple-modal-subtitle').textContent = '日時・サプリ・メモを変更できます';
   setSuppleSubmitLabel('✓ 更新する');
   document.getElementById('supple-btn-delete-record').classList.remove('hidden');
 
   const dateEl = document.getElementById('supple-input-date');
+  const timeEl = document.getElementById('supple-input-time');
   const timingEl = document.getElementById('supple-input-timing');
   const noteEl = document.getElementById('supple-input-note');
 
   if (dateEl) dateEl.value = item.date;
+  if (timeEl) timeEl.value = intakeTimeOf(item) || getSuppleNowTimeStr();
   if (timingEl) timingEl.value = item.timing || '夜';
   if (noteEl) noteEl.value = item.note || '';
 
@@ -1415,6 +1468,8 @@ function currentSuppleIntakePicks() {
 function submitSuppleIntake() {
   const editId = document.getElementById('supple-edit-intake-id').value;
   const date = document.getElementById('supple-input-date').value;
+  const timeEl = document.getElementById('supple-input-time');
+  const time = normalizeSuppleTime(timeEl && timeEl.value) || getSuppleNowTimeStr();
   const timing = document.getElementById('supple-input-timing').value;
   const note = document.getElementById('supple-input-note').value.trim();
   const picks = currentSuppleIntakePicks();
@@ -1432,6 +1487,7 @@ function submitSuppleIntake() {
       const oldItem = suppleIntakes[idx];
       if (adjustSuppleStock(oldItem.suppleId, intakeQtyOf(oldItem))) stockUpdated = true;
       suppleIntakes[idx].date = date;
+      suppleIntakes[idx].time = time;
       suppleIntakes[idx].suppleId = first.id;
       suppleIntakes[idx].qty = first.qty;
       suppleIntakes[idx].timing = timing;
@@ -1444,6 +1500,7 @@ function submitSuppleIntake() {
       suppleIntakes.push({
         id: 'intake_' + now + '_' + i,
         date: date,
+        time: time,
         suppleId: p.id,
         qty: p.qty,
         timing: timing,
@@ -1458,6 +1515,7 @@ function submitSuppleIntake() {
       suppleIntakes.push({
         id: 'intake_' + now + '_' + i,
         date: date,
+        time: time,
         suppleId: p.id,
         qty: p.qty,
         timing: timing,

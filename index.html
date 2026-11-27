@@ -103,15 +103,26 @@
       font-family: ui-sans-serif, system-ui, sans-serif;
     }
 
-    html:not(.boot-surface-ready) body > :not(#boot-splash) {
+    html:not([data-boot-surface="ready"]) body > :not(#boot-splash) {
       visibility: hidden !important;
       opacity: 0 !important;
       pointer-events: none !important;
     }
 
-    html:not(.ui-ready) body > :not(#boot-splash),
-    html:not(.ui-ready) body > :not(#boot-splash) * {
+    html:not([data-ui-ready="1"]) body > :not(#boot-splash),
+    html:not([data-ui-ready="1"]) body > :not(#boot-splash) * {
       animation-play-state: paused !important;
+    }
+
+    #boot-splash[data-splash-playing="0"] > * {
+      opacity: 0 !important;
+      visibility: hidden !important;
+    }
+
+    #boot-splash[data-splash-playing="0"] *,
+    #boot-splash[data-splash-playing="0"] *::before,
+    #boot-splash[data-splash-playing="0"] *::after {
+      animation: none !important;
     }
 
     #app-bottom-nav {
@@ -133,7 +144,7 @@
     }
   </style>
   <script>
-    window.__DUMP_BUILD__ = 'v475';
+    window.__DUMP_BUILD__ = 'v476';
     // かつてここで「既知の最新ビルドより古い＝巻き戻り」と判定し、キャッシュ全消し＋SW登録解除を
     // していたが、その直後はオフライン用の控えが無く、ネットワークが不調だと起動不能になった。
     // 判定値(dump_known_good_build)は下がらない一方通行のため、一度ずれると毎回自己破壊を繰り返す。
@@ -6790,10 +6801,10 @@
 
 <body class="bg-[#030509] min-h-screen text-white pb-36 selection:bg-cyan-500/30 overflow-x-hidden">
   <!-- Boot Splash（暗闇から選択された演出をフェードイン表示） -->
-  <div id="boot-splash"></div>
+  <div id="boot-splash" data-splash-playing="0"></div>
   <script>
     (function () {
-   rentSplashStyle = 'cyber-ring';
+      var currentSplashStyle = 'cyber-ring';
       try {
         var savedStyle = localStorage.getItem('dump_boot_splash_style');
         if (savedStyle) currentSplashStyle = savedStyle;
@@ -7024,6 +7035,12 @@
               if (window.getComputedStyle(nav).position !== 'fixed' || (navRect && navRect.height < 40)) {
                 ready = false;
               }
+              if (ready) {
+                var navGrid = nav.firstElementChild;
+                if (navGrid && window.getComputedStyle(navGrid).display !== 'grid') {
+                  ready = false;
+                }
+              }
             }
           }
           if (ready) {
@@ -7042,6 +7059,62 @@
         }
       }
 
+      var skipListenersBound = false;
+      function bindSplashSkipListeners() {
+        if (skipListenersBound || hardRemoved) return;
+        var s = document.getElementById('boot-splash');
+        if (!s) return;
+        skipListenersBound = true;
+        s.addEventListener('click', function () {
+          readyToDismiss = true;
+          dismissBootSplash(true);
+        }, { once: true });
+        s.addEventListener('touchend', function () {
+          readyToDismiss = true;
+          dismissBootSplash(true);
+        }, { once: true, passive: true });
+      }
+
+      function nowPerf() {
+        return (typeof performance !== 'undefined' && performance && typeof performance.now === 'function')
+          ? performance.now()
+          : Date.now();
+      }
+
+      function waitForIdleFrames(cb, maxWaitMs) {
+        var deadline = Date.now() + (maxWaitMs || 550);
+        var cleanStreak = 0;
+        var prevTs = nowPerf();
+        function step() {
+          if (splashAnimStarted || hardRemoved) return;
+          var now = nowPerf();
+          var dt = now - prevTs;
+          prevTs = now;
+          if (dt < 28) {
+            cleanStreak++;
+          } else {
+            cleanStreak = 0;
+          }
+          if (cleanStreak >= 4 || Date.now() >= deadline) {
+            cb();
+            return;
+          }
+          requestAnimationFrame(step);
+        }
+        requestAnimationFrame(step);
+      }
+
+      var splashContentMounted = false;
+      function ensureSplashContentMounted() {
+        if (splashContentMounted || isInstantSplash) return;
+        var s = document.getElementById('boot-splash');
+        if (!s) return;
+        splashContentMounted = true;
+        if (s.dataset) s.dataset.splashPlaying = '0';
+        window.__renderSplashContent(s, currentSplashStyle);
+        void s.offsetWidth;
+      }
+
       function startSplashAnimation() {
         if (splashAnimStarted || hardRemoved) return;
         splashAnimStarted = true;
@@ -7050,15 +7123,19 @@
           clearTimeout(splashStartFallbackTimer);
           splashStartFallbackTimer = null;
         }
-        syncBootLayoutOnce();
+        if (bootLayoutReady && utilitiesReady()) {
+          syncBootLayoutOnce();
+          document.documentElement.dataset.bootSurface = 'ready';
+        }
         var s = document.getElementById('boot-splash');
         if (s) {
+          ensureSplashContentMounted();
           try { sessionStorage.setItem('dump_splash_at', String(Date.now())); } catch (e) { }
-          window.__renderSplashContent(s, currentSplashStyle);
-          void s.offsetWidth;
+          if (s.dataset) s.dataset.splashPlaying = '1';
         }
         minShowUntil = Date.now() + styleDuration;
         setTimeout(function () { scheduleReveal(false); }, styleDuration);
+        setTimeout(bindSplashSkipListeners, 300);
       }
 
       function tryStartSplashAnimation(forceStart) {
@@ -7069,14 +7146,13 @@
         }
         if (splashStartPending && !forceStart) return;
         splashStartPending = true;
-        // 演出を始める前に不透明カバーの背後で UI 描画と GPU レイヤー生成を先に完了させる
-        syncBootLayoutOnce();
-        document.documentElement.classList.add('boot-surface-ready');
-        requestAnimationFrame(function () {
-          setTimeout(function () {
-            requestAnimationFrame(startSplashAnimation);
-          }, 70);
-        });
+        // 演出を始める前に不透明カバーの背後で UI 描画とスプラッシュ DOM 解析・GPU レイヤー生成を先に完了させる
+        if (bootLayoutReady && utilitiesReady()) {
+          syncBootLayoutOnce();
+          document.documentElement.dataset.bootSurface = 'ready';
+        }
+        ensureSplashContentMounted();
+        waitForIdleFrames(startSplashAnimation, 550);
       }
 
       if (!isInstantSplash) {
@@ -7091,7 +7167,8 @@
         var s = document.getElementById('boot-splash');
         if (!s) {
           hardRemoved = true;
-          document.documentElement.classList.add('boot-surface-ready', 'ui-ready');
+          document.documentElement.dataset.bootSurface = 'ready';
+          document.documentElement.dataset.uiReady = '1';
           flushAfterBootSplash();
           return;
         }
@@ -7108,10 +7185,12 @@
             finish();
           }
         });
-        document.documentElement.classList.add('boot-surface-ready');
+        document.documentElement.dataset.bootSurface = 'ready';
         requestAnimationFrame(function () {
           if (hardRemoved) return;
-          s.classList.add('splash-out');
+          s.style.opacity = '0';
+          s.style.transform = 'scale3d(1.02, 1.02, 1)';
+          s.style.pointerEvents = 'none';
         });
         setTimeout(finish, 560);
       }
@@ -7150,7 +7229,6 @@
         s = s || document.getElementById('boot-splash');
         if (s) {
           try {
-            s.classList.add('is-gone');
             s.style.display = 'none';
             s.style.opacity = '0';
             s.style.visibility = 'hidden';
@@ -7161,10 +7239,10 @@
         }
         if (hardRemoved) return;
         hardRemoved = true;
-        document.documentElement.classList.add('boot-surface-ready');
+        document.documentElement.dataset.bootSurface = 'ready';
         // スプラッシュ消去後、次フレームで背後UIのアニメーション・後続タスクを段階的に解放
         requestAnimationFrame(function () {
-          document.documentElement.classList.add('ui-ready');
+          document.documentElement.dataset.uiReady = '1';
           requestAnimationFrame(flushAfterBootSplash);
         });
       }
@@ -7195,17 +7273,6 @@
         }
       };
 
-      // タップで強制スキップ（急いでいるときの即座消去）
-      if (s0) {
-        s0.addEventListener('click', function () {
-          readyToDismiss = true;
-          dismissBootSplash(true);
-        }, { once: true });
-        s0.addEventListener('touchend', function () {
-          readyToDismiss = true;
-          dismissBootSplash(true);
-        }, { once: true, passive: true });
-      }
       // bfcache 復帰は即消去
       window.addEventListener('pageshow', function (ev) {
         if (ev && ev.persisted) {

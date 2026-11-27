@@ -36585,7 +36585,7 @@
       if (typeof restoreLiveInputDraftSync === 'function') restoreLiveInputDraftSync();
       bindInputContentHistoryLock();
       bindInputContentEditorKeys();
-      if (typeof restoreLiveInputDraftFromCacheStorage === 'function') {
+      if (!opts.isBoot && typeof restoreLiveInputDraftFromCacheStorage === 'function') {
         void restoreLiveInputDraftFromCacheStorage();
       }
       if (!opts.skipHistoryCloudSync && typeof syncLiveInputDraftWithCloud === 'function') {
@@ -36605,7 +36605,7 @@
       syncInputTabHistoryLock();
       updateSkipInputTopUI();
       if (opts.isBoot) {
-        revealInputCaret(input);
+        if (input) input.scrollTop = 0;
         const afterBoot = typeof window.__afterBootSplash === 'function' ? window.__afterBootSplash : null;
         if (afterBoot) {
           afterBoot(() => {

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'dump-app-v476';
+const CACHE_NAME = 'dump-app-v477';
 const PENDING_WRITES_CACHE = 'dump-pending-writes-v1';
 const PENDING_WRITES_CACHE_URL = './__pending_inbox_writes.json';
 const LIVE_INPUT_DRAFT_CACHE = 'dump-input-draft-v1';
@@ -461,6 +461,14 @@ self.addEventListener('message', (e) => {
   }
 });
 
+function deferBackgroundRevalidate(task, delayMs = 4000) {
+  setTimeout(() => {
+    try {
+      Promise.resolve(task()).catch(() => {});
+    } catch (_) {}
+  }, delayMs);
+}
+
 /**
  * 画面遷移（HTML）: 短時間ネット優先、だめなら全世代キャッシュ、最後に復旧ページ。
  * reject / undefined / リダイレクト済み応答は返さない（いずれも ERR_FAILED になる）。
@@ -472,7 +480,7 @@ async function handleNavigate(request) {
     : caches.match(request).then((r) => cleanResponse(r)))
     .catch(() => null);
 
-  // 現行キャッシュが揃っていれば即座（0ms）に返し、裏で version.json を確認して必要時のみキャッシュ更新
+  // 現行キャッシュが揃っていれば即座（0ms）に返し、起動直後の負荷を避けて数秒後に裏でキャッシュ更新
   if (shell) {
     try {
       const host = self.location && self.location.hostname;
@@ -480,7 +488,7 @@ async function handleNavigate(request) {
         const currentCache = await caches.open(CACHE_NAME);
         const currentShell = await cleanResponse(await currentCache.match(APP_SHELL_PATH));
         if (currentShell && currentShell.ok) {
-          (async () => {
+          deferBackgroundRevalidate(async () => {
             try {
               const verUrl = new URL('./version.json?ts=' + Date.now(), self.registration.scope).href;
               const verRes = await fetch(verUrl, { cache: 'no-store' }).catch(() => null);
@@ -493,7 +501,7 @@ async function handleNavigate(request) {
               const fresh = await fetch(appShellUrl(), { cache: 'no-store' }).catch(() => null);
               if (fresh && fresh.ok) await putIndexInCache(fresh);
             } catch (_) {}
-          })();
+          }, 4000);
           return currentShell;
         }
       }
@@ -541,9 +549,9 @@ async function handleCdn(request) {
     const cache = await caches.open(CACHE_NAME);
     const cached = await cache.match(request);
     if (cached) {
-      fetch(request).then((res) => {
+      deferBackgroundRevalidate(() => fetch(request).then((res) => {
         if (res) cache.put(request, res.clone()).catch(() => {});
-      }).catch(() => {});
+      }), 4000);
       return cached;
     }
     try {
@@ -568,9 +576,9 @@ async function handleAsset(request) {
       const currentCache = await caches.open(CACHE_NAME);
       const cachedCurrent = await currentCache.match(request);
       if (cachedCurrent) {
-        fetch(request, { cache: 'no-store' }).then((net) => {
+        deferBackgroundRevalidate(() => fetch(request, { cache: 'no-store' }).then((net) => {
           if (net && net.ok) currentCache.put(request, net.clone()).catch(() => {});
-        }).catch(() => {});
+        }), 4000);
         return cachedCurrent;
       }
     } catch (_) {}

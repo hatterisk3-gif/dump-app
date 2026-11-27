@@ -514,7 +514,7 @@
           if (typeof purgeCorruptLocalInputHistory === 'function') purgeCorruptLocalInputHistory();
           var inputMode = document.getElementById('input-mode');
           if (inputMode && inputMode.classList.contains('active') && typeof renderInputTabHistory === 'function') {
-            renderInputTabHistory({ skipCloudSync: true, skipDupSchedule: true, singleChunk: true });
+            renderInputTabHistory({ skipCloudSync: true, skipDupSchedule: true, singleChunk: true, initialChunkLimit: 10 });
           }
         } catch (err) {
           console.error('boot init failed', err);
@@ -32655,9 +32655,6 @@
       const prevLoc = (!options.fromBack && typeof getAppLocationKey === 'function')
         ? getAppLocationKey()
         : '';
-      if (tabId !== 'input-mode' && typeof closeCaptureOverlay === 'function') {
-        closeCaptureOverlay({ force: true });
-      }
       let targetTab = tabId;
       if (tabId === 'memo-mode') {
         try {
@@ -32669,6 +32666,9 @@
       }
       if (RETIRED_MEMO_SUB_TABS.includes(targetTab)) {
         targetTab = targetTab === 'diary-mode' ? 'gantt-mode' : 'input-mode';
+      }
+      if (targetTab !== 'input-mode' && typeof closeCaptureOverlay === 'function') {
+        closeCaptureOverlay({ force: true });
       }
       if (targetTab !== 'blocks-mode' && typeof closeCheckBlockExpand === 'function') {
         closeCheckBlockExpand({ silent: true });
@@ -36609,8 +36609,10 @@
         const afterBoot = typeof window.__afterBootSplash === 'function' ? window.__afterBootSplash : null;
         if (afterBoot) {
           afterBoot(() => {
-            getCaptureNavReservePx._cache = null;
-            syncCaptureOverlayViewport();
+            if (!overlay.dataset.vvGeom) {
+              getCaptureNavReservePx._cache = null;
+              syncCaptureOverlayViewport();
+            }
             ensureSubmitInboxReady({ force: true, reason: 'open_capture_post_boot' });
             revealInputCaret(input);
           });
@@ -38864,7 +38866,10 @@
       const appendChunk = () => {
         if (token !== inputTabPaintToken) return;
         const frag = document.createDocumentFragment();
-        const end = Math.min(idx + INPUT_TAB_PAINT_CHUNK, visible.length);
+        const chunkLimit = (idx === 0 && Number.isFinite(Number(paintOpts.initialChunkLimit)) && Number(paintOpts.initialChunkLimit) > 0)
+          ? Math.floor(Number(paintOpts.initialChunkLimit))
+          : INPUT_TAB_PAINT_CHUNK;
+        const end = Math.min(idx + chunkLimit, visible.length);
         for (; idx < end; idx++) {
           frag.appendChild(createInputTabHistoryCard(visible[idx], { favLookup }));
         }

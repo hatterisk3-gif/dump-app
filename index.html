@@ -54,7 +54,9 @@
 
     #boot-splash {
       position: fixed;
-      inset: -2px;
+      inset: -48px;
+      padding: 48px;
+      box-sizing: border-box;
       z-index: 2147483647;
       background: #030509;
       display: flex;
@@ -130,6 +132,14 @@
       left: 0;
       right: 0;
       bottom: 0;
+      height: 5rem;
+      z-index: 50;
+    }
+
+    #app-bottom-nav > div {
+      display: grid;
+      grid-template-columns: repeat(6, minmax(0, 1fr));
+      height: 5rem;
     }
 
     #memo-sub-nav {
@@ -137,6 +147,14 @@
       left: 0;
       right: 0;
       bottom: 5rem;
+      height: 3.5rem;
+      z-index: 48;
+    }
+
+    #memo-sub-nav > div {
+      display: grid;
+      grid-template-columns: repeat(6, minmax(0, 1fr));
+      height: 3.5rem;
     }
 
     #memo-sub-nav.hidden {
@@ -144,7 +162,7 @@
     }
   </style>
   <script>
-    window.__DUMP_BUILD__ = 'v476';
+    window.__DUMP_BUILD__ = 'v477';
     // かつてここで「既知の最新ビルドより古い＝巻き戻り」と判定し、キャッシュ全消し＋SW登録解除を
     // していたが、その直後はオフライン用の控えが無く、ネットワークが不調だと起動不能になった。
     // 判定値(dump_known_good_build)は下がらない一方通行のため、一度ずれると毎回自己破壊を繰り返す。
@@ -2368,7 +2386,9 @@
     /* 起動時ブートスプラッシュ（Tailwind読込前でも表示できるよう素のCSSで記述） */
     #boot-splash {
       position: fixed;
-      inset: -2px;
+      inset: -48px;
+      padding: 48px;
+      box-sizing: border-box;
       z-index: 2147483647;
       background: #030509;
       display: flex;
@@ -6829,7 +6849,8 @@
       var hardRemoved = false;
       var readyToDismiss = false;
       var bootLayoutReady = false;
-      var revealDeadline = Date.now() + 6500;
+      var pageLoaded = document.readyState === 'complete';
+      var revealDeadline = Date.now() + 9000;
       var s0 = document.getElementById('boot-splash');
 
       // 各演出が完結するまでの時間（ミリ秒）
@@ -7018,34 +7039,37 @@
       function utilitiesReady() {
         if (twReadyCached) return true;
         try {
-          var probe = document.getElementById('tw-ready-probe');
-          if (!probe) {
-            probe = document.createElement('div');
-            probe.id = 'tw-ready-probe';
-            probe.className = 'fixed';
-            probe.setAttribute('aria-hidden', 'true');
-            probe.style.cssText = 'left:0;top:0;width:0;height:0;overflow:hidden;pointer-events:none;';
-            document.documentElement.appendChild(probe);
-          }
-          var ready = window.getComputedStyle(probe).position === 'fixed';
-          if (ready) {
-            var nav = document.getElementById('app-bottom-nav');
-            if (nav) {
-              var navRect = nav.getBoundingClientRect ? nav.getBoundingClientRect() : null;
-              if (window.getComputedStyle(nav).position !== 'fixed' || (navRect && navRect.height < 40)) {
-                ready = false;
-              }
-              if (ready) {
-                var navGrid = nav.firstElementChild;
-                if (navGrid && window.getComputedStyle(navGrid).display !== 'grid') {
+          var ready = true;
+          var nav = document.getElementById('app-bottom-nav');
+          if (nav) {
+            var navCs = window.getComputedStyle(nav);
+            var navRect = nav.getBoundingClientRect ? nav.getBoundingClientRect() : null;
+            if (navCs.position !== 'fixed' || (navRect && navRect.height < 70)) {
+              ready = false;
+            }
+            if (ready) {
+              var navGrid = nav.firstElementChild;
+              if (navGrid) {
+                var gridCs = window.getComputedStyle(navGrid);
+                var cols = String(gridCs.gridTemplateColumns || '').trim();
+                var colCount = cols ? cols.split(/\s+/).length : 0;
+                if (gridCs.display !== 'grid' || (cols && colCount < 6 && cols.indexOf('repeat(6') < 0)) {
                   ready = false;
                 }
               }
             }
           }
           if (ready) {
+            var capOverlay = document.getElementById('capture-overlay');
+            if (capOverlay) {
+              var capCs = window.getComputedStyle(capOverlay);
+              if (capCs.position !== 'fixed' || capCs.display !== 'flex') {
+                ready = false;
+              }
+            }
+          }
+          if (ready) {
             twReadyCached = true;
-            if (probe.parentNode) probe.parentNode.removeChild(probe);
           }
           return ready;
         } catch (e) {
@@ -7082,7 +7106,7 @@
       }
 
       function waitForIdleFrames(cb, maxWaitMs) {
-        var deadline = Date.now() + (maxWaitMs || 550);
+        var deadline = Date.now() + (maxWaitMs || 700);
         var cleanStreak = 0;
         var prevTs = nowPerf();
         function step() {
@@ -7090,12 +7114,12 @@
           var now = nowPerf();
           var dt = now - prevTs;
           prevTs = now;
-          if (dt < 28) {
+          if (dt < 24) {
             cleanStreak++;
           } else {
             cleanStreak = 0;
           }
-          if (cleanStreak >= 4 || Date.now() >= deadline) {
+          if (cleanStreak >= 5 || Date.now() >= deadline) {
             cb();
             return;
           }
@@ -7125,7 +7149,6 @@
         }
         if (bootLayoutReady && utilitiesReady()) {
           syncBootLayoutOnce();
-          document.documentElement.dataset.bootSurface = 'ready';
         }
         var s = document.getElementById('boot-splash');
         if (s) {
@@ -7140,25 +7163,26 @@
 
       function tryStartSplashAnimation(forceStart) {
         if (splashAnimStarted || hardRemoved) return;
-        if (!forceStart && (!bootLayoutReady || !utilitiesReady())) {
+        if (!forceStart && (!bootLayoutReady || !utilitiesReady() || !pageLoaded)) {
           setTimeout(function () { tryStartSplashAnimation(false); }, 50);
           return;
         }
         if (splashStartPending && !forceStart) return;
         splashStartPending = true;
-        // 演出を始める前に不透明カバーの背後で UI 描画とスプラッシュ DOM 解析・GPU レイヤー生成を先に完了させる
+        // 演出中は背面UIを非表示に保ち、スプラッシュ DOM 解析・Tailwind 安定後に再生開始する
         if (bootLayoutReady && utilitiesReady()) {
           syncBootLayoutOnce();
-          document.documentElement.dataset.bootSurface = 'ready';
         }
         ensureSplashContentMounted();
-        waitForIdleFrames(startSplashAnimation, 550);
+        setTimeout(function () {
+          waitForIdleFrames(startSplashAnimation, 700);
+        }, 140);
       }
 
       if (!isInstantSplash) {
         splashStartFallbackTimer = setTimeout(function () {
           tryStartSplashAnimation(true);
-        }, 2600);
+        }, 5000);
       }
 
       var fadingStarted = false;
@@ -7185,14 +7209,17 @@
             finish();
           }
         });
+        syncBootLayoutOnce();
         document.documentElement.dataset.bootSurface = 'ready';
         requestAnimationFrame(function () {
-          if (hardRemoved) return;
-          s.style.opacity = '0';
-          s.style.transform = 'scale3d(1.02, 1.02, 1)';
-          s.style.pointerEvents = 'none';
+          requestAnimationFrame(function () {
+            if (hardRemoved) return;
+            s.style.opacity = '0';
+            s.style.transform = 'scale3d(1.02, 1.02, 1)';
+            s.style.pointerEvents = 'none';
+          });
         });
-        setTimeout(finish, 560);
+        setTimeout(finish, 600);
       }
 
       function revealBootSurface() {
@@ -7281,6 +7308,7 @@
         }
       });
       window.addEventListener('load', function () {
+        pageLoaded = true;
         readyToDismiss = true;
         if (isInstantSplash || splashAnimStarted) {
           scheduleReveal(false);
@@ -7292,7 +7320,7 @@
       setTimeout(function () {
         readyToDismiss = true;
         scheduleReveal(true);
-      }, 6000);
+      }, 9500);
     })();
   </script>
   <!-- Global Loader -->

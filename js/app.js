@@ -514,7 +514,7 @@
           if (typeof purgeCorruptLocalInputHistory === 'function') purgeCorruptLocalInputHistory();
           var inputMode = document.getElementById('input-mode');
           if (inputMode && inputMode.classList.contains('active') && typeof renderInputTabHistory === 'function') {
-            renderInputTabHistory({ skipCloudSync: true, skipDupSchedule: true });
+            renderInputTabHistory({ skipCloudSync: true, skipDupSchedule: true, singleChunk: true });
           }
         } catch (err) {
           console.error('boot init failed', err);
@@ -32114,7 +32114,8 @@
       treeBound = true;
     }
 
-    function initTreeMode() {
+    function initTreeMode(opts) {
+      opts = opts || {};
       treeState = loadTreeState();
       treeResetHistory();
       if (!treeState.linkStyle) treeState.linkStyle = 'arrow';
@@ -32126,20 +32127,27 @@
       renderTree();
       treeOpenAtOrigin();
       treeUpdateLinkStyleButton();
-      if (typeof startTreeLibraryPoll === 'function') startTreeLibraryPoll();
-      const gen = ++treeInitSyncGen;
-      setTreeHint('クラウドと同期中…');
-      const sync = (typeof syncTreeLibrary === 'function')
-        ? syncTreeLibrary({ render: true })
-        : Promise.resolve();
-      sync.then(() => {
-        if (gen !== treeInitSyncGen) return;
-        treeOpenAtOrigin();
-        treeResetInteractionHint();
-      }).catch(() => {
-        if (gen !== treeInitSyncGen) return;
-        setTreeHint('同期に失敗したため端末内データを表示中');
-      });
+      const startTreeCloudSync = () => {
+        if (typeof startTreeLibraryPoll === 'function') startTreeLibraryPoll();
+        const gen = ++treeInitSyncGen;
+        setTreeHint('クラウドと同期中…');
+        const sync = (typeof syncTreeLibrary === 'function')
+          ? syncTreeLibrary({ render: true })
+          : Promise.resolve();
+        sync.then(() => {
+          if (gen !== treeInitSyncGen) return;
+          treeOpenAtOrigin();
+          treeResetInteractionHint();
+        }).catch(() => {
+          if (gen !== treeInitSyncGen) return;
+          setTreeHint('同期に失敗したため端末内データを表示中');
+        });
+      };
+      if (opts.deferCloudSync && typeof window.__afterBootSplash === 'function') {
+        window.__afterBootSplash(startTreeCloudSync);
+      } else {
+        startTreeCloudSync();
+      }
     }
 
     // ========== QRカメラ ==========
@@ -32772,10 +32780,10 @@
         renderFavoritesList();
       }
       if (targetTab === 'gantt-mode' && typeof initGanttMode === 'function') {
-        initGanttMode();
+        initGanttMode({ deferCloudSync: !!(options && options.isBoot) });
       }
       if (targetTab === 'tree-mode' && typeof initTreeMode === 'function') {
-        initTreeMode();
+        initTreeMode({ deferCloudSync: !!(options && options.isBoot) });
       }
       if (targetTab === 'input-mode') {
         updateCaptureOverlayDateHeading();
@@ -38866,6 +38874,10 @@
           finishPaint();
           return;
         }
+        if (paintOpts.singleChunk) {
+          armHistoryTail();
+          return;
+        }
         // 画面に入る分だけ先に作り、残りは下までスクロールしたときに足す
         const canMeasure = scroller.clientHeight > 80;
         const filled = canMeasure && scroller.scrollHeight > scroller.clientHeight + 48;
@@ -40684,7 +40696,7 @@
         ? pruneStaleLocalInputHistory()
         : (typeof getLocalInputHistory === 'function' ? getLocalInputHistory() : []);
       // CAPTURE オープン時は必ず描画（初期「読み込み中...」放置／スキップ事故を防ぐ）
-      paintInputTabHistory(local, { force: true, skipDupSchedule: !!options.skipDupSchedule });
+      paintInputTabHistory(local, { force: true, skipDupSchedule: !!options.skipDupSchedule, singleChunk: !!options.singleChunk });
       if (!options.skipCloudSync) {
         runInBackground(() => syncInputTabHistoryFromCloud({ force: true }));
       }
@@ -41137,7 +41149,8 @@
       el.textContent = text || '';
       el.className = 'text-[10px] font-bold min-h-[14px] ' + (cls || 'text-cyan-600/80');
     }
-    function initGanttMode() {
+    function initGanttMode(opts) {
+      opts = opts || {};
       ganttTasks = loadGanttCache();
       if (!ganttViewStart) ganttViewStart = ganttMondayOf(ganttTodayStr());
       const startEl = document.getElementById('gantt-new-start');
@@ -41150,21 +41163,28 @@
       bindGanttNewTitleTodoTracker();
       renderGanttAll();
       renderGanttTodoCandidates();
-      setGanttSyncStatus('同期中…');
-      runInBackground(async () => {
-        try {
-          if (typeof syncInputTabHistoryFromCloud === 'function') {
-            syncInputTabHistoryFromCloud().then(() => {
-              renderGanttTodoCandidates();
-            }).catch(() => { });
+      const startGanttCloudSync = () => {
+        setGanttSyncStatus('同期中…');
+        runInBackground(async () => {
+          try {
+            if (typeof syncInputTabHistoryFromCloud === 'function') {
+              syncInputTabHistoryFromCloud().then(() => {
+                renderGanttTodoCandidates();
+              }).catch(() => { });
+            }
+            await syncGanttLibrary({ render: true });
+            setGanttSyncStatus('同期済み', 'text-emerald-500/80');
+            setTimeout(() => setGanttSyncStatus(''), 1600);
+          } catch (_) {
+            setGanttSyncStatus('オフライン（端末のみ）', 'text-amber-400/90');
           }
-          await syncGanttLibrary({ render: true });
-          setGanttSyncStatus('同期済み', 'text-emerald-500/80');
-          setTimeout(() => setGanttSyncStatus(''), 1600);
-        } catch (_) {
-          setGanttSyncStatus('オフライン（端末のみ）', 'text-amber-400/90');
-        }
-      });
+        });
+      };
+      if (opts.deferCloudSync && typeof window.__afterBootSplash === 'function') {
+        window.__afterBootSplash(startGanttCloudSync);
+      } else {
+        startGanttCloudSync();
+      }
     }
     function jumpGanttToToday() {
       ganttViewStart = ganttMondayOf(ganttTodayStr());

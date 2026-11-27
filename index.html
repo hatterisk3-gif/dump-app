@@ -54,7 +54,7 @@
 
     #boot-splash {
       position: fixed;
-      inset: 0;
+      inset: -2px;
       z-index: 2147483647;
       background: #030509;
       display: flex;
@@ -113,9 +113,27 @@
     html:not(.ui-ready) body > :not(#boot-splash) * {
       animation-play-state: paused !important;
     }
+
+    #app-bottom-nav {
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: 0;
+    }
+
+    #memo-sub-nav {
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: 5rem;
+    }
+
+    #memo-sub-nav.hidden {
+      display: none !important;
+    }
   </style>
   <script>
-    window.__DUMP_BUILD__ = 'v474';
+    window.__DUMP_BUILD__ = 'v475';
     // かつてここで「既知の最新ビルドより古い＝巻き戻り」と判定し、キャッシュ全消し＋SW登録解除を
     // していたが、その直後はオフライン用の控えが無く、ネットワークが不調だと起動不能になった。
     // 判定値(dump_known_good_build)は下がらない一方通行のため、一度ずれると毎回自己破壊を繰り返す。
@@ -219,9 +237,9 @@
   </script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link
+  <link id="dump-google-fonts-link"
     href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@500;700;800&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap"
-    rel="stylesheet" media="print" onload="this.media='all'">
+    rel="stylesheet" media="print">
   <noscript>
     <link
       href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@500;700;800&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap"
@@ -2339,7 +2357,7 @@
     /* 起動時ブートスプラッシュ（Tailwind読込前でも表示できるよう素のCSSで記述） */
     #boot-splash {
       position: fixed;
-      inset: 0;
+      inset: -2px;
       z-index: 2147483647;
       background: #030509;
       display: flex;
@@ -4383,7 +4401,7 @@
       pointer-events: none;
     }
 
-    #supple-fab-add > * {
+    #supple-fab-add>* {
       pointer-events: auto;
     }
 
@@ -6775,7 +6793,7 @@
   <div id="boot-splash"></div>
   <script>
     (function () {
-      var currentSplashStyle = 'cyber-ring';
+   rentSplashStyle = 'cyber-ring';
       try {
         var savedStyle = localStorage.getItem('dump_boot_splash_style');
         if (savedStyle) currentSplashStyle = savedStyle;
@@ -6800,7 +6818,7 @@
       var hardRemoved = false;
       var readyToDismiss = false;
       var bootLayoutReady = false;
-      var revealDeadline = Date.now() + 5000;
+      var revealDeadline = Date.now() + 6500;
       var s0 = document.getElementById('boot-splash');
 
       // 各演出が完結するまでの時間（ミリ秒）
@@ -6951,6 +6969,10 @@
       function flushAfterBootSplash() {
         if (afterSplashFlushed) return;
         afterSplashFlushed = true;
+        try {
+          var fontLink = document.getElementById('dump-google-fonts-link');
+          if (fontLink && fontLink.media !== 'all') fontLink.media = 'all';
+        } catch (_) { }
         var q = afterSplashQueue.splice(0, afterSplashQueue.length);
         q.forEach(function (item, idx) {
           setTimeout(function () {
@@ -6997,8 +7019,11 @@
           var ready = window.getComputedStyle(probe).position === 'fixed';
           if (ready) {
             var nav = document.getElementById('app-bottom-nav');
-            if (nav && window.getComputedStyle(nav).position !== 'fixed') {
-              ready = false;
+            if (nav) {
+              var navRect = nav.getBoundingClientRect ? nav.getBoundingClientRect() : null;
+              if (window.getComputedStyle(nav).position !== 'fixed' || (navRect && navRect.height < 40)) {
+                ready = false;
+              }
             }
           }
           if (ready) {
@@ -7044,15 +7069,20 @@
         }
         if (splashStartPending && !forceStart) return;
         splashStartPending = true;
+        // 演出を始める前に不透明カバーの背後で UI 描画と GPU レイヤー生成を先に完了させる
+        syncBootLayoutOnce();
+        document.documentElement.classList.add('boot-surface-ready');
         requestAnimationFrame(function () {
-          requestAnimationFrame(startSplashAnimation);
+          setTimeout(function () {
+            requestAnimationFrame(startSplashAnimation);
+          }, 70);
         });
       }
 
       if (!isInstantSplash) {
         splashStartFallbackTimer = setTimeout(function () {
           tryStartSplashAnimation(true);
-        }, 900);
+        }, 2600);
       }
 
       var fadingStarted = false;
@@ -7078,13 +7108,10 @@
             finish();
           }
         });
-        // 先に背後UIを1フレーム描画させてから、次フレームでスプラッシュをフェードアウト（突っかかり防止）
         document.documentElement.classList.add('boot-surface-ready');
         requestAnimationFrame(function () {
-          requestAnimationFrame(function () {
-            if (hardRemoved) return;
-            s.classList.add('splash-out');
-          });
+          if (hardRemoved) return;
+          s.classList.add('splash-out');
         });
         setTimeout(finish, 560);
       }
@@ -7198,7 +7225,7 @@
       setTimeout(function () {
         readyToDismiss = true;
         scheduleReveal(true);
-      }, 4500);
+      }, 6000);
     })();
   </script>
   <!-- Global Loader -->
@@ -7484,7 +7511,8 @@
             <h2 id="capture-overlay-heading" aria-label="今日の日付"
               class="capture-overlay-heading text-base sm:text-xl font-black text-cyan-100 tracking-wide drop-shadow-md truncate min-w-0 tabular-nums">
               <span id="capture-overlay-date-short" class="sm:hidden"></span><span id="capture-overlay-date-full"
-                class="hidden sm:inline"></span></h2>
+                class="hidden sm:inline"></span>
+            </h2>
             <div class="flex items-center gap-1.5 shrink-0">
               <button type="button" id="capture-cancel-replace-btn" onclick="cancelInputHistoryReplace()"
                 title="登録チェックの読み込みを取り消す" aria-label="登録チェックの読み込みを取り消す"
@@ -7751,9 +7779,11 @@
         </div>
         <div class="grid grid-cols-2 gap-2 mt-2 pb-1 shrink-0">
           <button type="button" onclick="sendReviewDetailToGantt(this)"
-            class="bg-emerald-950/40 text-emerald-200 border border-emerald-700/50 hover:bg-emerald-900/50 font-extrabold h-10 rounded-xl transition active:scale-95 text-xs">📅 ガントへ送る</button>
+            class="bg-emerald-950/40 text-emerald-200 border border-emerald-700/50 hover:bg-emerald-900/50 font-extrabold h-10 rounded-xl transition active:scale-95 text-xs">📅
+            ガントへ送る</button>
           <button type="button" onclick="sendReviewDetailToTree()"
-            class="bg-indigo-950/40 text-indigo-200 border border-indigo-700/50 hover:bg-indigo-900/50 font-extrabold h-10 rounded-xl transition active:scale-95 text-xs">🌳 ツリーへ送る</button>
+            class="bg-indigo-950/40 text-indigo-200 border border-indigo-700/50 hover:bg-indigo-900/50 font-extrabold h-10 rounded-xl transition active:scale-95 text-xs">🌳
+            ツリーへ送る</button>
         </div>
         <div id="review-move-section" class="border-t-2 border-cyan-900/50 pt-4 mt-3 hidden" aria-hidden="true"
           data-retired="folder-move">
@@ -8218,7 +8248,8 @@
                 <div id="fortune-quick-wheel-day" class="fortune-wheel-col" aria-label="日"></div>
               </div>
             </div>
-            <p class="text-[10px] text-slate-500 font-bold leading-relaxed">年・月・日の3柱だけを見ます。出生時間は使わず、節入り当日の蔵干は正午扱いで出します。</p>
+            <p class="text-[10px] text-slate-500 font-bold leading-relaxed">年・月・日の3柱だけを見ます。出生時間は使わず、節入り当日の蔵干は正午扱いで出します。
+            </p>
           </div>
 
           <div id="fortune-quick-result" class="space-y-3"></div>
@@ -8343,8 +8374,8 @@
                     <div class="fortune-wheel-cols fortune-wheel-cols--time">
                       <div id="fortune-wheel-hour" class="fortune-wheel-col" data-wheel-type="hour" aria-label="時">
                       </div>
-                      <div id="fortune-wheel-minute" class="fortune-wheel-col" data-wheel-type="minute"
-                        aria-label="分"></div>
+                      <div id="fortune-wheel-minute" class="fortune-wheel-col" data-wheel-type="minute" aria-label="分">
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -8369,7 +8400,8 @@
                 class="text-xs font-mono font-bold text-sky-200/90 bg-sky-950/60 border border-sky-800/40 px-2.5 py-1.5 rounded-lg">
                 1995年 1月 1日 12:00（男性）
               </div>
-              <button type="button" id="fortune-modal-register-submit-btn" onclick="registerCurrentFortuneSliderProfile()"
+              <button type="button" id="fortune-modal-register-submit-btn"
+                onclick="registerCurrentFortuneSliderProfile()"
                 class="w-full py-2.5 rounded-lg bg-gradient-to-r from-sky-600 to-indigo-600 hover:from-sky-500 hover:to-indigo-500 text-white font-extrabold text-xs shadow-md transition active:scale-[0.98]">
                 登録する
               </button>
@@ -8602,16 +8634,19 @@
         </div>
         <div class="shrink-0 px-3 sm:px-4 py-3 border-t border-cyan-900/40 bg-[#070a14]/95 space-y-2.5">
           <div class="flex items-center justify-between gap-2">
-            <p id="qr-status" class="text-[11px] font-extrabold text-cyan-300/90 leading-relaxed min-h-[1.25rem]">カメラ起動待ち…
+            <p id="qr-status" class="text-[11px] font-extrabold text-cyan-300/90 leading-relaxed min-h-[1.25rem]">
+              カメラ起動待ち…
             </p>
-            <label class="inline-flex items-center gap-1.5 shrink-0 text-[11px] font-bold text-slate-300 cursor-pointer select-none">
+            <label
+              class="inline-flex items-center gap-1.5 shrink-0 text-[11px] font-bold text-slate-300 cursor-pointer select-none">
               <input type="checkbox" id="qr-auto-open-toggle" onchange="setQrAutoOpenEnabled(this.checked)"
                 class="w-4 h-4 accent-cyan-500 rounded cursor-pointer">
               <span>自動オープン</span>
             </label>
           </div>
           <div id="qr-result-card" class="rounded-xl border border-cyan-900/50 bg-black/40 px-3 py-2">
-            <p id="qr-last" class="text-[11px] font-mono text-slate-300 break-all line-clamp-2 min-h-[1.1rem]">まだ読み取り結果がありません</p>
+            <p id="qr-last" class="text-[11px] font-mono text-slate-300 break-all line-clamp-2 min-h-[1.1rem]">
+              まだ読み取り結果がありません</p>
           </div>
           <div class="flex flex-wrap gap-2">
             <button type="button" id="qr-start-btn" onclick="startQrScanner()"
@@ -8800,7 +8835,8 @@
           </p>
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
             <button type="button" onclick="exportAllDumpDataJson()"
-              class="h-11 px-3 rounded-xl bg-cyan-950/70 hover:bg-cyan-900/70 border border-cyan-600/50 text-cyan-100 text-xs font-extrabold transition active:scale-95">⬇️ JSON バックアップを保存</button>
+              class="h-11 px-3 rounded-xl bg-cyan-950/70 hover:bg-cyan-900/70 border border-cyan-600/50 text-cyan-100 text-xs font-extrabold transition active:scale-95">⬇️
+              JSON バックアップを保存</button>
             <label
               class="h-11 px-3 rounded-xl bg-indigo-950/70 hover:bg-indigo-900/70 border border-indigo-600/50 text-indigo-100 text-xs font-extrabold transition active:scale-95 inline-flex items-center justify-center cursor-pointer">
               <span>⬆️ JSON から復元</span>
@@ -8819,7 +8855,8 @@
           </p>
           <div class="flex flex-wrap items-center gap-2.5 pt-1">
             <button type="button" id="btn-purge-system-trash" onclick="runPurgeSystemTrash()"
-              class="h-10 px-4 rounded-xl bg-amber-950/70 hover:bg-amber-900/70 border border-amber-600/50 text-amber-100 text-xs font-extrabold transition active:scale-95">🧹 システム履歴を整理する</button>
+              class="h-10 px-4 rounded-xl bg-amber-950/70 hover:bg-amber-900/70 border border-amber-600/50 text-amber-100 text-xs font-extrabold transition active:scale-95">🧹
+              システム履歴を整理する</button>
             <span id="purge-system-trash-status" class="text-[11px] font-bold text-slate-400"></span>
           </div>
         </div>
@@ -10703,7 +10740,8 @@
                     class="hidden mt-2 p-4 rounded-xl bg-gradient-to-br from-violet-950/50 via-black/45 to-cyan-950/40 border border-violet-700/50 space-y-3">
                   </div>
                   <p class="text-[10px] text-slate-500 font-bold leading-relaxed">※
-                    順逆は年柱の陰陽と性別（陽男・陰女は順行、陰男・陽女は逆行）。順行は次の節入り、逆行は直前の節入りまでの時間を、3日=1年・1日=4ヶ月・2時間=10日で歳・月・日に換算します。節入りは太陽黄経の実時刻（日本時間）です。年齢の右端は、次の大運が始まるときです。</p>
+                    順逆は年柱の陰陽と性別（陽男・陰女は順行、陰男・陽女は逆行）。順行は次の節入り、逆行は直前の節入りまでの時間を、3日=1年・1日=4ヶ月・2時間=10日で歳・月・日に換算します。節入りは太陽黄経の実時刻（日本時間）です。年齢の右端は、次の大運が始まるときです。
+                  </p>
                 </div>
               </div>
 
@@ -11768,7 +11806,8 @@
                 <div class="sanmei-acc-content hidden p-4 pt-1 border-t border-cyan-900/40 space-y-3">
                   <p data-info-title="月ごとの起こりやすいこと（今年）" data-info-key="sanmei-monthly"
                     class="text-[11px] text-slate-400 font-bold leading-relaxed">
-                    今年の暦月ごとに、日干×その月の干支（主星）と、生まれ月・日柱との位相（冲・合など）を混ぜた「起こりやすいテーマ」です。節入りは太陽黄経による天文計算（JST）の月柱で見ます。断定ではなく目安です。</p>
+                    今年の暦月ごとに、日干×その月の干支（主星）と、生まれ月・日柱との位相（冲・合など）を混ぜた「起こりやすいテーマ」です。節入りは太陽黄経による天文計算（JST）の月柱で見ます。断定ではなく目安です。
+                  </p>
                   <div id="sanmei-monthly-year-label" class="text-[11px] text-teal-400/90 font-bold"></div>
                   <div id="sanmei-monthly-list" class="space-y-2"></div>
                   <p class="text-[10px] text-slate-500 font-bold leading-relaxed">※
@@ -11943,8 +11982,10 @@
             <input type="hidden" id="ziwei-birth-date" value="">
             <input type="hidden" id="ziwei-birth-time" value="">
             <input type="hidden" id="ziwei-birth-gender" value="male">
-            <div class="rounded-xl border border-fuchsia-800/40 bg-black/30 px-3 py-2 flex items-center justify-between gap-2">
-              <label for="ziwei-late-rat-mode" class="text-[11px] font-extrabold text-fuchsia-300 shrink-0">23時台の扱い（子時）</label>
+            <div
+              class="rounded-xl border border-fuchsia-800/40 bg-black/30 px-3 py-2 flex items-center justify-between gap-2">
+              <label for="ziwei-late-rat-mode"
+                class="text-[11px] font-extrabold text-fuchsia-300 shrink-0">23時台の扱い（子時）</label>
               <select id="ziwei-late-rat-mode" onchange="onZiweiLateRatModeChange(this.value)"
                 class="bg-slate-950/90 border border-fuchsia-700/60 rounded-lg px-2.5 py-1.5 text-xs font-bold text-fuchsia-100 focus:outline-none focus:border-fuchsia-400">
                 <option value="early">早子（23時〜当日扱い）</option>
@@ -13238,12 +13279,14 @@
       <div class="flex-1 min-h-0 p-5 space-y-4 overflow-y-auto">
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
-            <label for="supple-routine-create-name" class="block text-xs font-bold text-amber-200 mb-1.5">🏷️ セット名（任意）</label>
+            <label for="supple-routine-create-name" class="block text-xs font-bold text-amber-200 mb-1.5">🏷️
+              セット名（任意）</label>
             <input type="text" id="supple-routine-create-name" maxlength="40" placeholder="空欄なら日付で表示"
               class="w-full px-3 py-2.5 rounded-2xl bg-black/40 border border-amber-800/50 text-white text-sm font-semibold placeholder-slate-500 focus:outline-hidden focus:border-amber-400 transition-all" />
           </div>
           <div>
-            <label for="supple-routine-create-timing" class="block text-xs font-bold text-amber-200 mb-1.5">🕒 タイミング</label>
+            <label for="supple-routine-create-timing" class="block text-xs font-bold text-amber-200 mb-1.5">🕒
+              タイミング</label>
             <select id="supple-routine-create-timing"
               class="w-full px-3 py-2.5 rounded-2xl bg-black/40 border border-amber-800/50 text-sm font-bold text-amber-100 focus:outline-hidden focus:border-amber-400">
               <option value="朝">朝食後</option>
@@ -13445,7 +13488,8 @@
       </div>
 
       <!-- フォーム（スクロール領域: flex-1 min-h-0） -->
-      <div id="supple-master-scroll-body" class="flex-1 min-h-0 p-5 pb-8 space-y-4 overflow-y-auto overscroll-contain touch-pan-y">
+      <div id="supple-master-scroll-body"
+        class="flex-1 min-h-0 p-5 pb-8 space-y-4 overflow-y-auto overscroll-contain touch-pan-y">
         <input type="hidden" id="supple-master-edit-id" value="" />
 
         <!-- バーコード登録 & JAN検索 -->
@@ -13517,8 +13561,8 @@
                 class="cursor-pointer px-2.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-cyan-200 text-xs font-bold flex items-center justify-center gap-1.5 border border-cyan-900/40 transition-colors active:scale-95 shadow-2xs whitespace-nowrap">
                 <span>📷</span>
                 <span>カメラ</span>
-                <input type="file" id="supple-master-file-camera" accept="image/*" capture="environment"
-                  class="hidden" onchange="handleSupplePhotoUpload(event)" />
+                <input type="file" id="supple-master-file-camera" accept="image/*" capture="environment" class="hidden"
+                  onchange="handleSupplePhotoUpload(event)" />
               </label>
 
               <!-- ギャラリーから選ぶ -->
@@ -13569,7 +13613,8 @@
           </div>
           <div>
             <label class="block text-[11px] font-bold text-cyan-200 mb-1">⏱️ 1日の目安消費数</label>
-            <input type="number" id="supple-master-daily-dose" min="0" max="99" step="0.5" inputmode="decimal" placeholder="例: 2"
+            <input type="number" id="supple-master-daily-dose" min="0" max="99" step="0.5" inputmode="decimal"
+              placeholder="例: 2"
               class="w-full px-3.5 py-2 rounded-2xl bg-black/40 border border-cyan-800/60 text-white text-xs font-bold focus:outline-hidden focus:border-cyan-400 transition-all" />
           </div>
         </div>

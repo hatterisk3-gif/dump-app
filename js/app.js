@@ -32573,7 +32573,7 @@
           if (typeof closeSuppleAllModals === 'function') {
             closeSuppleAllModals();
           } else {
-            ['modal-supple-intake', 'modal-supple-master', 'modal-supple-scanner'].forEach(id => {
+            ['modal-supple-intake', 'modal-supple-master', 'modal-supple-scanner', 'modal-supple-routines', 'modal-supple-stock'].forEach(id => {
               const el = document.getElementById(id);
               if (el) {
                 el.classList.add('hidden');

@@ -91,7 +91,7 @@
     }
   </style>
   <script>
-    window.__DUMP_BUILD__ = 'v463';
+    window.__DUMP_BUILD__ = 'v465';
     // かつてここで「既知の最新ビルドより古い＝巻き戻り」と判定し、キャッシュ全消し＋SW登録解除を
     // していたが、その直後はオフライン用の控えが無く、ネットワークが不調だと起動不能になった。
     // 判定値(dump_known_good_build)は下がらない一方通行のため、一度ずれると毎回自己破壊を繰り返す。
@@ -4371,6 +4371,14 @@
 
     #supple-fab-add {
       display: none !important;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 0.55rem;
+      pointer-events: none;
+    }
+
+    #supple-fab-add > * {
+      pointer-events: auto;
     }
 
     #supplement-mode.active~#supple-fab-add,
@@ -4382,12 +4390,50 @@
       display: none !important;
     }
 
+    #supple-fab-backdrop {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 54;
+      background: rgba(2, 6, 23, 0.45);
+      backdrop-filter: blur(2px);
+    }
+
+    #supple-fab-add.supple-fab-open #supple-fab-backdrop {
+      display: block;
+    }
+
+    #supple-fab-actions {
+      display: none;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 0.55rem;
+    }
+
+    #supple-fab-add.supple-fab-open #supple-fab-actions {
+      display: flex;
+    }
+
+    #supple-fab-actions,
+    #supple-fab-main {
+      position: relative;
+      z-index: 1;
+    }
+
+    #supple-fab-add.supple-fab-open #supple-fab-main-icon {
+      transform: rotate(45deg);
+    }
+
     body:has(#modal-supple-intake:not(.hidden)) #supple-fab-add,
     body:has(#modal-supple-master:not(.hidden)) #supple-fab-add,
     body:has(#modal-supple-scanner:not(.hidden)) #supple-fab-add,
+    body:has(#modal-supple-routines:not(.hidden)) #supple-fab-add,
+    body:has(#modal-supple-stock:not(.hidden)) #supple-fab-add,
     body:has(#modal-supple-intake:not(.hidden)) #app-bottom-nav,
     body:has(#modal-supple-master:not(.hidden)) #app-bottom-nav,
     body:has(#modal-supple-scanner:not(.hidden)) #app-bottom-nav,
+    body:has(#modal-supple-routines:not(.hidden)) #app-bottom-nav,
+    body:has(#modal-supple-stock:not(.hidden)) #app-bottom-nav,
     html.supple-modal-open #supple-fab-add,
     body.supple-modal-open #supple-fab-add,
     html.supple-modal-open #app-bottom-nav,
@@ -4398,26 +4444,34 @@
     /* サプリモーダルの hidden は display: none !important を保証 */
     #modal-supple-intake.hidden,
     #modal-supple-master.hidden,
-    #modal-supple-scanner.hidden {
+    #modal-supple-scanner.hidden,
+    #modal-supple-routines.hidden,
+    #modal-supple-stock.hidden {
       display: none !important;
     }
 
     /* サプリタブ以外ではサプリ関連モーダルを強制非表示 */
     body:not(:has(#supplement-mode.active)) #modal-supple-intake,
     body:not(:has(#supplement-mode.active)) #modal-supple-master,
-    body:not(:has(#supplement-mode.active)) #modal-supple-scanner {
+    body:not(:has(#supplement-mode.active)) #modal-supple-scanner,
+    body:not(:has(#supplement-mode.active)) #modal-supple-routines,
+    body:not(:has(#supplement-mode.active)) #modal-supple-stock {
       display: none !important;
     }
 
     /* サプリ記録・マスタ登録モーダルの全画面展開（モバイル） */
     #modal-supple-intake,
-    #modal-supple-master {
+    #modal-supple-master,
+    #modal-supple-routines,
+    #modal-supple-stock {
       position: fixed;
       inset: 0;
     }
 
     #modal-supple-intake>div,
-    #modal-supple-master>div {
+    #modal-supple-master>div,
+    #modal-supple-routines>div,
+    #modal-supple-stock>div {
       display: flex !important;
       flex-direction: column !important;
       overflow: hidden !important;
@@ -4427,7 +4481,9 @@
     @media (max-width: 639px) {
 
       #modal-supple-intake,
-      #modal-supple-master {
+      #modal-supple-master,
+      #modal-supple-routines,
+      #modal-supple-stock {
         top: 0 !important;
         right: 0 !important;
         bottom: 0 !important;
@@ -4438,7 +4494,9 @@
       }
 
       #modal-supple-intake>div,
-      #modal-supple-master>div {
+      #modal-supple-master>div,
+      #modal-supple-routines>div,
+      #modal-supple-stock>div {
         height: 100% !important;
         max-height: 100% !important;
         min-height: 0 !important;
@@ -8471,44 +8529,6 @@
               </div>
             </div>
           </section>
-
-          <!-- クイックセット（一括記録） -->
-          <section id="supple-routines-section"
-            class="bg-[#0b1021]/90 rounded-3xl p-4 border border-cyan-900/50 space-y-2.5">
-            <div class="flex items-center justify-between gap-2">
-              <div class="flex items-center gap-1.5 min-w-0">
-                <span class="text-sm shrink-0">⚡</span>
-                <h3 class="font-extrabold text-cyan-50 text-xs sm:text-sm truncate">クイックセット（1タップ記録）</h3>
-              </div>
-              <button type="button" onclick="openSuppleIntakeModal()"
-                class="shrink-0 whitespace-nowrap text-[11px] font-bold text-emerald-300 hover:text-emerald-200 px-2.5 py-1 rounded-lg bg-emerald-950/40 border border-emerald-700/50 transition active:scale-95">
-                ＋ 選んで作成
-              </button>
-            </div>
-            <div id="supple-routines-list" class="grid grid-cols-1 sm:grid-cols-2 gap-2"></div>
-          </section>
-
-          <!-- 登録サプリ・在庫一覧（折りたたみ） -->
-          <details id="supple-master-list-section"
-            class="bg-[#0b1021]/90 rounded-3xl border border-cyan-900/50 overflow-hidden">
-            <summary
-              class="cursor-pointer list-none px-4 py-3.5 flex items-center justify-between gap-2 text-xs sm:text-sm font-extrabold text-cyan-100 hover:bg-cyan-950/30 select-none">
-              <span class="flex items-center gap-1.5"><span>📦</span><span>登録サプリ・在庫管理</span></span>
-              <span class="flex items-center gap-2">
-                <span id="supple-master-list-badge" class="text-[11px] text-cyan-400/80 font-bold"></span>
-                <span class="text-cyan-400 text-xs">▾</span>
-              </span>
-            </summary>
-            <div class="px-4 pb-4 pt-1 border-t border-cyan-900/30 space-y-2.5">
-              <div class="flex justify-end">
-                <button type="button" onclick="openSuppleMasterModal()"
-                  class="px-3 py-1.5 rounded-xl bg-emerald-950/50 border border-emerald-600/50 text-emerald-300 text-[11px] font-extrabold hover:bg-emerald-900/50 transition active:scale-95">
-                  ＋ 新しいサプリを追加
-                </button>
-              </div>
-              <div id="supple-master-list-container" class="space-y-2"></div>
-            </div>
-          </details>
 
           <!-- 摂取履歴タイムライン一覧 -->
           <section class="space-y-3">
@@ -13061,14 +13081,40 @@
     <!-- 旧整理バッジ互換（常時非表示・件数同期のみ） -->
     <span id="badge-count" class="hidden" aria-hidden="true" style="display:none!important" hidden>0</span>
   </nav>
-  <!-- サプリ登録用フローティングプラスボタン (FAB) -->
-  <button type="button" id="supple-fab-add" onclick="openSuppleIntakeModal()" aria-label="摂取したサプリを登録"
-    class="fixed right-5 z-[55] w-14 h-14 rounded-full bg-gradient-to-tr from-emerald-500 to-teal-400 text-white shadow-[0_10px_25px_rgba(16,185,129,0.5)] flex items-center justify-center hover:scale-105 active:scale-95 transition-all duration-200 group focus:outline-hidden"
-    style="display: none; width: 56px; height: 56px; bottom: calc(6.2rem + env(safe-area-inset-bottom, 0px)); right: 1.25rem;">
-    <span
-      class="text-3xl font-light leading-none select-none group-hover:rotate-90 transition-transform duration-300 pb-0.5"
-      style="display:inline-block; line-height: 1;">＋</span>
-  </button>
+  <!-- サプリ用フローティングアクション（スピードダイアル） -->
+  <div id="supple-fab-add" class="fixed z-[55]"
+    style="display: none; bottom: calc(6.2rem + env(safe-area-inset-bottom, 0px)); right: 1.25rem;"
+    aria-label="サプリ操作メニュー">
+    <div id="supple-fab-backdrop" onclick="closeSuppleFabMenu()" aria-hidden="true"></div>
+    <div id="supple-fab-actions">
+      <button type="button" onclick="openSuppleStockModal()"
+        class="flex items-center gap-2 pl-3 pr-2 py-2 rounded-full bg-[#0b1021]/95 border border-cyan-700/60 text-cyan-50 shadow-lg shadow-black/40 active:scale-95 transition">
+        <span class="text-[11px] font-extrabold whitespace-nowrap">登録サプリ・在庫</span>
+        <span
+          class="w-10 h-10 rounded-full bg-cyan-900/80 border border-cyan-600/50 text-base flex items-center justify-center">📦</span>
+      </button>
+      <button type="button" onclick="openSuppleRoutinesModal()"
+        class="flex items-center gap-2 pl-3 pr-2 py-2 rounded-full bg-[#0b1021]/95 border border-amber-600/55 text-amber-50 shadow-lg shadow-black/40 active:scale-95 transition">
+        <span class="text-[11px] font-extrabold whitespace-nowrap">クイックセット</span>
+        <span
+          class="w-10 h-10 rounded-full bg-amber-950/90 border border-amber-500/50 text-base flex items-center justify-center">⚡</span>
+      </button>
+      <button type="button" onclick="closeSuppleFabMenu(); openSuppleIntakeModal()"
+        class="flex items-center gap-2 pl-3 pr-2 py-2 rounded-full bg-[#0b1021]/95 border border-emerald-600/55 text-emerald-50 shadow-lg shadow-black/40 active:scale-95 transition">
+        <span class="text-[11px] font-extrabold whitespace-nowrap">摂取を記録</span>
+        <span
+          class="w-10 h-10 rounded-full bg-emerald-900/80 border border-emerald-500/50 text-base flex items-center justify-center">✓</span>
+      </button>
+    </div>
+    <button type="button" id="supple-fab-main" onclick="toggleSuppleFabMenu()" aria-label="サプリメニューを開く"
+      aria-expanded="false" aria-controls="supple-fab-actions"
+      class="w-14 h-14 rounded-full bg-gradient-to-tr from-emerald-500 to-teal-400 text-white shadow-[0_10px_25px_rgba(16,185,129,0.5)] flex items-center justify-center hover:scale-105 active:scale-95 transition-all duration-200 focus:outline-hidden"
+      style="width: 56px; height: 56px;">
+      <span id="supple-fab-main-icon"
+        class="text-3xl font-light leading-none select-none transition-transform duration-300 pb-0.5"
+        style="display:inline-block; line-height: 1;">＋</span>
+    </button>
+  </div>
 
   <nav id="app-bottom-nav"
     class="fixed bottom-0 left-0 right-0 bg-[#070a14]/80 backdrop-blur-xl border-t border-cyan-900/50 shadow-[0_-10px_40px_rgba(34,211,238,0.15)] z-50">
@@ -13105,6 +13151,87 @@
       </button>
     </div>
   </nav>
+  <!-- ===== ◯ クイックセットモーダル ===== -->
+  <div id="modal-supple-routines"
+    class="fixed inset-0 hidden bg-black/85 backdrop-blur-sm flex-col justify-start sm:justify-center items-center p-0 sm:p-4 w-full h-full"
+    style="z-index: 10000; display: none;">
+    <div
+      class="bg-[#0b1021] w-full max-w-xl h-full sm:h-auto sm:max-h-[92vh] min-h-0 rounded-none sm:rounded-3xl shadow-2xl border-0 sm:border border-amber-800/50 flex flex-col overflow-hidden text-slate-100">
+      <div class="px-5 pt-5 pb-3 border-b border-amber-900/40 flex items-center justify-between gap-3 shrink-0">
+        <div class="flex items-center gap-2.5 min-w-0">
+          <div
+            class="w-8 h-8 rounded-xl bg-amber-950 text-amber-300 border border-amber-700/50 flex items-center justify-center text-sm font-bold">
+            ⚡
+          </div>
+          <div class="min-w-0">
+            <h3 class="font-extrabold text-amber-50 text-base truncate">クイックセット</h3>
+            <p class="text-[11px] text-amber-300/80">1タップでまとめて記録</p>
+          </div>
+        </div>
+        <button type="button" onclick="closeSuppleRoutinesModal()"
+          class="w-8 h-8 rounded-full bg-slate-800 text-slate-400 hover:text-white flex items-center justify-center transition-colors">✕</button>
+      </div>
+      <div class="flex-1 min-h-0 p-5 space-y-3 overflow-y-auto">
+        <div class="flex justify-end">
+          <button type="button" onclick="closeSuppleRoutinesModal(); openSuppleIntakeModal()"
+            class="shrink-0 whitespace-nowrap text-[11px] font-bold text-emerald-300 hover:text-emerald-200 px-2.5 py-1.5 rounded-lg bg-emerald-950/40 border border-emerald-700/50 transition active:scale-95">
+            ＋ 選んで作成
+          </button>
+        </div>
+        <div id="supple-routines-list" class="grid grid-cols-1 sm:grid-cols-2 gap-2"></div>
+      </div>
+      <div
+        class="px-5 pt-3.5 pb-[calc(1.5rem+env(safe-area-inset-bottom,0px))] border-t border-amber-900/40 bg-[#070a14]/95 shrink-0">
+        <button type="button" onclick="closeSuppleRoutinesModal()"
+          class="w-full py-2.5 px-3 rounded-xl bg-slate-800 border border-slate-700 text-slate-300 text-xs font-bold hover:bg-slate-700 transition-colors">
+          閉じる
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== ◯ 登録サプリ・在庫確認モーダル ===== -->
+  <div id="modal-supple-stock"
+    class="fixed inset-0 hidden bg-black/85 backdrop-blur-sm flex-col justify-start sm:justify-center items-center p-0 sm:p-4 w-full h-full"
+    style="z-index: 10000; display: none;">
+    <div
+      class="bg-[#0b1021] w-full max-w-xl h-full sm:h-auto sm:max-h-[92vh] min-h-0 rounded-none sm:rounded-3xl shadow-2xl border-0 sm:border border-cyan-800/60 flex flex-col overflow-hidden text-slate-100">
+      <div class="px-5 pt-5 pb-3 border-b border-cyan-900/40 flex items-center justify-between gap-3 shrink-0">
+        <div class="flex items-center gap-2.5 min-w-0">
+          <div
+            class="w-8 h-8 rounded-xl bg-cyan-950 text-cyan-300 border border-cyan-700/50 flex items-center justify-center text-sm font-bold">
+            📦
+          </div>
+          <div class="min-w-0">
+            <h3 class="font-extrabold text-cyan-50 text-base truncate">登録サプリ・在庫確認</h3>
+            <p class="text-[11px] text-cyan-400/80">種類の管理と残数の確認</p>
+          </div>
+        </div>
+        <div class="flex items-center gap-2 shrink-0">
+          <span id="supple-master-list-badge" class="text-[11px] text-cyan-400/80 font-bold"></span>
+          <button type="button" onclick="closeSuppleStockModal()"
+            class="w-8 h-8 rounded-full bg-slate-800 text-slate-400 hover:text-white flex items-center justify-center transition-colors">✕</button>
+        </div>
+      </div>
+      <div class="flex-1 min-h-0 p-5 space-y-3 overflow-y-auto">
+        <div class="flex justify-end">
+          <button type="button" onclick="openSuppleMasterModal()"
+            class="px-3 py-1.5 rounded-xl bg-emerald-950/50 border border-emerald-600/50 text-emerald-300 text-[11px] font-extrabold hover:bg-emerald-900/50 transition active:scale-95">
+            ＋ 新しいサプリを追加
+          </button>
+        </div>
+        <div id="supple-master-list-container" class="space-y-2"></div>
+      </div>
+      <div
+        class="px-5 pt-3.5 pb-[calc(1.5rem+env(safe-area-inset-bottom,0px))] border-t border-cyan-900/40 bg-[#070a14]/95 shrink-0">
+        <button type="button" onclick="closeSuppleStockModal()"
+          class="w-full py-2.5 px-3 rounded-xl bg-slate-800 border border-slate-700 text-slate-300 text-xs font-bold hover:bg-slate-700 transition-colors">
+          閉じる
+        </button>
+      </div>
+    </div>
+  </div>
+
   <!-- ===== ◯ 摂取したサプリ 登録・編集モーダル ===== -->
   <div id="modal-supple-intake"
     class="fixed inset-0 hidden bg-black/85 backdrop-blur-sm flex-col justify-start sm:justify-center items-center p-0 sm:p-4 w-full h-full"
@@ -13139,15 +13266,6 @@
           <label class="block text-xs font-bold text-cyan-200 mb-1.5">📅 摂取した日付</label>
           <input type="date" id="supple-input-date"
             class="w-full px-4 py-2.5 rounded-2xl bg-black/40 border border-cyan-800/60 text-white text-sm font-semibold focus:outline-hidden focus:border-cyan-400 transition-all" />
-        </div>
-
-        <!-- 1.5. セットから選択（登録済みクイックセットがある場合のみ表示） -->
-        <div id="supple-intake-routines-wrap" class="hidden">
-          <div class="flex items-center justify-between gap-2 mb-1.5">
-            <label class="text-xs font-bold text-amber-200">⚡ セットから選択</label>
-            <span class="text-[10px] text-slate-400 font-bold">タップで一括選択</span>
-          </div>
-          <div id="supple-intake-routines-list" class="grid grid-cols-1 gap-1.5"></div>
         </div>
 
         <!-- 2. サプリ選択（複数・個数・削除） -->

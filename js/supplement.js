@@ -401,16 +401,83 @@ async function uploadSuppleMasterPhotoToDrive(masterId, dataUrl) {
   }
 }
 
+function closeSuppleFabMenu() {
+  const fab = document.getElementById('supple-fab-add');
+  const mainBtn = document.getElementById('supple-fab-main');
+  if (fab) fab.classList.remove('supple-fab-open');
+  if (mainBtn) {
+    mainBtn.setAttribute('aria-expanded', 'false');
+    mainBtn.setAttribute('aria-label', 'サプリメニューを開く');
+  }
+}
+
+function toggleSuppleFabMenu() {
+  const fab = document.getElementById('supple-fab-add');
+  const mainBtn = document.getElementById('supple-fab-main');
+  if (!fab) return;
+  const willOpen = !fab.classList.contains('supple-fab-open');
+  fab.classList.toggle('supple-fab-open', willOpen);
+  if (mainBtn) {
+    mainBtn.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
+    mainBtn.setAttribute('aria-label', willOpen ? 'サプリメニューを閉じる' : 'サプリメニューを開く');
+  }
+}
+
+function showSuppleSheetModal(id) {
+  closeSuppleFabMenu();
+  const modal = document.getElementById(id);
+  if (!modal) return;
+  if (modal.parentElement !== document.body) document.body.appendChild(modal);
+  modal.classList.remove('hidden');
+  modal.classList.add('flex');
+  modal.style.setProperty('display', 'flex', 'important');
+  syncSuppleFabVisibility();
+}
+
+function hideSuppleSheetModal(id) {
+  const modal = document.getElementById(id);
+  if (!modal) return;
+  modal.classList.add('hidden');
+  modal.classList.remove('flex');
+  modal.style.setProperty('display', 'none', 'important');
+  syncSuppleFabVisibility();
+}
+
+function openSuppleRoutinesModal() {
+  renderSuppleRoutines();
+  showSuppleSheetModal('modal-supple-routines');
+}
+
+function closeSuppleRoutinesModal() {
+  hideSuppleSheetModal('modal-supple-routines');
+}
+
+function openSuppleStockModal() {
+  renderSuppleMasterList();
+  showSuppleSheetModal('modal-supple-stock');
+}
+
+function closeSuppleStockModal() {
+  hideSuppleSheetModal('modal-supple-stock');
+}
+
 function syncSuppleFabVisibility() {
   const fab = document.getElementById('supple-fab-add');
   const suppleTab = document.getElementById('supplement-mode');
   const isSuppleActive = !!(suppleTab && suppleTab.classList.contains('active'));
-  const anyModalOpen = ['modal-supple-intake', 'modal-supple-master', 'modal-supple-scanner'].some((id) => {
+  const anyModalOpen = [
+    'modal-supple-intake',
+    'modal-supple-master',
+    'modal-supple-scanner',
+    'modal-supple-routines',
+    'modal-supple-stock'
+  ].some((id) => {
     const el = document.getElementById(id);
     return el && !el.classList.contains('hidden');
   });
   document.documentElement.classList.toggle('supple-modal-open', anyModalOpen);
   document.body.classList.toggle('supple-modal-open', anyModalOpen);
+  if (!isSuppleActive || anyModalOpen) closeSuppleFabMenu();
   if (fab) {
     fab.style.setProperty('display', (isSuppleActive && !anyModalOpen) ? 'flex' : 'none', 'important');
   }
@@ -1027,67 +1094,6 @@ function renderSuppleRoutines() {
       container.innerHTML = chipsHtml + restoreHtml;
     }
   }
-  renderSuppleIntakeRoutines();
-}
-
-function renderSuppleIntakeRoutines() {
-  const wrap = document.getElementById('supple-intake-routines-wrap');
-  const listEl = document.getElementById('supple-intake-routines-list');
-  if (!wrap || !listEl) return;
-  const allRoutines = getAllSuppleRoutines();
-  if (!allRoutines.length) {
-    wrap.classList.add('hidden');
-    listEl.innerHTML = '';
-    return;
-  }
-  wrap.classList.remove('hidden');
-  const ordered = orderedSuppleRoutines(allRoutines);
-  listEl.innerHTML = ordered.map((r) => {
-    const label = suppleRoutineDisplayName(r);
-    const isMorning = (r.timing || '') === '朝';
-    const validCount = (r.items || []).filter((it) => suppleMasters.some((m) => m.id === it.suppleId)).length;
-    const names = (r.items || []).map((it) => {
-      const m = suppleMasters.find((x) => x.id === it.suppleId);
-      return m ? m.name + (it.qty > 1 ? '×' + it.qty : '') : '';
-    }).filter(Boolean).join(' / ');
-    const thumbs = suppleRoutineThumbsHtml(r.items, isMorning ? 40 : 28);
-    const autoBadge = r.isAuto
-      ? `<span class="inline-block ml-1 px-1 py-0.2 rounded bg-emerald-950/80 border border-emerald-600/45 text-[9px] font-extrabold text-emerald-300 align-middle">自動</span>`
-      : '';
-    const delTitle = r.isAuto ? 'この自動セットを非表示にする' : 'セットを削除';
-    return `
-      <div class="flex items-start gap-1 rounded-xl bg-amber-950/45 border ${isMorning ? 'border-amber-400/70' : 'border-amber-600/50'} pl-3 pr-1.5 py-2 w-full" data-supple-routine-auto="${r.isAuto ? '1' : '0'}">
-        <button type="button" onclick="applySuppleRoutineToIntakePicker('${escapeHtml(r.id)}')"
-          class="text-left min-w-0 flex-1 text-amber-100 hover:text-white transition active:scale-[0.99]">
-          <span class="block text-xs font-extrabold">⚡ ${escapeHtml(label)} <span class="text-[10px] text-emerald-300 font-bold">(${escapeHtml(r.timing || '随時')}${validCount ? '・' + validCount + '種' : ''})</span>${autoBadge}</span>
-          ${thumbs}
-          ${names ? `<span class="block text-[9px] text-amber-200/75 mt-1 leading-snug">${escapeHtml(names)}</span>` : ''}
-        </button>
-        <button type="button" onclick="deleteSuppleRoutine('${escapeHtml(r.id)}', event)"
-          class="w-6 h-6 rounded-lg text-amber-300/70 hover:text-rose-400 hover:bg-slate-800/80 text-[11px] shrink-0"
-          title="${delTitle}" aria-label="${delTitle}">✕</button>
-      </div>
-    `;
-  }).join('');
-}
-
-function applySuppleRoutineToIntakePicker(routineId) {
-  const r = findSuppleRoutineById(routineId);
-  if (!r) return;
-  const validItems = (r.items || []).filter((it) => suppleMasters.some((m) => m.id === it.suppleId));
-  if (!validItems.length) {
-    alert('このセットに含まれるサプリが見つかりませんでした');
-    return;
-  }
-  suppleIntakePicks = validItems.map((it) => ({
-    id: it.suppleId,
-    qty: Math.max(1, Math.min(99, parseInt(it.qty, 10) || 1))
-  }));
-  const timingEl = document.getElementById('supple-input-timing');
-  if (timingEl && r.timing && Array.from(timingEl.options).some((o) => o.value === r.timing)) {
-    timingEl.value = r.timing;
-  }
-  renderSuppleDropdownList();
 }
 
 function saveCurrentSuppleRoutine() {
@@ -1151,6 +1157,7 @@ function runSuppleRoutine(routineId) {
   if (stockUpdated) saveSuppleMasters(suppleMasters, { queueCloud: false });
   saveSuppleIntakes(suppleIntakes);
   renderSuppleAll();
+  closeSuppleRoutinesModal();
   setSuppleSyncStatus('⚡ 「' + label + '」を記録しました（' + validItems.length + '種）', 'ok');
 }
 
@@ -1310,7 +1317,6 @@ function openSuppleIntakeModal() {
   if (noteEl) noteEl.value = '';
 
   suppleIntakePicks = [];
-  renderSuppleIntakeRoutines();
   renderSuppleDropdownList();
   const modal = document.getElementById('modal-supple-intake');
   if (modal) {
@@ -1343,7 +1349,6 @@ function openSuppleEditModal(intakeId, ev) {
   if (noteEl) noteEl.value = item.note || '';
 
   suppleIntakePicks = [{ id: item.suppleId, qty: intakeQtyOf(item) }];
-  renderSuppleIntakeRoutines();
   renderSuppleDropdownList();
 
   const modal = document.getElementById('modal-supple-intake');
@@ -1358,10 +1363,19 @@ function openSuppleEditModal(intakeId, ev) {
 
 // サプリ関連の全モーダルを一括で閉じる
 function closeSuppleAllModals() {
+  closeSuppleFabMenu();
   closeSuppleIntakeModal();
   closeSuppleMasterModal();
   closeSupplementBarcodeScanner();
-  ['modal-supple-intake', 'modal-supple-master', 'modal-supple-scanner'].forEach(id => {
+  closeSuppleRoutinesModal();
+  closeSuppleStockModal();
+  [
+    'modal-supple-intake',
+    'modal-supple-master',
+    'modal-supple-scanner',
+    'modal-supple-routines',
+    'modal-supple-stock'
+  ].forEach(id => {
     const el = document.getElementById(id);
     if (el) {
       el.classList.add('hidden');

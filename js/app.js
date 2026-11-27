@@ -32719,6 +32719,7 @@
         initTreeMode();
       }
       if (targetTab === 'input-mode') {
+        updateCaptureOverlayDateHeading();
         if (typeof ensureInputTopPreferenceApplied === 'function') {
           ensureInputTopPreferenceApplied({
             skipAutoFocus: !!(options && options.skipAutoFocus),
@@ -36561,11 +36562,41 @@
         }, 120);
       }
     }
+    let captureOverlayDateKey = '';
+    function updateCaptureOverlayDateHeading(force) {
+      const heading = document.getElementById('capture-overlay-heading');
+      if (!heading) return;
+      const now = new Date();
+      const y = now.getFullYear();
+      const m = now.getMonth() + 1;
+      const d = now.getDate();
+      const w = ['日', '月', '火', '水', '木', '金', '土'][now.getDay()];
+      const key = `${y}-${m}-${d}`;
+      if (!force && key === captureOverlayDateKey) return;
+      captureOverlayDateKey = key;
+      const shortText = `${m}/${d}(${w})`;
+      const fullText = `${y}/${m}/${d}(${w})`;
+      const jaTitle = `${y}年${m}月${d}日（${w}）`;
+      const shortEl = document.getElementById('capture-overlay-date-short');
+      const fullEl = document.getElementById('capture-overlay-date-full');
+      if (shortEl && fullEl) {
+        shortEl.textContent = shortText;
+        fullEl.textContent = fullText;
+      } else {
+        heading.textContent = shortText;
+      }
+      heading.title = jaTitle;
+      heading.setAttribute('aria-label', jaTitle);
+    }
     window.addEventListener('pageshow', () => {
+      updateCaptureOverlayDateHeading();
       if (isCaptureOverlayOpen()) revealInputCaret();
     });
     document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'visible' && isCaptureOverlayOpen()) revealInputCaret();
+      if (document.visibilityState === 'visible') {
+        updateCaptureOverlayDateHeading();
+        if (isCaptureOverlayOpen()) revealInputCaret();
+      }
     });
     function closeCaptureOverlay(opts) {
       opts = opts || {};
@@ -41044,6 +41075,7 @@
       if (endEl && !endEl.value) endEl.value = ganttAddDays(today, 2);
       const gcalToggle = document.getElementById('gantt-gcal-sync-toggle');
       if (gcalToggle) gcalToggle.checked = isGanttGCalSyncEnabled();
+      bindGanttNewTitleTodoTracker();
       renderGanttAll();
       renderGanttTodoCandidates();
       setGanttSyncStatus('同期中…');
@@ -41076,7 +41108,250 @@
       renderGanttTaskList();
       renderGanttTodoCandidates();
     }
+    let ganttBarDrag = null;
+    let ganttBarScrollLockBound = false;
+    const GANTT_BAR_LONG_PRESS_MS = 220;
+
+    function ganttFormatShortMd(dateStr) {
+      const dt = ganttParseDate(dateStr);
+      if (!dt) return String(dateStr || '');
+      return (dt.getMonth() + 1) + '/' + dt.getDate();
+    }
+
+    function formatGanttShortRange(startStr, endStr) {
+      return startStr === endStr
+        ? ganttFormatShortMd(startStr)
+        : (ganttFormatShortMd(startStr) + ' 〜 ' + ganttFormatShortMd(endStr));
+    }
+
+    function ensureGanttBarScrollLockListeners() {
+      if (ganttBarScrollLockBound) return;
+      ganttBarScrollLockBound = true;
+      window.addEventListener('touchmove', (ev) => {
+        if (!ganttBarDrag || !ganttBarDrag.started) return;
+        if (ev.cancelable) ev.preventDefault();
+        const t = ev.touches && ev.touches[0];
+        if (t) {
+          ganttBarDrag.lastX = t.clientX;
+          ganttBarDrag.lastY = t.clientY;
+          updateGanttBarDrag(t.clientX);
+        }
+      }, { capture: true, passive: false });
+      window.addEventListener('wheel', (ev) => {
+        if (!ganttBarDrag || !ganttBarDrag.started) return;
+        if (ev.cancelable) ev.preventDefault();
+      }, { capture: true, passive: false });
+      window.addEventListener('blur', () => {
+        if (ganttBarDrag) cancelGanttBarDrag();
+      });
+    }
+
+    function positionGanttDragTooltip(drag, text) {
+      if (!drag || !drag.tooltip || !drag.barEl) return;
+      const rect = drag.barEl.getBoundingClientRect();
+      const centerX = rect.left + rect.width / 2;
+      const x = Math.max(48, Math.min(window.innerWidth - 48, centerX));
+      const y = Math.max(36, rect.top - 8);
+      drag.tooltip.textContent = text;
+      drag.tooltip.style.left = x + 'px';
+      drag.tooltip.style.top = y + 'px';
+    }
+
+    function cleanupGanttBarDragState(drag) {
+      if (!drag) return;
+      if (drag.timer) {
+        clearTimeout(drag.timer);
+        drag.timer = null;
+      }
+      if (drag.barEl) {
+        drag.barEl.classList.remove('is-dragging');
+      }
+      const wrap = document.getElementById('gantt-chart-wrap');
+      if (wrap) {
+        wrap.classList.remove('is-bar-dragging');
+        if (drag.onWrapScroll) wrap.removeEventListener('scroll', drag.onWrapScroll);
+      }
+      if (drag.tooltip && drag.tooltip.parentNode) {
+        drag.tooltip.parentNode.removeChild(drag.tooltip);
+      }
+      drag.tooltip = null;
+      if (ganttBarDrag === drag) ganttBarDrag = null;
+    }
+
+    function cancelGanttBarDrag() {
+      if (!ganttBarDrag) return;
+      const drag = ganttBarDrag;
+      const wasStarted = drag.started;
+      cleanupGanttBarDragState(drag);
+      if (wasStarted) {
+        renderGanttChart();
+        setGanttSyncStatus('');
+      }
+    }
+
+    function startGanttBarDrag(drag) {
+      if (ganttBarDrag !== drag || drag.started || drag.scrolling) return;
+      ensureGanttBarScrollLockListeners();
+      drag.started = true;
+      drag.timer = null;
+      drag.startX = drag.lastX;
+      if (drag.barEl) {
+        drag.barEl.dataset.suppressClick = '1';
+        drag.barEl.classList.add('is-dragging');
+        try { drag.barEl.setPointerCapture(drag.pointerId); } catch (_) { }
+      }
+      const wrap = document.getElementById('gantt-chart-wrap');
+      if (wrap) {
+        drag.lockedScrollLeft = wrap.scrollLeft;
+        drag.onWrapScroll = () => {
+          if (ganttBarDrag === drag && drag.started && wrap.scrollLeft !== drag.lockedScrollLeft) {
+            wrap.scrollLeft = drag.lockedScrollLeft;
+          }
+        };
+        wrap.addEventListener('scroll', drag.onWrapScroll, { passive: true });
+        wrap.classList.add('is-bar-dragging');
+      }
+      const tooltip = document.createElement('div');
+      tooltip.className = 'gantt-drag-tooltip';
+      document.body.appendChild(tooltip);
+      drag.tooltip = tooltip;
+      positionGanttDragTooltip(drag, formatGanttShortRange(drag.taskStart, drag.taskEnd));
+      try { if (navigator.vibrate) navigator.vibrate(18); } catch (_) { }
+      setGanttSyncStatus('左右にスライドして日付を変更', 'text-cyan-300 font-bold');
+    }
+
+    function updateGanttBarDrag(clientX) {
+      if (!ganttBarDrag || !ganttBarDrag.started) return;
+      const drag = ganttBarDrag;
+      const rawDelta = Math.round((clientX - drag.startX) / GANTT_DAY_W);
+      const minDelta = -drag.origEndOff;
+      const maxDelta = (GANTT_VIEW_DAYS - 1) - drag.origStartOff;
+      const deltaDays = Math.max(minDelta, Math.min(maxDelta, rawDelta));
+      const newStartOff = drag.origStartOff + deltaDays;
+      const newEndOff = drag.origEndOff + deltaDays;
+      const visStart = Math.max(0, Math.min(GANTT_VIEW_DAYS - 1, newStartOff));
+      const visEnd = Math.max(visStart, Math.min(GANTT_VIEW_DAYS - 1, newEndOff));
+      if (drag.barEl) {
+        const left = GANTT_LABEL_W + visStart * GANTT_DAY_W + 3;
+        const w = Math.max(GANTT_DAY_W - 6, (visEnd - visStart + 1) * GANTT_DAY_W - 6);
+        drag.barEl.style.left = left + 'px';
+        drag.barEl.style.width = w + 'px';
+      }
+      if (deltaDays !== drag.deltaDays) {
+        drag.deltaDays = deltaDays;
+        try { if (navigator.vibrate) navigator.vibrate(8); } catch (_) { }
+      }
+      const nextStart = ganttAddDays(drag.taskStart, deltaDays);
+      const nextEnd = ganttAddDays(drag.taskEnd, deltaDays);
+      const rangeText = formatGanttShortRange(nextStart, nextEnd);
+      positionGanttDragTooltip(drag, rangeText);
+      setGanttSyncStatus(rangeText, 'text-cyan-300 font-bold');
+    }
+
+    function finishGanttBarDrag() {
+      if (!ganttBarDrag) return;
+      const drag = ganttBarDrag;
+      const taskId = drag.taskId;
+      const deltaDays = drag.deltaDays;
+      const wasStarted = drag.started;
+      cleanupGanttBarDragState(drag);
+      if (!wasStarted) return;
+      if (deltaDays !== 0) {
+        shiftGanttTaskDates(taskId, deltaDays);
+      } else {
+        renderGanttChart();
+        setGanttSyncStatus('');
+      }
+    }
+
+    function shiftGanttTaskDates(id, deltaDays) {
+      if (!deltaDays) return;
+      const task = ganttTasks.find((t) => t.id === id);
+      if (!task) return;
+      const nextStart = ganttAddDays(task.start, deltaDays);
+      const nextEnd = ganttAddDays(task.end, deltaDays);
+      const updated = normalizeGanttTask({ ...task, start: nextStart, end: nextEnd });
+      if (!updated) return;
+      saveGanttCache(ganttTasks.map((t) => t.id === id ? updated : t));
+      renderGanttAll();
+      setGanttSyncStatus('日付を変更しました（' + formatGanttShortRange(updated.start, updated.end) + '）', 'text-emerald-500/80');
+      if (isGanttGCalSyncEnabled()) {
+        syncTaskToGCal(updated);
+      }
+    }
+
+    function bindGanttBarDrag(barEl, task) {
+      if (!barEl || !task) return;
+      barEl.addEventListener('contextmenu', (ev) => {
+        ev.preventDefault();
+      });
+      barEl.addEventListener('pointerdown', (e) => {
+        if (e.pointerType === 'mouse' && e.button !== 0) return;
+        if (ganttBarDrag) cancelGanttBarDrag();
+        const origStartOff = ganttDiffDays(ganttViewStart, task.start);
+        const origEndOff = ganttDiffDays(ganttViewStart, task.end);
+        const drag = {
+          pointerId: e.pointerId,
+          taskId: task.id,
+          taskStart: task.start,
+          taskEnd: task.end,
+          origStartOff,
+          origEndOff,
+          barEl,
+          startX: e.clientX,
+          startY: e.clientY,
+          lastX: e.clientX,
+          lastY: e.clientY,
+          deltaDays: 0,
+          started: false,
+          scrolling: false,
+          tooltip: null,
+          timer: null,
+          lockedScrollLeft: 0,
+          onWrapScroll: null
+        };
+        ganttBarDrag = drag;
+        const onMove = (ev) => {
+          if (!ganttBarDrag || ganttBarDrag !== drag || ev.pointerId !== drag.pointerId) return;
+          drag.lastX = ev.clientX;
+          drag.lastY = ev.clientY;
+          if (!drag.started) {
+            const dist = Math.hypot(ev.clientX - drag.startX, ev.clientY - drag.startY);
+            if (!drag.scrolling && dist > 8) {
+              drag.scrolling = true;
+              if (drag.timer) {
+                clearTimeout(drag.timer);
+                drag.timer = null;
+              }
+            }
+            return;
+          }
+          if (ev.cancelable) ev.preventDefault();
+          updateGanttBarDrag(ev.clientX);
+        };
+        const onUp = (ev) => {
+          if (ev.pointerId !== drag.pointerId) return;
+          document.removeEventListener('pointermove', onMove, true);
+          document.removeEventListener('pointerup', onUp, true);
+          document.removeEventListener('pointercancel', onUp, true);
+          if (ganttBarDrag !== drag) return;
+          if (drag.scrolling || !drag.started || ev.type === 'pointercancel') {
+            cancelGanttBarDrag();
+            return;
+          }
+          finishGanttBarDrag();
+        };
+        document.addEventListener('pointermove', onMove, true);
+        document.addEventListener('pointerup', onUp, true);
+        document.addEventListener('pointercancel', onUp, true);
+        drag.timer = setTimeout(() => {
+          startGanttBarDrag(drag);
+        }, GANTT_BAR_LONG_PRESS_MS);
+      });
+    }
+
     function renderGanttChart() {
+      if (ganttBarDrag && ganttBarDrag.started) return;
       const chart = document.getElementById('gantt-chart');
       const labelEl = document.getElementById('gantt-range-label');
       if (!chart) return;
@@ -41103,6 +41378,7 @@
       }).join('');
 
       const sorted = normalizeGanttTasks(ganttTasks);
+      const taskById = new Map(sorted.map((t) => [t.id, t]));
       let body = '';
       if (!sorted.length) {
         body = '<div class="gantt-empty">タスクがありません。下のフォームから追加できます。</div>';
@@ -41142,10 +41418,23 @@
         + '<div class="gantt-corner" style="width:' + GANTT_LABEL_W + 'px">タスク</div>'
         + headCells + '</div><div class="gantt-body">' + body + '</div>';
 
-      chart.querySelectorAll('.gantt-bar, .gantt-row-label').forEach((el) => {
+      chart.querySelectorAll('.gantt-row-label').forEach((el) => {
         el.addEventListener('click', (ev) => {
           ev.preventDefault();
           const id = el.getAttribute('data-id');
+          if (id) focusGanttTaskInList(id);
+        });
+      });
+      chart.querySelectorAll('.gantt-bar').forEach((el) => {
+        const id = el.getAttribute('data-id');
+        const task = id ? taskById.get(id) : null;
+        if (task) bindGanttBarDrag(el, task);
+        el.addEventListener('click', (ev) => {
+          ev.preventDefault();
+          if (el.dataset.suppressClick === '1') {
+            el.dataset.suppressClick = '';
+            return;
+          }
           if (id) focusGanttTaskInList(id);
         });
       });
@@ -41339,6 +41628,8 @@
         alert('開始日と終了日を指定してください');
         return;
       }
+      const matchedTodo = findGanttTodoCandidateByTitle(title) || ganttSelectedTodoCandidate;
+      ganttSelectedTodoCandidate = null;
       const task = normalizeGanttTask({
         id: ganttNewId(),
         title,
@@ -41348,6 +41639,7 @@
         done: false
       });
       saveGanttCache(ganttTasks.concat([task]));
+      const removedFromTodo = matchedTodo ? removeGanttTodoCandidateFromTodoList(matchedTodo) : false;
       if (titleEl) {
         titleEl.value = '';
         try { titleEl.blur(); } catch (_) { }
@@ -41368,7 +41660,7 @@
 
       renderGanttAll();
       scrollGanttToTop();
-      setGanttSyncStatus('保存しました', 'text-emerald-500/80');
+      setGanttSyncStatus(removedFromTodo ? '保存しました（やることリストから削除）' : '保存しました', 'text-emerald-500/80');
 
       if (isGanttGCalSyncEnabled()) {
         setGanttSyncStatus('📅 Googleカレンダーに同期中…', 'text-sky-400 font-bold');
@@ -41523,27 +41815,59 @@
 
     function extractGanttTodoTitle(raw) {
       if (!raw || typeof raw !== 'string') return '';
-      const lines = raw.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+      const lines = raw
+        .split(/\r?\n/)
+        .map((l) => l.trim())
+        .filter((l) => l && !/^!\[.*?\]\(.*?\)$/.test(l) && !/^https?:\/\/\S+$/i.test(l));
       if (!lines.length) return '';
-      let line = lines[0];
-      line = line.replace(/^[-*・■□▶︎▷\s]*(?:\[[ xX]?\])?\s*/, '').trim();
-      line = line.replace(/^(\d+[.)]\s*)/, '').trim();
-      if (/^!\[.*?\]\(.*?\)$/.test(line)) return '';
-      if (/^https?:\/\/\S+$/i.test(line)) return '';
-      return line.slice(0, 60);
+      let text = lines.join(' ');
+      text = text.replace(/^[-*・■□▶︎▷\s]*(?:\[[ xX]?\])?\s*/, '').trim();
+      text = text.replace(/^(\d+[.)]\s*)/, '').trim();
+      if (!text) return '';
+      if (/^!\[.*?\]\(.*?\)$/.test(text)) return '';
+      if (/^https?:\/\/\S+$/i.test(text)) return '';
+      return text.slice(0, 60);
     }
 
-    function getGanttTodoCandidates() {
-      const seen = new Set();
+    let ganttSelectedTodoCandidate = null;
+
+    function getGanttTodoCandidateEntries() {
+      const byTitleKey = new Map();
       const results = [];
 
-      const addCandidate = (text) => {
-        const title = extractGanttTodoTitle(text);
+      const addCandidateRecord = (record) => {
+        if (!record || !record.content) return;
+        const title = extractGanttTodoTitle(record.content);
         if (!title) return;
-        const key = title.toLowerCase();
-        if (seen.has(key)) return;
-        seen.add(key);
-        results.push(title);
+        const titleKey = title.toLowerCase();
+        let group = byTitleKey.get(titleKey);
+        if (!group) {
+          group = { title, key: titleKey, entries: [] };
+          byTitleKey.set(titleKey, group);
+          results.push(group);
+        }
+        const contentKey = typeof dumpContentKey === 'function'
+          ? dumpContentKey(record.content)
+          : String(record.content || '').trim();
+        const existing = group.entries.find((e) => {
+          const eKey = typeof dumpContentKey === 'function' ? dumpContentKey(e.content) : String(e.content || '').trim();
+          return eKey === contentKey;
+        });
+        if (existing) {
+          if (!existing.id && record.id) existing.id = record.id;
+          if (!existing.dumpId && record.dumpId) existing.dumpId = record.dumpId;
+          if ((!existing.file || existing.file === '未整理') && record.file) existing.file = record.file;
+          return;
+        }
+        group.entries.push({
+          id: record.id ? String(record.id) : '',
+          dumpId: record.dumpId ? String(record.dumpId) : '',
+          content: String(record.content),
+          folder: 'やることリスト',
+          file: record.file ? String(record.file) : '未整理',
+          lane: 'todo',
+          sourceKind: record.sourceKind || ''
+        });
       };
 
       if (typeof pendingDumpCache !== 'undefined' && Array.isArray(pendingDumpCache)) {
@@ -41552,7 +41876,13 @@
           const folder = String(p.destFolder || p.folder || '').trim();
           const lane = p.lane || (folder === 'やることリスト' ? 'todo' : '');
           if (lane === 'todo' || folder === 'やることリスト') {
-            addCandidate(p.content);
+            addCandidateRecord({
+              id: '',
+              dumpId: p.id && !(typeof isTempId === 'function' && isTempId(p.id)) ? String(p.id) : '',
+              content: p.content,
+              file: p.destFile || p.file || '未整理',
+              sourceKind: 'pending'
+            });
           }
         });
       }
@@ -41574,7 +41904,13 @@
           const lane = (typeof historyEntryLane === 'function' ? historyEntryLane(e) : '') || e.lane;
           const folder = String(e.destFolder || e.folder || '').replace(/^📥\s*/, '').trim();
           if (lane === 'todo' || folder === 'やることリスト') {
-            addCandidate(e.content);
+            addCandidateRecord({
+              id: e.id ? String(e.id) : '',
+              dumpId: e.dumpId && !(typeof isTempId === 'function' && isTempId(e.dumpId)) ? String(e.dumpId) : '',
+              content: e.content,
+              file: e.file || '未整理',
+              sourceKind: 'history'
+            });
           }
         });
       }
@@ -41589,13 +41925,82 @@
           if (item && item.content) {
             const folder = String(item.folder || '').trim();
             if (folder === 'やることリスト') {
-              addCandidate(item.content);
+              addCandidateRecord({
+                id: '',
+                dumpId: item.id && !(typeof isTempId === 'function' && isTempId(item.id)) ? String(item.id) : '',
+                content: item.content,
+                file: item.file || '未整理',
+                sourceKind: 'stored'
+              });
             }
           }
         });
       }
 
       return results;
+    }
+
+    function getGanttTodoCandidates() {
+      return getGanttTodoCandidateEntries().map((c) => c.title);
+    }
+
+    function findGanttTodoCandidateByTitle(title) {
+      const key = String(title || '').trim().toLowerCase();
+      if (!key) return null;
+      return getGanttTodoCandidateEntries().find((c) => c.key === key) || null;
+    }
+
+    function bindGanttNewTitleTodoTracker() {
+      const titleEl = document.getElementById('gantt-new-title');
+      if (!titleEl || titleEl.dataset.ganttTodoBound === '1') return;
+      titleEl.dataset.ganttTodoBound = '1';
+      const syncSelection = () => {
+        const val = String(titleEl.value || '').trim();
+        if (!val) {
+          ganttSelectedTodoCandidate = null;
+          return;
+        }
+        const exact = findGanttTodoCandidateByTitle(val);
+        if (exact) {
+          ganttSelectedTodoCandidate = exact;
+          return;
+        }
+        if (ganttSelectedTodoCandidate) {
+          const prevKey = ganttSelectedTodoCandidate.key;
+          const curKey = val.toLowerCase();
+          if (!prevKey.includes(curKey) && !curKey.includes(prevKey)) {
+            ganttSelectedTodoCandidate = null;
+          }
+        }
+      };
+      titleEl.addEventListener('input', syncSelection);
+      titleEl.addEventListener('change', syncSelection);
+    }
+
+    function removeGanttTodoCandidateFromTodoList(candidate) {
+      if (!candidate || !Array.isArray(candidate.entries) || !candidate.entries.length) return false;
+      const contents = [];
+      const storedIds = [];
+      candidate.entries.forEach((entry) => {
+        if (!entry || !entry.content) return;
+        contents.push(entry.content);
+        if (entry.dumpId && !(typeof isTempId === 'function' && isTempId(entry.dumpId))) {
+          storedIds.push(entry.dumpId);
+        }
+        if (typeof commitInputTabHistoryDelete === 'function') {
+          commitInputTabHistoryDelete(entry, false);
+        }
+      });
+      if (typeof forgetDumpedItemsByContents === 'function' && contents.length) {
+        forgetDumpedItemsByContents(contents, { includeStored: true });
+      }
+      if (typeof rememberRecentDumpTrash === 'function' && (storedIds.length || contents.length)) {
+        rememberRecentDumpTrash({ ids: storedIds, contents });
+      }
+      if (typeof flushLocalInputHistoryCache === 'function') {
+        flushLocalInputHistoryCache();
+      }
+      return contents.length > 0;
     }
 
     function renderGanttTodoCandidates() {
@@ -49556,6 +49961,8 @@
       const lightweightMode = localStorage.getItem('setting_lightweight_mode') === 'true';
       applyLightweightMode(lightweightMode);
       applyColorTheme(getColorTheme());
+      updateCaptureOverlayDateHeading(true);
+      setInterval(() => updateCaptureOverlayDateHeading(), 60 * 1000);
       // 廃止タブが残っていたら退避／フォルダ直接保存設定を無効化
       try {
         const sub = localStorage.getItem('memo_sub_tab');

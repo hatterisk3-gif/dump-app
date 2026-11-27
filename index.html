@@ -91,7 +91,7 @@
     }
   </style>
   <script>
-    window.__DUMP_BUILD__ = 'v462';
+    window.__DUMP_BUILD__ = 'v463';
     // かつてここで「既知の最新ビルドより古い＝巻き戻り」と判定し、キャッシュ全消し＋SW登録解除を
     // していたが、その直後はオフライン用の控えが無く、ネットワークが不調だと起動不能になった。
     // 判定値(dump_known_good_build)は下がらない一方通行のため、一度ずれると毎回自己破壊を繰り返す。
@@ -6547,11 +6547,44 @@
       text-overflow: ellipsis;
       box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
       z-index: 1;
+      cursor: grab;
+      user-select: none;
+      -webkit-user-select: none;
+      -webkit-touch-callout: none;
+      transition: box-shadow 0.12s ease, filter 0.12s ease;
     }
 
     .gantt-bar.is-done {
       text-decoration: line-through;
       filter: grayscale(0.35);
+    }
+
+    .gantt-bar.is-dragging {
+      cursor: grabbing;
+      z-index: 10;
+      box-shadow: 0 6px 18px rgba(34, 211, 238, 0.55), 0 0 0 2px rgba(255, 255, 255, 0.9);
+      filter: brightness(1.12);
+      touch-action: none;
+    }
+
+    .gantt-chart-wrap.is-bar-dragging {
+      touch-action: none;
+    }
+
+    .gantt-drag-tooltip {
+      position: fixed;
+      z-index: 1200;
+      pointer-events: none;
+      padding: 0.25rem 0.55rem;
+      border-radius: 999px;
+      background: rgba(8, 47, 73, 0.96);
+      border: 1px solid rgba(34, 211, 238, 0.75);
+      color: #ecfeff;
+      font-size: 11px;
+      font-weight: 900;
+      white-space: nowrap;
+      box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
+      transform: translate(-50%, -100%);
     }
 
     .gantt-list-item {
@@ -6688,6 +6721,11 @@
       background: rgba(236, 254, 255, 0.85);
       color: #0e7490;
       border-color: rgba(8, 145, 178, 0.3);
+    }
+
+    html.theme-light .gantt-drag-tooltip {
+      background: rgba(14, 116, 144, 0.96);
+      color: #ffffff;
     }
   </style>
 </head>
@@ -7341,9 +7379,10 @@
         <div id="capture-overlay-panel"
           class="bg-[#0b1021] p-3 sm:p-5 rounded-2xl sm:rounded-3xl shadow-[0_0_40px_rgba(34,211,238,0.15)] w-full max-w-none mx-auto relative border border-cyan-900/50 flex-1 min-h-0 flex flex-col overflow-hidden">
           <div id="capture-overlay-header" class="shrink-0 flex justify-between items-center gap-2 mb-1.5">
-            <h2
-              class="capture-overlay-heading text-base sm:text-xl font-black text-cyan-100 tracking-wide drop-shadow-md truncate min-w-0">
-              INBOX入力</h2>
+            <h2 id="capture-overlay-heading" aria-label="今日の日付"
+              class="capture-overlay-heading text-base sm:text-xl font-black text-cyan-100 tracking-wide drop-shadow-md truncate min-w-0 tabular-nums">
+              <span id="capture-overlay-date-short" class="sm:hidden"></span><span id="capture-overlay-date-full"
+                class="hidden sm:inline"></span></h2>
             <div class="flex items-center gap-1.5 shrink-0">
               <button type="button" id="capture-cancel-replace-btn" onclick="cancelInputHistoryReplace()"
                 title="登録チェックの読み込みを取り消す" aria-label="登録チェックの読み込みを取り消す"

@@ -9841,6 +9841,64 @@
       return (yearYang && male) || (!yearYang && !male);
     }
 
+    function sanmeiAgePointLabel(years, months, days) {
+      let text = `${years}歳`;
+      if (months) text += `${months}ヶ月`;
+      if (days) text += `${days}日`;
+      return text;
+    }
+
+    function sanmeiDaiunPeriodLabel(q, step) {
+      const start = sanmeiAgePointLabel(q.years + step * 10, q.months, q.days);
+      const next = sanmeiAgePointLabel(q.years + (step + 1) * 10, q.months, q.days);
+      return `${start}〜${next}`;
+    }
+
+    function sanmeiDaiunRangeText(item) {
+      if (!item) return '';
+      if (item.periodLabel) return item.periodLabel;
+      return `${item.periodStart}〜${item.periodEnd}歳`;
+    }
+
+    function sanmeiDaiunStartText(info) {
+      if (!info) return '';
+      if (info.startAgeLabel) return info.startAgeLabel;
+      return `${info.startAge}歳`;
+    }
+
+    // 3日=1年、1日=4ヶ月、1時辰（2時間）=10日
+    function sanmeiSplitQiyun(diffMs) {
+      const minutes = Math.max(0, Math.abs(diffMs) / 60000);
+      const yearMin = 3 * 24 * 60;
+      const monthMin = yearMin / 12;
+      const dayMin = 12; // 2時間=10日 → 1日=12分相当
+      let years = Math.floor(minutes / yearMin);
+      let rem = minutes - years * yearMin;
+      let months = Math.floor(rem / monthMin + 1e-9);
+      rem -= months * monthMin;
+      let days = Math.floor(rem / dayMin + 1e-9);
+      if (months >= 12) {
+        years += Math.floor(months / 12);
+        months %= 12;
+      }
+      return { years, months, days };
+    }
+
+    function sanmeiAddCalendar(base, years, months, days) {
+      const monthIndex = base.getMonth() + months;
+      const y = base.getFullYear() + years + Math.floor(monthIndex / 12);
+      const m = ((monthIndex % 12) + 12) % 12;
+      const dim = new Date(y, m + 1, 0).getDate();
+      const dt = new Date(y, m, Math.min(base.getDate(), dim), base.getHours(), base.getMinutes(), 0, 0);
+      if (days) dt.setDate(dt.getDate() + days);
+      return dt;
+    }
+
+    function sanmeiFormatClock(dt) {
+      const p = (n) => String(n).padStart(2, '0');
+      return `${dt.getFullYear()}-${p(dt.getMonth() + 1)}-${p(dt.getDate())} ${p(dt.getHours())}:${p(dt.getMinutes())}`;
+    }
+
     function sanmeiCalcDaiun(natalChart, birthDateStr, birthTimeStr, gender, asOf = new Date()) {
       const birth = sanmeiParseDateTime(birthDateStr, birthTimeStr || '12:00');
       const forward = sanmeiDaiunForward(natalChart.year.stem, gender);
@@ -9858,45 +9916,49 @@
         }
       }
       if (!target) return null;
-      const days = Math.abs(Math.round((target.getTime() - t) / 86400000));
-      const startAge = Math.max(0, Math.round(days / 3));
+      const q = sanmeiSplitQiyun(target.getTime() - t);
+      const qiyun = sanmeiAddCalendar(birth, q.years, q.months, q.days);
       const monthJiazi = sanmeiJiaziIndex(natalChart.month.stem, natalChart.month.branch);
       const firstJiazi = (monthJiazi + (forward ? 1 : -1) + 60) % 60;
 
-      // 満年齢（簡易）
       let age = asOf.getFullYear() - birth.getFullYear();
       const mdAsOf = (asOf.getMonth() + 1) * 100 + asOf.getDate();
       const mdBirth = (birth.getMonth() + 1) * 100 + birth.getDate();
       if (mdAsOf < mdBirth) age -= 1;
       age = Math.max(0, age);
 
+      const beforeStart = asOf.getTime() < qiyun.getTime();
       let step = 0;
-      let periodStart = startAge;
-      let periodEnd = startAge + 9;
-      let currentJiazi = firstJiazi;
-      if (age >= startAge) {
-        step = Math.floor((age - startAge) / 10);
-        currentJiazi = (firstJiazi + (forward ? step : -step) + 600) % 60;
-        periodStart = startAge + step * 10;
-        periodEnd = periodStart + 9;
-      } else {
-        // 起運前は「前運」として月柱を参考表示せず、最初の大運を予告
-        currentJiazi = firstJiazi;
-        periodStart = startAge;
-        periodEnd = startAge + 9;
+      if (!beforeStart) {
+        for (let i = 0; i < 16; i++) {
+          const start = sanmeiAddCalendar(qiyun, i * 10, 0, 0);
+          const next = sanmeiAddCalendar(qiyun, (i + 1) * 10, 0, 0);
+          if (asOf.getTime() >= start.getTime() && asOf.getTime() < next.getTime()) {
+            step = i;
+            break;
+          }
+          if (asOf.getTime() >= next.getTime()) step = i + 1;
+        }
       }
-
+      const shownStep = beforeStart ? 0 : step;
+      const currentJiazi = (firstJiazi + (forward ? shownStep : -shownStep) + 600) % 60;
       const stem = currentJiazi % 10;
       const branch = currentJiazi % 12;
       const juusei = sanmeiFollowerStar(natalChart.day.stem, branch);
+      const startAgeLabel = sanmeiAgePointLabel(q.years, q.months, q.days);
       return {
         forward,
-        startAge,
+        startAge: q.years,
+        startMonths: q.months,
+        startDays: q.days,
+        startAgeLabel,
         age,
-        step,
-        beforeStart: age < startAge,
-        periodStart,
-        periodEnd,
+        step: shownStep,
+        beforeStart,
+        periodStart: q.years + shownStep * 10,
+        periodEnd: q.years + (shownStep + 1) * 10,
+        periodLabel: sanmeiDaiunPeriodLabel(q, shownStep),
+        basisText: `${forward ? '次の節入り' : '直前の節入り'} ${sanmeiFormatClock(target)} までを ${startAgeLabel} に換算（3日=1年・1日=4ヶ月・2時間=10日）`,
         stem,
         branch,
         ganzi: SANMEI_STEMS[stem] + SANMEI_BRANCHES[branch],
@@ -9912,7 +9974,11 @@
       const base = sanmeiCalcDaiun(natalChart, birthDateStr, birthTimeStr || '12:00', gender, asOf);
       if (!base) return null;
       const forward = base.forward;
-      const startAge = base.startAge;
+      const qiyunAge = {
+        years: base.startAge,
+        months: base.startMonths || 0,
+        days: base.startDays || 0
+      };
       const monthJiazi = sanmeiJiaziIndex(natalChart.month.stem, natalChart.month.branch);
       const firstJiazi = (monthJiazi + (forward ? 1 : -1) + 60) % 60;
       const tenchuKey = sanmeiTenchusatsuKey(natalChart.day.stem, natalChart.day.branch);
@@ -9938,8 +10004,9 @@
         const branch = jiazi % 12;
         const stemChar = SANMEI_STEMS[stem];
         const branchChar = SANMEI_BRANCHES[branch];
-        const periodStart = startAge + step * 10;
-        const periodEnd = periodStart + 9;
+        const periodStart = qiyunAge.years + step * 10;
+        const periodEnd = periodStart + 10;
+        const periodLabel = sanmeiDaiunPeriodLabel(qiyunAge, step);
         const star = sanmeiMainStar(natalChart.day.stem, stem);
         const juusei = sanmeiFollowerStar(natalChart.day.stem, branch);
         const juuseiScore = SANMEI_JUUSEI_SCORE[juusei] ?? 0;
@@ -9969,6 +10036,7 @@
           junLabel: SANMEI_DAIUN_JUN_LABELS[step] || `${step + 1}旬`,
           periodStart,
           periodEnd,
+          periodLabel,
           stem,
           branch,
           stemChar,
@@ -9986,12 +10054,14 @@
 
       const tenchuSteps = list.filter((x) => x.isDaiunTenchu);
       const tenchuRangeText = tenchuSteps.length
-        ? `${tenchuSteps[0].periodStart}〜${tenchuSteps[tenchuSteps.length - 1].periodEnd}歳（${tenchuSteps.map((x) => x.ganzi).join('・')}）`
+        ? `${sanmeiAgePointLabel(qiyunAge.years + tenchuSteps[0].step * 10, qiyunAge.months, qiyunAge.days)}〜${sanmeiAgePointLabel(qiyunAge.years + (tenchuSteps[tenchuSteps.length - 1].step + 1) * 10, qiyunAge.months, qiyunAge.days)}（${tenchuSteps.map((x) => x.ganzi).join('・')}）`
         : '—';
 
       return {
         forward,
-        startAge,
+        startAge: base.startAge,
+        startAgeLabel: base.startAgeLabel,
+        basisText: base.basisText,
         age: base.age,
         beforeStart: base.beforeStart,
         currentStep: base.step,
@@ -10046,7 +10116,7 @@
       detailEl.innerHTML = `
         <div class="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-violet-800/40">
           <div>
-            <div class="text-[10px] font-extrabold text-violet-300">${item.junLabel}（${item.periodStart}〜${item.periodEnd}歳）${item.current ? '・いま歩いている大運' : ''}</div>
+            <div class="text-[10px] font-extrabold text-violet-300">${item.junLabel}（${sanmeiDaiunRangeText(item)}）${item.current ? '・いま歩いている大運' : ''}</div>
             <div class="text-base font-black text-cyan-50 mt-0.5">大運 <span class="font-mono text-amber-200">${item.ganzi}</span> ／ 主星: <span class="text-cyan-300">${item.star}</span> ／ 従星: <span class="text-amber-300">${item.juusei}（${item.juuseiScore}点）</span></div>
           </div>
           <div class="flex flex-wrap gap-1.5">${shugoHtml}</div>
@@ -10098,7 +10168,7 @@
 
       if (badgeEl && curItem) {
         badgeEl.textContent = pack.beforeStart
-          ? `起運${pack.startAge}歳〜（初旬:${curItem.ganzi}）`
+          ? `起運${sanmeiDaiunStartText(pack)}〜（初旬:${curItem.ganzi}）`
           : `いま: ${curItem.ganzi}・${curItem.star}（${curItem.juuseiScore}点）`;
       }
       if (tenchuBadgeEl) {
@@ -10114,7 +10184,7 @@
         <div class="flex flex-wrap items-center justify-between gap-2">
           <div>
             <div class="text-[10px] font-extrabold text-violet-300 tracking-wide">
-              ${pack.beforeStart ? `現在は起運前（満${pack.age}歳・立運 約${pack.startAge}歳〜）` : `いま歩いている大運（満${pack.age}歳・${curItem.junLabel} ${curItem.periodStart}〜${curItem.periodEnd}歳）`}
+              ${pack.beforeStart ? `現在は起運前（満${pack.age}歳・立運 ${sanmeiDaiunStartText(pack)}〜）` : `いま歩いている大運（満${pack.age}歳・${curItem.junLabel} ${sanmeiDaiunRangeText(curItem)}）`}
             </div>
             <div class="flex flex-wrap items-baseline gap-2 mt-1">
               <span class="text-2xl font-black text-amber-100 font-mono">${curItem.ganzi}</span>
@@ -10124,7 +10194,7 @@
             </div>
           </div>
           <div class="text-right text-[11px] font-bold text-slate-300 space-y-0.5">
-            <div><span class="text-violet-300 font-extrabold">${dirLabel}</span>（${genderLabel}）・立運 約<span class="text-amber-200 font-extrabold">${pack.startAge}歳</span></div>
+            <div><span class="text-violet-300 font-extrabold">${dirLabel}</span>（${genderLabel}）・立運 <span class="text-amber-200 font-extrabold">${sanmeiDaiunStartText(pack)}</span></div>
             <div class="text-[10px] text-rose-300/90">大運天中殺: ${pack.tenchuRangeText}</div>
           </div>
         </div>
@@ -10161,7 +10231,7 @@
         row.innerHTML = `
           <div class="flex flex-wrap items-center gap-x-2.5 gap-y-1">
             <span class="text-[11px] font-extrabold text-violet-300 min-w-[2.2rem]">${item.junLabel}</span>
-            <span class="font-extrabold text-amber-100 min-w-[5.2rem]">${item.periodStart}〜${item.periodEnd}歳</span>
+            <span class="font-extrabold text-amber-100">${sanmeiDaiunRangeText(item)}</span>
             <span class="inline-flex items-center gap-0.5 font-mono text-sm font-black">
               <span class="px-1.5 py-0.5 rounded border sanmei-wx ${stemWx}">${item.stemChar}</span>
               <span class="px-1.5 py-0.5 rounded border sanmei-wx ${branchWx}">${item.branchChar}</span>
@@ -10228,9 +10298,9 @@
           const dir = daiun.forward ? '順行' : '逆行';
           const genderLabel = gender === 'female' ? '女性' : '男性';
           if (daiun.beforeStart) {
-            summaryEl.textContent = `大運: 起運 ${daiun.startAge}歳〜（${dir}・${genderLabel}）。いまは起運前。最初の大運は ${daiun.ganzi}（主星: ${daiun.star}）。`;
+            summaryEl.textContent = `大運: 起運 ${sanmeiDaiunStartText(daiun)}〜（${dir}・${genderLabel}）。いまは起運前。最初の大運は ${daiun.ganzi}（主星: ${daiun.star}）。`;
           } else {
-            summaryEl.textContent = `大運: ${daiun.ganzi}（${daiun.periodStart}〜${daiun.periodEnd}歳・${dir}・${genderLabel}）／主星: ${daiun.star} ※起運年齢は節入り近似のため目安です。`;
+            summaryEl.textContent = `大運: ${daiun.ganzi}（${sanmeiDaiunRangeText(daiun)}・${dir}・${genderLabel}）／主星: ${daiun.star}`;
           }
         } else {
           summaryEl.textContent = '大運を算出できませんでした。';
@@ -13525,7 +13595,11 @@
       const base = sanmeiCalcDaiun(natalChart, birthDateStr, birthTimeStr || '12:00', gender, new Date());
       if (!base) return [];
       const forward = base.forward;
-      const startAge = base.startAge;
+      const qiyunAge = {
+        years: base.startAge,
+        months: base.startMonths || 0,
+        days: base.startDays || 0
+      };
       const monthJiazi = sanmeiJiaziIndex(natalChart.month.stem, natalChart.month.branch);
       const firstJiazi = (monthJiazi + (forward ? 1 : -1) + 60) % 60;
       const list = [];
@@ -13533,12 +13607,12 @@
         const jiazi = (firstJiazi + (forward ? step : -step) + 600) % 60;
         const stem = jiazi % 10;
         const branch = jiazi % 12;
-        const periodStart = startAge + step * 10;
-        const periodEnd = periodStart + 9;
+        const periodStart = qiyunAge.years + step * 10;
         list.push({
           step,
           periodStart,
-          periodEnd,
+          periodEnd: periodStart + 10,
+          periodLabel: sanmeiDaiunPeriodLabel(qiyunAge, step),
           stem,
           branch,
           ganzi: SANMEI_STEMS[stem] + SANMEI_BRANCHES[branch],
@@ -13546,7 +13620,15 @@
           current: !base.beforeStart && base.step === step
         });
       }
-      return { startAge, forward, beforeStart: base.beforeStart, currentStep: base.step, list };
+      return {
+        startAge: base.startAge,
+        startAgeLabel: base.startAgeLabel,
+        basisText: base.basisText,
+        forward,
+        beforeStart: base.beforeStart,
+        currentStep: base.step,
+        list
+      };
     }
 
     const BAZI_GROUP_CONCRETE = {
@@ -14734,7 +14816,7 @@
         const dTag = baziFortuneYongTag(analysis, curDaiun.tengod);
         daiunOverlay = `いまの大運 ${curDaiun.ganzi}（${curDaiun.tengod}・${dTag.label}）に、流年→流時と重ねて読むと安定します。`;
       } else if (daiunInfo && daiunInfo.beforeStart) {
-        daiunOverlay = `起運前（約${daiunInfo.startAge}歳〜）。流年・流日の影響が相対的に大きく出やすい目安です。`;
+        daiunOverlay = `起運前（${sanmeiDaiunStartText(daiunInfo)}〜）。流年・流日の影響が相対的に大きく出やすい目安です。`;
       }
       return {
         asOf: dateStr,
@@ -16154,12 +16236,12 @@
         const curTag = baziFortuneYongTag(analysis, cur.tengod);
         sections.push({
           title: 'いまの10年の流れで意識すること',
-          text: `${cur.periodStart}〜${cur.periodEnd}歳は${cur.ganzi}・${cur.tengod}の時期です（${curTag.label}）。${curGuide.meaning || 'この役割のテーマが表れやすくなります。'}${curGuide.mindset ? ` 具体策: ${curGuide.mindset}` : ''} ${curTag.text}`
+          text: `${sanmeiDaiunRangeText(cur)}は${cur.ganzi}・${cur.tengod}の時期です（${curTag.label}）。${curGuide.meaning || 'この役割のテーマが表れやすくなります。'}${curGuide.mindset ? ` 具体策: ${curGuide.mindset}` : ''} ${curTag.text}`
         });
       } else if (daiunInfo && daiunInfo.beforeStart) {
         sections.push({
           title: '10年の流れ',
-          text: `大きな運の区切りはおよそ${daiunInfo.startAge}歳から。それまでは命式本体の役割バランスを軸に読む段階です。`
+          text: `大きな運の区切りは${sanmeiDaiunStartText(daiunInfo)}から。それまでは命式本体の役割バランスを軸に読む段階です。`
         });
       }
       const ln = liunianOpt || window.__baziLiunian;
@@ -16534,7 +16616,7 @@
           if (daiunInfo.beforeStart) {
             const tip = document.createElement('div');
             tip.className = 'text-[11px] text-teal-300/90 font-bold mb-1';
-            tip.textContent = `起運 約${daiunInfo.startAge}歳（${daiunInfo.forward ? '順行' : '逆行'}）・いまは起運前`;
+            tip.textContent = `起運 ${sanmeiDaiunStartText(daiunInfo)}（${daiunInfo.forward ? '順行' : '逆行'}）・いまは起運前`;
             listEl.appendChild(tip);
           }
           daiunInfo.list.forEach((item) => {
@@ -16545,7 +16627,7 @@
             row.className = item.current
               ? 'w-full text-left px-3 py-2 rounded-xl bg-emerald-900/50 border border-emerald-500/60 text-emerald-50'
               : 'w-full text-left px-3 py-2 rounded-xl bg-black/40 border border-emerald-900/50 text-emerald-100/90 hover:border-emerald-600/50 transition';
-            row.innerHTML = `<span class="font-extrabold">${item.periodStart}〜${item.periodEnd}歳</span>
+            row.innerHTML = `<span class="font-extrabold">${sanmeiDaiunRangeText(item)}</span>
               <span class="ml-2 font-mono">${item.ganzi}</span>
               <span class="ml-2 text-teal-300">${item.tengod}</span>
               <span class="ml-2 text-[10px] font-extrabold ${tagCls}">${dTag.label}</span>
@@ -16628,7 +16710,7 @@
         yongText: analysis.yongText || '',
         nature: (unifiedFindSection(sogo.sections, ['日主の気質', '日主から見る基本性格']) || {}).text || '',
         tens: (unifiedFindSection(sogo.sections, ['十神']) || {}).text || '',
-        daiun: cur ? `${cur.periodStart}〜${cur.periodEnd}歳・${cur.ganzi}（${cur.tengod}）` : '',
+        daiun: cur ? `${sanmeiDaiunRangeText(cur)}・${cur.ganzi}（${cur.tengod}）` : '',
         daiunTg: cur ? cur.tengod : '',
         daiunTag: cur ? baziFortuneYongTag(analysis, cur.tengod).label : '',
         liunianYear: ln && ln.year ? `${ln.year.ganzi}（${ln.year.tengod}・${ln.year.tag.label}）` : '',
@@ -17670,7 +17752,7 @@
         score -= 1;
         waitBits.push(plain
           ? '大きな運の区切りの前段階なので、土台のスキルと人脈を厚くしてから動くと安定しやすいです。'
-          : (`起運前（約${daiunInfo.startAge}歳〜）。土台づくりを優先し、大きな転職は準備完了後が無難です。`));
+          : (`起運前（${sanmeiDaiunStartText(daiunInfo)}〜）。土台づくりを優先し、大きな転職は準備完了後が無難です。`));
       }
 
       if (baziAnalysis && liunian && liunian.year && typeof baziFortuneYongTag === 'function') {
@@ -17718,7 +17800,7 @@
             if (starPlain) {
               goBits.push(plain
                 ? (`いまの十年前後の波は「${starPlain}」。このテーマに合う転職なら納得感が続きやすいです。`)
-                : (`算命の大運主星 ${daiun.star}（${daiun.periodStart}〜${daiun.periodEnd}歳）: ${starPlain}`));
+                : (`算命の大運主星 ${daiun.star}（${sanmeiDaiunRangeText(daiun)}）: ${starPlain}`));
             }
             if (starGuide.mindset) {
               waitBits.push(plain
@@ -18157,13 +18239,13 @@
           const daiun = sanmeiCalcDaiun(chart, birth.date, birth.time || '12:00', gender, new Date());
           if (daiun) {
             if (daiun.beforeStart) {
-              bits.push(`大運の本格スタートはおよそ${daiun.startAge}歳。いまは命式そのものの持ち味を土台にする時期。`);
+              bits.push(`大運の本格スタートは${sanmeiDaiunStartText(daiun)}。いまは命式そのものの持ち味を土台にする時期。`);
             } else {
               const starGuide = daiun.star && SANMEI_STAR_GUIDE[daiun.star] ? SANMEI_STAR_GUIDE[daiun.star] : null;
               const starPlain = starGuide && starGuide.meaning
                 ? String(starGuide.meaning).replace(/星/g, '傾向').replace(/・/g, '、')
                 : '';
-              bits.push(`${daiun.periodStart}〜${daiun.periodEnd}歳ごろの波。${starPlain || 'この時期らしいテーマが表に出やすい。'}`);
+              bits.push(`${sanmeiDaiunRangeText(daiun)}ごろの波。${starPlain || 'この時期らしいテーマが表に出やすい。'}`);
             }
           }
         }
@@ -46593,7 +46675,7 @@
         if (dp && dp.list && dp.list.length) {
           const cur = dp.list.find((x) => x.current) || dp.list[0];
           if (cur) {
-            bits.push(`大運${cur.ganzi}(${cur.periodStart}〜${cur.periodEnd}歳・${cur.star}・${cur.juusei}${cur.isDaiunTenchu ? '・大運天中殺' : ''})`);
+            bits.push(`大運${cur.ganzi}(${sanmeiDaiunRangeText(cur)}・${cur.star}・${cur.juusei}${cur.isDaiunTenchu ? '・大運天中殺' : ''})`);
           }
         }
       } catch (e) { }

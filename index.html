@@ -162,7 +162,7 @@
     }
   </style>
   <script>
-    window.__DUMP_BUILD__ = 'v477';
+    window.__DUMP_BUILD__ = 'v478';
     // かつてここで「既知の最新ビルドより古い＝巻き戻り」と判定し、キャッシュ全消し＋SW登録解除を
     // していたが、その直後はオフライン用の控えが無く、ネットワークが不調だと起動不能になった。
     // 判定値(dump_known_good_build)は下がらない一方通行のため、一度ずれると毎回自己破壊を繰り返す。
@@ -8687,8 +8687,20 @@
               <div class="flex items-center gap-1.5">
                 <span class="text-sm">🕒</span>
                 <h3 class="font-extrabold text-cyan-50 text-xs sm:text-sm">摂取履歴</h3>
+                <span class="text-[10px] text-slate-400 font-medium">タップで選択</span>
               </div>
               <span id="supple-history-count" class="text-[11px] text-slate-400 font-medium"></span>
+            </div>
+
+            <div id="supple-history-select-bar"
+              class="hidden sticky top-2 z-20 flex items-center justify-between gap-2 px-3 py-2 rounded-2xl bg-[#070a14]/95 border border-amber-500/60 shadow-lg shadow-black/40 backdrop-blur-md">
+              <span id="supple-history-select-summary" class="text-[11px] font-extrabold text-amber-200 truncate">0件選択中</span>
+              <div class="flex items-center gap-1.5 shrink-0">
+                <button type="button" onclick="clearSuppleHistorySelection()"
+                  class="px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 text-[11px] font-bold transition">解除</button>
+                <button type="button" onclick="openSuppleRoutineCreateFromHistorySelection()"
+                  class="px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-[11px] font-extrabold shadow-md shadow-amber-500/20 active:scale-95 transition">⚡ クイックセットに登録</button>
+              </div>
             </div>
 
             <!-- 履歴リストコンテナ -->
@@ -13391,6 +13403,14 @@
               <option value="随時">随時</option>
             </select>
           </div>
+        </div>
+        <div id="supple-routine-history-section" class="space-y-1.5">
+          <div class="flex items-center justify-between gap-2">
+            <label class="min-w-0 text-xs font-bold text-amber-200 leading-tight">🕒 摂取履歴から選ぶ</label>
+            <span class="text-[10px] text-slate-400 font-bold shrink-0">タップで選択</span>
+          </div>
+          <div id="supple-routine-history-list"
+            class="max-h-44 overflow-y-auto space-y-1.5 rounded-2xl border border-cyan-900/50 bg-black/30 p-1.5"></div>
         </div>
         <div>
           <div class="flex items-center justify-between gap-2 mb-1.5">

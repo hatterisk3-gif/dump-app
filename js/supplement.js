@@ -256,6 +256,9 @@ var suppleRoutines = loadSuppleRoutines();
 var suppleDismissedAutoRoutines = loadSuppleDismissedAutoRoutines();
 var suppleIntakePicks = [];
 var suppleRoutineCreatePicks = [];
+var suppleHistorySelectedIds = new Set();
+var suppleRoutineCreateSelectedHistoryKey = '';
+var suppleRoutineCreateOrigin = 'list';
 var suppleChartPeriod = 7;
 var suppleChartInstance = null;
 var suppleHtml5QrScanner = null;
@@ -490,20 +493,52 @@ function closeSuppleRoutinesModal() {
   hideSuppleSheetModal('modal-supple-routines');
 }
 
-function openSuppleRoutineCreateModal() {
-  suppleRoutineCreatePicks = [];
+function normalizeSuppleTimingOption(timing) {
+  const t = String(timing || '').trim();
+  const allowed = ['朝', '昼', '夜', '運動前後', '随時'];
+  return allowed.includes(t) ? t : '夜';
+}
+
+function inferSuppleDominantTiming(items) {
+  const counts = new Map();
+  (Array.isArray(items) ? items : []).forEach((it) => {
+    const raw = String(it && it.timing || '').trim();
+    if (!raw) return;
+    const norm = normalizeSuppleTimingOption(raw);
+    counts.set(norm, (counts.get(norm) || 0) + 1);
+  });
+  let best = '夜';
+  let bestCount = -1;
+  counts.forEach((cnt, key) => {
+    if (cnt > bestCount) {
+      bestCount = cnt;
+      best = key;
+    }
+  });
+  return best;
+}
+
+function openSuppleRoutineCreateModal(opts = {}) {
+  suppleRoutineCreateOrigin = opts && opts.origin === 'history' ? 'history' : 'list';
+  suppleRoutineCreateSelectedHistoryKey = String((opts && opts.selectedHistoryKey) || '');
+  suppleRoutineCreatePicks = Array.isArray(opts && opts.picks)
+    ? opts.picks
+      .filter((p) => p && p.id)
+      .map((p) => ({ id: String(p.id), qty: Math.max(1, Math.min(99, parseInt(p.qty, 10) || 1)) }))
+    : [];
   const nameEl = document.getElementById('supple-routine-create-name');
-  if (nameEl) nameEl.value = '';
+  if (nameEl) nameEl.value = String((opts && opts.name) || '');
   const timingEl = document.getElementById('supple-routine-create-timing');
-  if (timingEl) timingEl.value = '夜';
+  if (timingEl) timingEl.value = normalizeSuppleTimingOption((opts && opts.timing) || '夜');
   closeSuppleRoutinesModal();
+  renderSuppleRoutineCreateHistoryList();
   renderSuppleRoutineCreatePickList();
   showSuppleSheetModal('modal-supple-routine-create');
 }
 
 function closeSuppleRoutineCreateModal(opts = {}) {
   hideSuppleSheetModal('modal-supple-routine-create');
-  if (opts.returnToList !== false) {
+  if (opts.returnToList !== false && suppleRoutineCreateOrigin !== 'history') {
     openSuppleRoutinesModal();
   }
 }
@@ -1115,7 +1150,7 @@ function renderSuppleRoutines() {
   if (container) {
     if (!allRoutines.length) {
       container.innerHTML =
-        '<p class="text-[11px] text-slate-400 font-medium sm:col-span-2">過去の記録で2回以上同じ組み合わせがあると自動で追加されます（手動登録は右上の「＋ 選んで作成」から作成できます）</p>'
+        '<p class="text-[11px] text-slate-400 font-medium sm:col-span-2">過去の記録で2回以上同じ組み合わせがあると自動で追加されます（右上の「＋ 選んで作成」や、摂取履歴のタップ選択からも作成できます）</p>'
         + (hasDismissed
           ? '<button type="button" onclick="restoreSuppleDismissedAutoRoutines()" class="text-[11px] font-bold text-cyan-300 hover:text-cyan-200 underline sm:col-span-2 text-left">↺ 非表示の自動セットを戻す</button>'
           : '');
@@ -1221,13 +1256,109 @@ function deleteSuppleRoutine(routineId, ev) {
   renderSuppleRoutines();
 }
 
+function pruneSuppleHistorySelection() {
+  const existingIds = new Set((Array.isArray(suppleIntakes) ? suppleIntakes : []).map((it) => it && it.id).filter(Boolean));
+  Array.from(suppleHistorySelectedIds).forEach((id) => {
+    if (!existingIds.has(id)) suppleHistorySelectedIds.delete(id);
+  });
+}
+
+function syncSuppleHistorySelectionBar() {
+  const bar = document.getElementById('supple-history-select-bar');
+  const summary = document.getElementById('supple-history-select-summary');
+  if (!bar) return;
+  const count = suppleHistorySelectedIds.size;
+  bar.classList.toggle('hidden', count === 0);
+  if (!summary) return;
+  if (count === 0) {
+    summary.textContent = '0件選択中';
+    return;
+  }
+  const uniqueSupples = new Set();
+  (Array.isArray(suppleIntakes) ? suppleIntakes : []).forEach((it) => {
+    if (it && suppleHistorySelectedIds.has(it.id) && it.suppleId) {
+      uniqueSupples.add(it.suppleId);
+    }
+  });
+  summary.textContent = '✓ ' + count + '件選択中' + (uniqueSupples.size ? '（' + uniqueSupples.size + '種）' : '');
+}
+
+function toggleSuppleHistoryItemSelection(intakeId) {
+  const id = String(intakeId || '');
+  if (!id) return;
+  if (suppleHistorySelectedIds.has(id)) {
+    suppleHistorySelectedIds.delete(id);
+  } else {
+    suppleHistorySelectedIds.add(id);
+  }
+  renderSuppleHistory();
+}
+
+function toggleSuppleHistorySessionSelection(dateStr, timeLabel) {
+  const d = String(dateStr || '');
+  const t = String(timeLabel || '--:--');
+  const matchingIds = (Array.isArray(suppleIntakes) ? suppleIntakes : [])
+    .filter((it) => it && String(it.date || '') === d && (formatSuppleTimeLabel(intakeTimeOf(it)) || '--:--') === t)
+    .map((it) => it.id)
+    .filter(Boolean);
+  if (!matchingIds.length) return;
+  const allSelected = matchingIds.every((id) => suppleHistorySelectedIds.has(id));
+  matchingIds.forEach((id) => {
+    if (allSelected) suppleHistorySelectedIds.delete(id);
+    else suppleHistorySelectedIds.add(id);
+  });
+  renderSuppleHistory();
+}
+
+function clearSuppleHistorySelection() {
+  suppleHistorySelectedIds.clear();
+  renderSuppleHistory();
+}
+
+function openSuppleRoutineCreateFromHistorySelection() {
+  const selected = (Array.isArray(suppleIntakes) ? suppleIntakes : [])
+    .filter((it) => it && suppleHistorySelectedIds.has(it.id));
+  if (!selected.length) return;
+  const items = normalizeSuppleRoutineItems(
+    selected.map((it) => ({ suppleId: it.suppleId, qty: intakeQtyOf(it) }))
+  );
+  if (!items.length) {
+    alert('選択した履歴に含まれる登録済みサプリが見つかりませんでした');
+    return;
+  }
+  const timing = inferSuppleDominantTiming(selected);
+  const sessionKeys = new Set(
+    selected.map((it) => String(it.date || '') + '::' + (formatSuppleTimeLabel(intakeTimeOf(it)) || '--:--'))
+  );
+  let selectedHistoryKey = '';
+  if (sessionKeys.size === 1) {
+    const onlyKey = Array.from(sessionKeys)[0];
+    const matchedSession = collectSuppleRecentHistorySessions(50).find((s) => s.key === onlyKey);
+    if (matchedSession && suppleRoutineSignature(timing, matchedSession.items) === suppleRoutineSignature(timing, items)) {
+      selectedHistoryKey = onlyKey;
+    }
+  }
+  openSuppleRoutineCreateModal({
+    picks: items.map((it) => ({ id: it.suppleId, qty: it.qty })),
+    timing,
+    origin: 'history',
+    selectedHistoryKey
+  });
+}
+
 // 摂取履歴の描画（日付 → 時間別セッション）
 function renderSuppleHistory() {
   const container = document.getElementById('supple-history-container');
-  if (!container) return;
+  pruneSuppleHistorySelection();
+  if (!container) {
+    syncSuppleHistorySelectionBar();
+    return;
+  }
   container.innerHTML = '';
 
   if (suppleIntakes.length === 0) {
+    suppleHistorySelectedIds.clear();
+    syncSuppleHistorySelectionBar();
     container.innerHTML = `
       <div class="bg-[#0b1021]/60 rounded-3xl p-6 text-center border border-cyan-900/30">
         <p class="text-xs font-bold text-slate-300">まだ摂取記録がありません</p>
@@ -1299,16 +1430,32 @@ function renderSuppleHistory() {
         const tm = String(it.timing || '').trim();
         if (tm && !timingSet.includes(tm)) timingSet.push(tm);
       });
+      const selectedInSession = sessionItems.filter((it) => suppleHistorySelectedIds.has(it.id)).length;
+      const allSessionSelected = sessionItems.length > 0 && selectedInSession === sessionItems.length;
+      const someSessionSelected = selectedInSession > 0 && !allSessionSelected;
+      const sessionCheckBoxClass = allSessionSelected
+        ? 'bg-amber-400 border-amber-300 text-slate-950'
+        : (someSessionSelected
+          ? 'bg-amber-900/80 border-amber-400/80 text-amber-200'
+          : 'border-cyan-700/60 bg-black/30 text-transparent');
+      const sessionCheckMark = allSessionSelected ? '✓' : (someSessionSelected ? '−' : '');
+
       const sessionEl = document.createElement('div');
-      sessionEl.className = 'rounded-xl border border-cyan-900/40 bg-black/25 overflow-hidden';
+      sessionEl.className = allSessionSelected
+        ? 'rounded-xl border border-amber-400/70 bg-amber-950/15 overflow-hidden transition-colors'
+        : 'rounded-xl border border-cyan-900/40 bg-black/25 overflow-hidden transition-colors';
       sessionEl.innerHTML = `
-        <div class="flex items-center justify-between gap-2 px-2.5 py-1.5 border-b border-cyan-950/80 bg-cyan-950/30">
+        <button type="button" onclick="toggleSuppleHistorySessionSelection('${escapeHtml(dateStr)}', '${escapeHtml(timeLabel)}')"
+          aria-pressed="${allSessionSelected ? 'true' : 'false'}"
+          title="この回のサプリをまとめて選択"
+          class="w-full flex items-center justify-between gap-2 px-2.5 py-1.5 border-b ${allSessionSelected ? 'border-amber-700/50 bg-amber-950/35' : 'border-cyan-950/80 bg-cyan-950/30 hover:bg-cyan-950/50'} text-left transition-colors">
           <div class="flex items-center gap-2 min-w-0">
+            <span class="w-4 h-4 rounded border ${sessionCheckBoxClass} flex items-center justify-center text-[10px] font-black shrink-0">${sessionCheckMark}</span>
             <span class="shrink-0 inline-flex items-center justify-center min-w-[3.2rem] px-1.5 py-0.5 rounded-lg bg-cyan-900/70 border border-cyan-600/40 text-[12px] font-extrabold text-cyan-200 tabular-nums">${escapeHtml(timeLabel)}</span>
             ${timingSet.length ? '<span class="text-[10px] font-bold text-slate-400 truncate">' + timingSet.map(escapeHtml).join('・') + '</span>' : ''}
           </div>
-          <span class="text-[10px] font-semibold text-slate-500 shrink-0">${sessionItems.length} 種</span>
-        </div>
+          <span class="text-[10px] font-semibold ${selectedInSession > 0 ? 'text-amber-300' : 'text-slate-500'} shrink-0">${selectedInSession > 0 ? selectedInSession + '/' : ''}${sessionItems.length} 種</span>
+        </button>
         <div class="flex flex-col gap-1 p-1.5" data-supple-chips="1"></div>
       `;
       sessionsContainer.appendChild(sessionEl);
@@ -1316,8 +1463,13 @@ function renderSuppleHistory() {
 
       sessionItems.forEach((item) => {
         const s = suppleMasters.find(m => m.id === item.suppleId) || { name: '削除されたサプリ', category: 'その他', photo: 'preset_capsule' };
+        const isSelected = suppleHistorySelectedIds.has(item.id);
         const chip = document.createElement('div');
-        chip.className = 'group flex items-center gap-2 w-full pl-2 pr-1.5 py-1.5 rounded-lg bg-slate-900/90 border border-cyan-900/40 hover:border-cyan-500 transition-all text-xs';
+        chip.dataset.historyId = String(item.id || '');
+        chip.dataset.historySelected = isSelected ? '1' : '0';
+        chip.className = isSelected
+          ? 'group flex items-center gap-2 w-full pl-2 pr-1.5 py-1.5 rounded-lg bg-amber-950/35 border border-amber-400/75 ring-1 ring-amber-400/35 transition-all text-xs'
+          : 'group flex items-center gap-2 w-full pl-2 pr-1.5 py-1.5 rounded-lg bg-slate-900/90 border border-cyan-900/40 hover:border-amber-500/60 transition-all text-xs';
 
         const thumb = getSupplePhotoThumbHtml(s.photo, 22);
         const cat = SUPPLE_CATEGORIES.find(c => c.name === s.category) || SUPPLE_CATEGORIES[5];
@@ -1326,14 +1478,19 @@ function renderSuppleHistory() {
         if (item.note) metaParts.push(escapeHtml(item.note));
 
         chip.innerHTML = `
-          <div class="flex items-center gap-2 min-w-0 flex-1 cursor-pointer" onclick="openSuppleEditModal('${escapeHtml(item.id)}')" title="クリックして編集">
+          <div class="flex items-center gap-2 min-w-0 flex-1 cursor-pointer select-none"
+            role="button" tabindex="0" aria-pressed="${isSelected ? 'true' : 'false'}"
+            onclick="toggleSuppleHistoryItemSelection('${escapeHtml(item.id)}')"
+            onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleSuppleHistoryItemSelection('${escapeHtml(item.id)}');}"
+            title="タップでクイックセット用に選択">
+            <span class="w-4 h-4 rounded border ${isSelected ? 'bg-amber-400 border-amber-300 text-slate-950' : 'border-slate-500 bg-black/30 text-transparent'} flex items-center justify-center text-[10px] font-black shrink-0">${isSelected ? '✓' : ''}</span>
             ${thumb}
             <div class="flex flex-col text-left min-w-0">
               <div class="flex items-center gap-1 min-w-0">
-                <span class="font-bold text-slate-100 hover:text-cyan-300 transition-colors truncate">${escapeHtml(s.name)}</span>
+                <span class="font-bold ${isSelected ? 'text-amber-100' : 'text-slate-100'} transition-colors truncate">${escapeHtml(s.name)}</span>
                 <span class="w-1.5 h-1.5 rounded-full shrink-0" style="background-color: ${cat.dot};"></span>
               </div>
-              <span class="text-[9px] text-slate-400 truncate">${metaParts.join('・')}</span>
+              <span class="text-[9px] ${isSelected ? 'text-amber-200/80' : 'text-slate-400'} truncate">${metaParts.join('・')}</span>
             </div>
           </div>
           <div class="flex items-center gap-0.5 ml-1 pl-1 border-l border-slate-800 shrink-0">
@@ -1345,6 +1502,8 @@ function renderSuppleHistory() {
       });
     });
   });
+
+  syncSuppleHistorySelectionBar();
 }
 
 function getSupplePhotoThumbHtml(photoRef, size = 26) {
@@ -1368,6 +1527,7 @@ function deleteSuppleIntake(id, ev) {
   if (target && adjustSuppleStock(target.suppleId, intakeQtyOf(target))) {
     saveSuppleMasters(suppleMasters, { queueCloud: false });
   }
+  suppleHistorySelectedIds.delete(id);
   suppleIntakes = suppleIntakes.filter(i => i.id !== id);
   saveSuppleIntakes(suppleIntakes);
   renderSuppleAll();
@@ -1662,6 +1822,122 @@ function changeSuppleIntakeQty(suppleId, delta, ev) {
   renderSuppleDropdownList();
 }
 
+function collectSuppleRecentHistorySessions(limit = 20) {
+  const validMasterIds = new Set(suppleMasters.map((m) => m.id));
+  const sorted = (Array.isArray(suppleIntakes) ? suppleIntakes : [])
+    .filter((it) => it && it.date && it.suppleId && validMasterIds.has(it.suppleId))
+    .slice()
+    .sort((a, b) => {
+      const ka = suppleIntakeSortKey(a);
+      const kb = suppleIntakeSortKey(b);
+      return ka < kb ? 1 : ka > kb ? -1 : 0;
+    });
+
+  const groups = [];
+  const byKey = new Map();
+  const dayNames = ['日', '月', '火', '水', '木', '金', '土'];
+
+  sorted.forEach((it) => {
+    const date = String(it.date);
+    const timeLabel = formatSuppleTimeLabel(intakeTimeOf(it)) || '--:--';
+    const key = date + '::' + timeLabel;
+    let grp = byKey.get(key);
+    if (!grp) {
+      if (groups.length >= limit) return;
+      const dObj = new Date(date + 'T00:00:00');
+      const dow = Number.isFinite(dObj.getTime()) ? dayNames[dObj.getDay()] : '';
+      const dateLabel = Number.isFinite(dObj.getTime())
+        ? ((dObj.getMonth() + 1) + '月' + dObj.getDate() + '日' + (dow ? ' (' + dow + ')' : ''))
+        : date;
+      grp = { key, date, timeLabel, dateLabel, rows: [] };
+      byKey.set(key, grp);
+      groups.push(grp);
+    }
+    grp.rows.push(it);
+  });
+
+  return groups
+    .map((grp) => {
+      const items = normalizeSuppleRoutineItems(
+        grp.rows.map((r) => ({ suppleId: r.suppleId, qty: intakeQtyOf(r) }))
+      );
+      if (!items.length) return null;
+      return {
+        key: grp.key,
+        date: grp.date,
+        timeLabel: grp.timeLabel,
+        dateLabel: grp.dateLabel,
+        timing: inferSuppleDominantTiming(grp.rows),
+        items
+      };
+    })
+    .filter(Boolean);
+}
+
+function renderSuppleRoutineCreateHistoryList() {
+  const section = document.getElementById('supple-routine-history-section');
+  const list = document.getElementById('supple-routine-history-list');
+  if (!list) return;
+  const sessions = collectSuppleRecentHistorySessions(20);
+  if (!sessions.length) {
+    if (section) section.classList.add('hidden');
+    list.innerHTML = '';
+    return;
+  }
+  if (section) section.classList.remove('hidden');
+
+  list.innerHTML = sessions.map((sess) => {
+    const selected = suppleRoutineCreateSelectedHistoryKey === sess.key;
+    const names = sess.items.map((it) => {
+      const m = suppleMasters.find((x) => x.id === it.suppleId);
+      return m ? m.name + (it.qty > 1 ? '×' + it.qty : '') : '';
+    }).filter(Boolean).join(' / ');
+    const thumbs = suppleRoutineThumbsHtml(sess.items, 26);
+    const cardCls = selected
+      ? 'w-full text-left px-2.5 py-2 rounded-xl bg-amber-950/35 border border-amber-400/80 ring-1 ring-amber-400/35 transition-all'
+      : 'w-full text-left px-2.5 py-2 rounded-xl bg-slate-900/80 border border-cyan-900/40 hover:border-amber-500/60 transition-all';
+    const badgeHtml = selected
+      ? '<span class="shrink-0 px-1.5 py-0.5 rounded-md bg-amber-400 text-slate-950 text-[9px] font-black">✓ 選択中</span>'
+      : '<span class="shrink-0 text-[10px] font-bold text-slate-400">' + sess.items.length + '種</span>';
+    return `
+      <button type="button" onclick="selectSuppleHistoryForRoutineCreate('${escapeHtml(sess.key)}')"
+        data-history-session-key="${escapeHtml(sess.key)}"
+        data-selected="${selected ? '1' : '0'}"
+        aria-pressed="${selected ? 'true' : 'false'}"
+        class="${cardCls}">
+        <div class="flex items-center justify-between gap-2">
+          <div class="flex items-center gap-1.5 min-w-0">
+            <span class="w-4 h-4 rounded border ${selected ? 'bg-amber-400 border-amber-300 text-slate-950' : 'border-slate-500 bg-black/30 text-transparent'} flex items-center justify-center text-[10px] font-black shrink-0">${selected ? '✓' : ''}</span>
+            <span class="text-[11px] font-extrabold ${selected ? 'text-amber-100' : 'text-cyan-100'} truncate">${escapeHtml(sess.dateLabel)} ${escapeHtml(sess.timeLabel)}</span>
+            <span class="text-[10px] font-bold text-emerald-300 shrink-0">(${escapeHtml(sess.timing)})</span>
+          </div>
+          ${badgeHtml}
+        </div>
+        ${thumbs}
+        ${names ? `<span class="block text-[9px] ${selected ? 'text-amber-200/80' : 'text-slate-400'} mt-1 truncate">${escapeHtml(names)}</span>` : ''}
+      </button>
+    `;
+  }).join('');
+}
+
+function selectSuppleHistoryForRoutineCreate(sessionKey) {
+  const key = String(sessionKey || '');
+  if (!key) return;
+  if (suppleRoutineCreateSelectedHistoryKey === key) {
+    suppleRoutineCreateSelectedHistoryKey = '';
+    suppleRoutineCreatePicks = [];
+  } else {
+    const sess = collectSuppleRecentHistorySessions(50).find((s) => s.key === key);
+    if (!sess) return;
+    suppleRoutineCreateSelectedHistoryKey = sess.key;
+    suppleRoutineCreatePicks = sess.items.map((it) => ({ id: it.suppleId, qty: it.qty }));
+    const timingEl = document.getElementById('supple-routine-create-timing');
+    if (timingEl) timingEl.value = normalizeSuppleTimingOption(sess.timing);
+  }
+  renderSuppleRoutineCreateHistoryList();
+  renderSuppleRoutineCreatePickList();
+}
+
 function renderSuppleRoutineCreatePickList() {
   suppleRoutineCreatePicks = currentSuppleRoutineCreatePicks();
   renderSuppleMultiPicker({
@@ -1674,12 +1950,16 @@ function renderSuppleRoutineCreatePickList() {
 }
 
 function toggleSuppleRoutineCreatePick(suppleId) {
+  suppleRoutineCreateSelectedHistoryKey = '';
   toggleSupplePickInList(suppleRoutineCreatePicks, suppleId);
+  renderSuppleRoutineCreateHistoryList();
   renderSuppleRoutineCreatePickList();
 }
 
 function changeSuppleRoutineCreateQty(suppleId, delta, ev) {
+  suppleRoutineCreateSelectedHistoryKey = '';
   changeSuppleQtyInList(suppleRoutineCreatePicks, suppleId, delta, ev);
+  renderSuppleRoutineCreateHistoryList();
   renderSuppleRoutineCreatePickList();
 }
 
@@ -1714,6 +1994,9 @@ function submitSuppleRoutineCreate() {
   };
   suppleRoutines.push(routine);
   saveSuppleRoutines(suppleRoutines);
+  suppleHistorySelectedIds.clear();
+  suppleRoutineCreateSelectedHistoryKey = '';
+  renderSuppleHistory();
   closeSuppleRoutineCreateModal({ returnToList: false });
   openSuppleRoutinesModal();
   if (typeof setSuppleSyncStatus === 'function') {
